@@ -31,6 +31,8 @@ app.get("/", (_req, res) => {
     version: "0.1.0",
     description: "Reference implementation of a Civic Hub backend",
     endpoints: {
+      "GET /process": "List all processes (UI read layer)",
+      "GET /process/:id/state": "Get UI-friendly process state with tally",
       "POST /process": "Create a new process (internal)",
       "GET /process/:id": "Get a process by ID (internal)",
       "POST /process/:id/action": "Execute an action on a process (internal)",

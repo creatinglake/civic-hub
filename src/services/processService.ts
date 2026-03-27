@@ -12,7 +12,7 @@ import {
 } from "../models/process.js";
 import { emitEvent } from "../events/eventEmitter.js";
 import { generateId } from "../utils/id.js";
-import { handleVoteAction, initializeVoteState } from "./voteProcess.js";
+import { handleVoteAction, initializeVoteState, getVoteState } from "./voteProcess.js";
 
 // In-memory process store
 const processes = new Map<string, Process>();
@@ -112,4 +112,41 @@ export function executeAction(
 
 export function getAllProcesses(): Process[] {
   return Array.from(processes.values());
+}
+
+/**
+ * Return a summary list of all processes, formatted for UI consumption.
+ */
+export function listProcessSummaries(): Record<string, unknown>[] {
+  return Array.from(processes.values()).map((p) => ({
+    id: p.id,
+    type: p.definition.type,
+    title: p.title,
+    status: p.status,
+    created_at: p.createdAt,
+    created_by: p.createdBy,
+  }));
+}
+
+/**
+ * Return a UI-friendly state view for a process.
+ * Delegates to the appropriate process-type handler.
+ */
+export function getProcessState(processId: string): Record<string, unknown> | undefined {
+  const process = processes.get(processId);
+  if (!process) return undefined;
+
+  if (process.definition.type === "civic.vote") {
+    return getVoteState(process);
+  }
+
+  // Fallback for unknown types — return basic info
+  return {
+    id: process.id,
+    type: process.definition.type,
+    title: process.title,
+    status: process.status,
+    created_at: process.createdAt,
+    created_by: process.createdBy,
+  };
 }

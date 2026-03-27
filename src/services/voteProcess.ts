@@ -95,3 +95,32 @@ function closeVote(
 
   return { tally, total_votes };
 }
+
+/**
+ * Compute a UI-friendly read view of a vote process.
+ * Derives tally from current votes — no extra storage needed.
+ */
+export function getVoteState(process: Process): Record<string, unknown> {
+  const state = process.state as unknown as VoteState;
+
+  const tally: Record<string, number> = {};
+  for (const opt of state.options) {
+    tally[opt] = 0;
+  }
+  for (const vote of Object.values(state.votes)) {
+    tally[vote] = (tally[vote] ?? 0) + 1;
+  }
+
+  return {
+    id: process.id,
+    type: process.definition.type,
+    title: process.title,
+    description: process.description,
+    status: process.status,
+    options: state.options,
+    tally,
+    total_votes: Object.keys(state.votes).length,
+    created_at: process.createdAt,
+    created_by: process.createdBy,
+  };
+}

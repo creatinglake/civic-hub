@@ -5,6 +5,8 @@ import {
   createProcess,
   getProcess,
   executeAction,
+  listProcessSummaries,
+  getProcessState,
 } from "../services/processService.js";
 
 export function handleCreateProcess(req: Request, res: Response): void {
@@ -66,4 +68,22 @@ export function handleProcessAction(req: Request, res: Response): void {
       res.status(400).json({ error: message });
     }
   }
+}
+
+// --- Read layer for UI consumption ---
+
+export function handleListProcesses(_req: Request, res: Response): void {
+  res.json(listProcessSummaries());
+}
+
+export function handleGetProcessState(req: Request, res: Response): void {
+  const id = req.params.id as string;
+  const state = getProcessState(id);
+
+  if (!state) {
+    res.status(404).json({ error: "Process not found" });
+    return;
+  }
+
+  res.json(state);
 }
