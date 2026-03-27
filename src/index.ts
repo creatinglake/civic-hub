@@ -7,6 +7,18 @@ import debugRoutes from "./routes/debugRoutes.js";
 const app = express();
 const PORT = parseInt(process.env.PORT ?? "3000", 10);
 
+// CORS — allow the UI dev server to talk to the API
+app.use((_req, res, next) => {
+  res.header("Access-Control-Allow-Origin", "*");
+  res.header("Access-Control-Allow-Headers", "Content-Type");
+  res.header("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  if (_req.method === "OPTIONS") {
+    res.sendStatus(204);
+    return;
+  }
+  next();
+});
+
 app.use(express.json());
 
 // --- Internal control surfaces ---

@@ -1,0 +1,241 @@
+/* Civic Hub — minimal UI styles */
+
+.app {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 2rem 1rem;
+}
+
+/* --- Pages --- */
+
+.page h1 {
+  margin: 0 0 0.25rem;
+}
+
+.subtitle {
+  color: #888;
+  margin: 0 0 1.5rem;
+}
+
+/* --- Process list --- */
+
+.process-list {
+  list-style: none;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.process-link {
+  text-decoration: none;
+  color: inherit;
+}
+
+/* --- Process card --- */
+
+.process-card {
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  padding: 1rem;
+  transition: border-color 0.15s;
+}
+
+.process-card:hover {
+  border-color: #888;
+}
+
+.process-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.process-card-header h3 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.process-card-meta {
+  display: flex;
+  gap: 1rem;
+  margin-top: 0.5rem;
+  font-size: 0.85rem;
+  color: #888;
+}
+
+/* --- Status badge --- */
+
+.status-badge {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.2rem 0.6rem;
+  border-radius: 12px;
+  white-space: nowrap;
+}
+
+.status-open {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+
+.status-closed {
+  background: #fce4ec;
+  color: #c62828;
+}
+
+/* --- Process detail page --- */
+
+.back-link {
+  display: inline-block;
+  margin-bottom: 1rem;
+  color: #555;
+  text-decoration: none;
+  font-size: 0.9rem;
+}
+
+.back-link:hover {
+  color: #000;
+}
+
+.process-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.process-header h1 {
+  margin: 0;
+}
+
+.process-description {
+  color: #555;
+  margin: 0 0 1rem;
+}
+
+.process-meta {
+  display: flex;
+  gap: 1.5rem;
+  font-size: 0.85rem;
+  color: #888;
+  margin-bottom: 2rem;
+  flex-wrap: wrap;
+}
+
+/* --- Vote panel --- */
+
+.vote-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.vote-options h4,
+.vote-tally h4 {
+  margin: 0 0 0.75rem;
+  font-size: 1rem;
+}
+
+.vote-buttons {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.vote-button {
+  padding: 0.5rem 1.25rem;
+  border: 2px solid #ddd;
+  border-radius: 6px;
+  background: #fff;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.vote-button:hover:not(:disabled) {
+  border-color: #333;
+  background: #f5f5f5;
+}
+
+.vote-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.vote-button.voted {
+  border-color: #2e7d32;
+  background: #e8f5e9;
+  font-weight: 600;
+}
+
+.vote-confirmation {
+  margin: 0.5rem 0 0;
+  color: #2e7d32;
+  font-size: 0.9rem;
+}
+
+/* --- Tally --- */
+
+.tally-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.tally-label {
+  width: 5rem;
+  font-size: 0.9rem;
+  text-transform: capitalize;
+}
+
+.tally-bar-track {
+  flex: 1;
+  height: 20px;
+  background: #f0f0f0;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.tally-bar-fill {
+  height: 100%;
+  background: #5c6bc0;
+  border-radius: 4px;
+  transition: width 0.3s ease;
+  min-width: 2px;
+}
+
+.tally-count {
+  font-size: 0.85rem;
+  color: #555;
+  width: 5rem;
+  text-align: right;
+}
+
+.tally-total {
+  margin: 0.5rem 0 0;
+  font-size: 0.85rem;
+  color: #888;
+}
+
+/* --- Utility --- */
+
+.error {
+  color: #c62828;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 2rem;
+  color: #888;
+}
+
+.hint {
+  font-size: 0.85rem;
+}
+
+.hint a {
+  color: #5c6bc0;
+}
