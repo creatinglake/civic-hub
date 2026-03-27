@@ -220,6 +220,17 @@
   color: #888;
 }
 
+/* --- Results hidden message --- */
+
+.results-hidden {
+  color: #888;
+  font-style: italic;
+  padding: 1rem;
+  background: #f9f9f9;
+  border-radius: 6px;
+  text-align: center;
+}
+
 /* --- Utility --- */
 
 .error {

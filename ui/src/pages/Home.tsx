@@ -17,10 +17,10 @@ export default function Home() {
   return (
     <div className="page">
       <h1>Civic Hub</h1>
-      <p className="subtitle">Community processes</p>
+      <p className="subtitle">Community votes</p>
 
       {loading && <p>Loading...</p>}
-      {error && <p className="error">Failed to load processes: {error}</p>}
+      {error && <p className="error">Failed to load votes: {error}</p>}
       {!loading && !error && <ProcessList processes={processes} />}
     </div>
   );

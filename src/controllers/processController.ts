@@ -78,7 +78,8 @@ export function handleListProcesses(_req: Request, res: Response): void {
 
 export function handleGetProcessState(req: Request, res: Response): void {
   const id = req.params.id as string;
-  const state = getProcessState(id);
+  const actor = req.query.actor as string | undefined;
+  const state = getProcessState(id, actor);
 
   if (!state) {
     res.status(404).json({ error: "Process not found" });

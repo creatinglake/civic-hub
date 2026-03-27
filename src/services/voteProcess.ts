@@ -6,23 +6,40 @@
 import { Process, ProcessAction } from "../models/process.js";
 import { emitEvent } from "../events/eventEmitter.js";
 
+export interface VotingWindow {
+  opens_at: string; // ISO timestamp
+  closes_at: string; // ISO timestamp
+}
+
 export interface VoteState {
   type: string; // "civic.vote"
   options: string[];
   votes: Record<string, string>; // actor -> selected option
   status: "open" | "closed";
+  voting: VotingWindow;
   [key: string]: unknown; // index signature for Record<string, unknown> compatibility
 }
+
+/** Default voting window duration: 3 days */
+const VOTING_WINDOW_MS = 3 * 24 * 60 * 60 * 1000;
 
 export function initializeVoteState(
   input: Record<string, unknown>
 ): VoteState {
   const options = (input.options as string[]) ?? ["yes", "no"];
+  const now = new Date();
+  const opensAt = now.toISOString();
+  const closesAt = new Date(now.getTime() + VOTING_WINDOW_MS).toISOString();
+
   return {
     type: "civic.vote",
     options,
     votes: {},
     status: "open",
+    voting: {
+      opens_at: opensAt,
+      closes_at: closesAt,
+    },
   };
 }
 
@@ -48,7 +65,14 @@ function submitVote(
   action: ProcessAction
 ): Record<string, unknown> {
   if (state.status === "closed") {
-    throw new Error("Cannot submit vote: process is closed");
+    throw new Error("Cannot submit vote: voting is closed");
+  }
+
+  // Auto-close if voting window has expired
+  if (new Date() > new Date(state.voting.closes_at)) {
+    process.status = "closed";
+    state.status = "closed";
+    throw new Error("Cannot submit vote: voting window has expired");
   }
 
   const option = action.payload.option as string;
@@ -112,8 +136,9 @@ function closeVote(
 /**
  * Compute a UI-friendly read view of a vote process.
  * Derives tally from current votes — no extra storage needed.
+ * If actor is provided, includes has_voted flag and hides tally if they haven't voted.
  */
-export function getVoteState(process: Process): Record<string, unknown> {
+export function getVoteState(process: Process, actor?: string): Record<string, unknown> {
   const state = process.state as unknown as VoteState;
 
   const tally: Record<string, number> = {};
@@ -124,6 +149,12 @@ export function getVoteState(process: Process): Record<string, unknown> {
     tally[vote] = (tally[vote] ?? 0) + 1;
   }
 
+  const totalVotes = Object.keys(state.votes).length;
+  const hasVoted = actor ? actor in state.votes : null;
+
+  // Results are only visible if the user has voted, or the vote is closed
+  const showResults = process.status === "closed" || hasVoted === true;
+
   return {
     id: process.id,
     type: process.definition.type,
@@ -131,8 +162,10 @@ export function getVoteState(process: Process): Record<string, unknown> {
     description: process.description,
     status: process.status,
     options: state.options,
-    tally,
-    total_votes: Object.keys(state.votes).length,
+    tally: showResults ? tally : null,
+    total_votes: showResults ? totalVotes : null,
+    has_voted: hasVoted,
+    closes_at: state.voting.closes_at,
     created_at: process.createdAt,
     created_by: process.createdBy,
   };

@@ -28,6 +28,8 @@ export interface ProcessSummary {
   type: string;
   title: string;
   status: "open" | "closed";
+  total_votes: number;
+  closes_at: string | null;
   created_at: string;
   created_by: string;
 }
@@ -39,8 +41,10 @@ export interface ProcessState {
   description: string;
   status: "open" | "closed";
   options: string[];
-  tally: Record<string, number>;
-  total_votes: number;
+  tally: Record<string, number> | null;
+  total_votes: number | null;
+  has_voted: boolean | null;
+  closes_at: string;
   created_at: string;
   created_by: string;
 }
@@ -49,8 +53,9 @@ export function listProcesses(): Promise<ProcessSummary[]> {
   return request("GET", "/process");
 }
 
-export function getProcessState(id: string): Promise<ProcessState> {
-  return request("GET", `/process/${id}/state`);
+export function getProcessState(id: string, actor?: string): Promise<ProcessState> {
+  const params = actor ? `?actor=${encodeURIComponent(actor)}` : "";
+  return request("GET", `/process/${id}/state${params}`);
 }
 
 // --- Actions (internal control surface) ---

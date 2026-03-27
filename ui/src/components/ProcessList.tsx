@@ -10,7 +10,7 @@ export default function ProcessList({ processes }: Props) {
   if (processes.length === 0) {
     return (
       <div className="empty-state">
-        <p>No processes yet.</p>
+        <p>No votes yet.</p>
         <p className="hint">
           Seed data at{" "}
           <a href="http://localhost:3000/debug/seed" target="_blank" rel="noreferrer">

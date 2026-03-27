@@ -3,6 +3,17 @@ import { useParams, Link } from "react-router-dom";
 import { getProcessState, type ProcessState } from "../services/api";
 import VotePanel from "../components/VotePanel";
 
+// Simulated current user — will be replaced with real identity later
+const CURRENT_USER = "user:demo";
+
+function formatDate(iso: string): string {
+  return new Date(iso).toLocaleDateString("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
 export default function Process() {
   const { id } = useParams<{ id: string }>();
   const [process, setProcess] = useState<ProcessState | null>(null);
@@ -11,7 +22,7 @@ export default function Process() {
 
   const fetchState = useCallback(() => {
     if (!id) return;
-    getProcessState(id)
+    getProcessState(id, CURRENT_USER)
       .then(setProcess)
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
@@ -23,11 +34,11 @@ export default function Process() {
 
   if (loading) return <p>Loading...</p>;
   if (error) return <p className="error">Error: {error}</p>;
-  if (!process) return <p>Process not found.</p>;
+  if (!process) return <p>Vote not found.</p>;
 
   return (
     <div className="page">
-      <Link to="/" className="back-link">&larr; All processes</Link>
+      <Link to="/" className="back-link">&larr; All votes</Link>
 
       <div className="process-header">
         <h1>{process.title}</h1>
@@ -39,12 +50,15 @@ export default function Process() {
       <p className="process-description">{process.description}</p>
 
       <div className="process-meta">
-        <span>Type: {process.type}</span>
-        <span>Created: {new Date(process.created_at).toLocaleDateString()}</span>
-        <span>By: {process.created_by}</span>
+        <span>Created by {process.created_by}</span>
+        <span>Created {formatDate(process.created_at)}</span>
+        {process.status === "open" && process.closes_at && (
+          <span>Vote closes on {formatDate(process.closes_at)}</span>
+        )}
+        {process.status === "closed" && <span>Voting closed</span>}
       </div>
 
-      <VotePanel process={process} onVoted={fetchState} />
+      <VotePanel process={process} actor={CURRENT_USER} onVoted={fetchState} />
     </div>
   );
 }
