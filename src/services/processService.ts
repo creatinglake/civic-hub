@@ -114,6 +114,11 @@ export function getAllProcesses(): Process[] {
   return Array.from(processes.values());
 }
 
+/** Clear all processes — used by debug/seed only */
+export function clearProcesses(): void {
+  processes.clear();
+}
+
 /**
  * Return a summary list of all processes, formatted for UI consumption.
  */

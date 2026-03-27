@@ -8,7 +8,8 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "dev": "tsx watch src/index.ts",
-    "test:flow": "tsx scripts/testFlow.ts"
+    "test:flow": "tsx scripts/testFlow.ts",
+    "seed": "curl -s http://localhost:3000/debug/seed | node -e \"process.stdin.on('data',d=>{const j=JSON.parse(d);console.log(j.message);j.processes.forEach(p=>console.log('  '+p.status.padEnd(6)+' '+p.title));console.log(j.event_count+' events emitted')})\""
   },
   "keywords": ["civic", "hub", "governance", "civic-social"],
   "license": "MIT",
