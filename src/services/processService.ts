@@ -1,8 +1,11 @@
-// Process service — manages process lifecycle and delegates to process-type handlers.
+// Process service — manages process lifecycle via the process registry.
 //
 // Process endpoints (/process) are INTERNAL control surfaces.
 // Events are the primary public interface of the hub.
 // All external systems should rely on events, not internal process APIs.
+//
+// This service delegates all process-specific logic to registered handlers.
+// It owns: storage, ID generation, lifecycle events, and the dispatch loop.
 
 import {
   Process,
@@ -12,7 +15,7 @@ import {
 } from "../models/process.js";
 import { emitEvent } from "../events/eventEmitter.js";
 import { generateId } from "../utils/id.js";
-import { handleVoteAction, initializeVoteState, getVoteState } from "./voteProcess.js";
+import { getProcessHandler } from "../processes/registry.js";
 
 // In-memory process store
 const processes = new Map<string, Process>();
@@ -20,15 +23,17 @@ const processes = new Map<string, Process>();
 const HUB_ID = "civic-hub-local";
 
 export function createProcess(input: CreateProcessInput): Process {
+  // Look up handler for this process type
+  const handler = getProcessHandler(input.definition.type);
+  if (!handler) {
+    throw new Error(`Unsupported process type: ${input.definition.type}`);
+  }
+
   const id = generateId("proc");
   const now = new Date().toISOString();
 
-  let initialState = input.state ?? {};
-
-  // Initialize process-specific state based on type
-  if (input.definition.type === "civic.vote") {
-    initialState = initializeVoteState(initialState);
-  }
+  // Delegate state initialization to the handler
+  const initialState = handler.initializeState(input.state ?? {});
 
   const process: Process = {
     id,
@@ -79,17 +84,18 @@ export function executeAction(
     throw new Error(`Process ${processId} is closed and cannot accept actions`);
   }
 
-  let result: Record<string, unknown> = {};
+  // Look up handler for this process type
+  const handler = getProcessHandler(process.definition.type);
+  if (!handler) {
+    throw new Error(`Unsupported process type: ${process.definition.type}`);
+  }
+
   const previousStatus = process.status;
 
   console.log(`[action] ${action.type} on ${processId} by ${action.actor}`);
 
-  // Route to the correct process-type handler
-  if (process.definition.type === "civic.vote") {
-    result = handleVoteAction(process, action);
-  } else {
-    throw new Error(`Unsupported process type: ${process.definition.type}`);
-  }
+  // Delegate to the registered handler
+  const result = handler.handleAction(process, action);
 
   process.updatedAt = new Date().toISOString();
 
@@ -121,20 +127,21 @@ export function clearProcesses(): void {
 
 /**
  * Return a summary list of all processes, formatted for UI consumption.
+ * Delegates to each handler's getSummary() method.
  */
 export function listProcessSummaries(): Record<string, unknown>[] {
   return Array.from(processes.values()).map((p) => {
-    const state = p.state as Record<string, unknown>;
-    const votes = (state.votes as Record<string, string>) ?? {};
-    const voting = state.voting as { closes_at?: string } | undefined;
+    const handler = getProcessHandler(p.definition.type);
+    if (handler) {
+      return handler.getSummary(p);
+    }
 
+    // Fallback for unknown types
     return {
       id: p.id,
       type: p.definition.type,
       title: p.title,
       status: p.status,
-      total_votes: Object.keys(votes).length,
-      closes_at: voting?.closes_at ?? null,
       created_at: p.createdAt,
       created_by: p.createdBy,
     };
@@ -143,18 +150,19 @@ export function listProcessSummaries(): Record<string, unknown>[] {
 
 /**
  * Return a UI-friendly state view for a process.
- * Delegates to the appropriate process-type handler.
- * actor: optional — used to determine has_voted and result visibility.
+ * Delegates to the handler's getReadModel() method.
+ * actor: optional — used to determine visibility rules.
  */
 export function getProcessState(processId: string, actor?: string): Record<string, unknown> | undefined {
   const process = processes.get(processId);
   if (!process) return undefined;
 
-  if (process.definition.type === "civic.vote") {
-    return getVoteState(process, actor);
+  const handler = getProcessHandler(process.definition.type);
+  if (handler) {
+    return handler.getReadModel(process, actor);
   }
 
-  // Fallback for unknown types — return basic info
+  // Fallback for unknown types
   return {
     id: process.id,
     type: process.definition.type,
