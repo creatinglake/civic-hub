@@ -1,5 +1,9 @@
 // Append-only in-memory event store
-// All civic events are stored here for retrieval and future federation
+// All civic events are stored here for retrieval and future federation.
+//
+// Events are the PRIMARY public interface of the hub.
+// External systems should consume from this store (via /events),
+// not from internal process APIs.
 
 import { CivicEvent } from "../models/event.js";
 
@@ -14,9 +18,14 @@ export function getAllEvents(): CivicEvent[] {
 }
 
 export function getEventsByProcessId(processId: string): CivicEvent[] {
-  return events.filter((e) => e.context.processId === processId);
+  return events.filter((e) => e.context.process_id === processId);
 }
 
 export function getEventCount(): number {
   return events.length;
+}
+
+/** Reset the store — used by debug/test endpoints only */
+export function clearEvents(): void {
+  events.length = 0;
 }

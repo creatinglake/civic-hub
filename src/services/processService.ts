@@ -1,4 +1,8 @@
-// Process service — manages process lifecycle and delegates to process-type handlers
+// Process service — manages process lifecycle and delegates to process-type handlers.
+//
+// Process endpoints (/process) are INTERNAL control surfaces.
+// Events are the primary public interface of the hub.
+// All external systems should rely on events, not internal process APIs.
 
 import {
   Process,
@@ -41,12 +45,18 @@ export function createProcess(input: CreateProcessInput): Process {
 
   processes.set(id, process);
 
+  console.log(`[process] created ${process.definition.type} "${process.title}" (${id})`);
+
   emitEvent({
     type: "vote.created",
     actor: input.createdBy,
-    object: { type: "civic.process", id },
-    context: { hubId: process.hubId, processId: id },
-    data: { title: input.title, definition: input.definition },
+    object: {
+      type: "civic.process",
+      id,
+      process_type: input.definition.type,
+      title: input.title,
+    },
+    context: { process_id: id, hub_id: process.hubId },
   });
 
   return process;
@@ -70,6 +80,9 @@ export function executeAction(
   }
 
   let result: Record<string, unknown> = {};
+  const previousStatus = process.status;
+
+  console.log(`[action] ${action.type} on ${processId} by ${action.actor}`);
 
   // Route to the correct process-type handler
   if (process.definition.type === "civic.vote") {
@@ -79,6 +92,20 @@ export function executeAction(
   }
 
   process.updatedAt = new Date().toISOString();
+
+  // Emit process.updated only when a meaningful state change occurred
+  if (process.status !== previousStatus) {
+    emitEvent({
+      type: "process.updated",
+      actor: action.actor,
+      object: {
+        type: "civic.process",
+        id: process.id,
+        status: process.status,
+      },
+      context: { process_id: process.id, hub_id: process.hubId },
+    });
+  }
 
   return { process, result };
 }

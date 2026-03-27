@@ -1,5 +1,7 @@
 // Vote process handler — implements "civic.vote" (advisory vote)
-// Handles vote submission and closing
+// Handles vote submission and closing.
+//
+// This module is kept modular so it can evolve into a plugin later.
 
 import { Process, ProcessAction } from "../models/process.js";
 import { emitEvent } from "../events/eventEmitter.js";
@@ -53,18 +55,17 @@ function submitVote(
     );
   }
 
-  const previousVote = state.votes[action.actor];
+  const previous_vote = state.votes[action.actor] ?? null;
   state.votes[action.actor] = option;
 
   emitEvent({
     type: "vote.submitted",
     actor: action.actor,
-    object: { type: "civic.process", id: process.id },
-    context: { hubId: process.hubId, processId: process.id },
-    data: { option, previousVote: previousVote ?? null },
+    object: { type: "civic.vote", option, previous_vote },
+    context: { process_id: process.id, hub_id: process.hubId },
   });
 
-  return { option, previousVote: previousVote ?? null };
+  return { option, previous_vote };
 }
 
 function closeVote(
@@ -83,13 +84,14 @@ function closeVote(
     tally[vote] = (tally[vote] ?? 0) + 1;
   }
 
+  const total_votes = Object.keys(state.votes).length;
+
   emitEvent({
     type: "vote.closed",
     actor: action.actor,
-    object: { type: "civic.process", id: process.id },
-    context: { hubId: process.hubId, processId: process.id },
-    data: { tally, totalVotes: Object.keys(state.votes).length },
+    object: { type: "civic.vote.result", tally, total_votes },
+    context: { process_id: process.id, hub_id: process.hubId },
   });
 
-  return { tally, totalVotes: Object.keys(state.votes).length };
+  return { tally, total_votes };
 }
