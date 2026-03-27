@@ -35,7 +35,7 @@ export function createProcess(input: CreateProcessInput): Process {
     definition: input.definition,
     title: input.title,
     description: input.description,
-    status: "active" as ProcessStatus,
+    status: "open" as ProcessStatus,
     hubId: input.hubId ?? HUB_ID,
     createdBy: input.createdBy,
     createdAt: now,
@@ -75,8 +75,8 @@ export function executeAction(
     throw new Error(`Process not found: ${processId}`);
   }
 
-  if (process.status === "closed" || process.status === "archived") {
-    throw new Error(`Process ${processId} is ${process.status} and cannot accept actions`);
+  if (process.status === "closed") {
+    throw new Error(`Process ${processId} is closed and cannot accept actions`);
   }
 
   let result: Record<string, unknown> = {};

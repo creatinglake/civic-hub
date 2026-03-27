@@ -53,7 +53,7 @@ async function run() {
   });
   assert(createRes.status === 201, "Process created with 201");
   assert(createRes.data.id !== undefined, "Process has an ID");
-  assert(createRes.data.status === "active", "Process status is active");
+  assert(createRes.data.status === "open", "Process status is open");
 
   const processId = createRes.data.id;
   log("Created Process", createRes.data);
@@ -79,6 +79,8 @@ async function run() {
   console.log("\n── Step 4: Get process state ──");
   const getRes = await request("GET", `/process/${processId}`);
   assert(getRes.status === 200, "Process retrieved");
+  assert(getRes.data.state.type === "civic.vote", "state.type is civic.vote");
+  assert(getRes.data.state.status === "open", "state.status is open");
   log("Process State", getRes.data);
 
   // 5. Close the vote
@@ -92,6 +94,22 @@ async function run() {
   assert(closeRes.data.process.status === "closed", "Process status is closed");
   assert(typeof closeRes.data.result.total_votes === "number", "Result uses snake_case total_votes");
   log("Tally", closeRes.data.result);
+
+  // 5b. Validate: cannot vote on closed process
+  console.log("\n── Step 5b: Validate closed process guards ──");
+  const lateVote = await request("POST", `/process/${processId}/action`, {
+    type: "vote.submit",
+    actor: "user:dave",
+    payload: { option: "yes" },
+  });
+  assert(lateVote.status === 400, "Voting on closed process returns 400");
+
+  const doubleClose = await request("POST", `/process/${processId}/action`, {
+    type: "vote.close",
+    actor: "user:testrunner",
+    payload: {},
+  });
+  assert(doubleClose.status === 400, "Closing already-closed process returns 400");
 
   // 6. Fetch all events
   console.log("\n── Step 6: Fetch all events ──");

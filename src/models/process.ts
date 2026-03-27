@@ -1,7 +1,7 @@
 // Civic Process model based on Civic Process Spec v0.1
 // A process represents a structured civic action (e.g., a vote, proposal, discussion)
 
-export type ProcessStatus = "draft" | "active" | "closed" | "archived";
+export type ProcessStatus = "open" | "closed";
 
 export interface ProcessDefinition {
   type: string; // e.g., "civic.vote"

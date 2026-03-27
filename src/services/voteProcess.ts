@@ -7,8 +7,10 @@ import { Process, ProcessAction } from "../models/process.js";
 import { emitEvent } from "../events/eventEmitter.js";
 
 export interface VoteState {
+  type: string; // "civic.vote"
   options: string[];
   votes: Record<string, string>; // actor -> selected option
+  status: "open" | "closed";
   [key: string]: unknown; // index signature for Record<string, unknown> compatibility
 }
 
@@ -17,8 +19,10 @@ export function initializeVoteState(
 ): VoteState {
   const options = (input.options as string[]) ?? ["yes", "no"];
   return {
+    type: "civic.vote",
     options,
     votes: {},
+    status: "open",
   };
 }
 
@@ -43,6 +47,10 @@ function submitVote(
   state: VoteState,
   action: ProcessAction
 ): Record<string, unknown> {
+  if (state.status === "closed") {
+    throw new Error("Cannot submit vote: process is closed");
+  }
+
   const option = action.payload.option as string;
 
   if (!option) {
@@ -73,7 +81,12 @@ function closeVote(
   state: VoteState,
   action: ProcessAction
 ): Record<string, unknown> {
+  if (state.status === "closed") {
+    throw new Error("Cannot close vote: process is already closed");
+  }
+
   process.status = "closed";
+  state.status = "closed";
 
   // Tally results
   const tally: Record<string, number> = {};
