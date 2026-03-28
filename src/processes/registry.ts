@@ -4,12 +4,31 @@
 // Each process type (e.g. civic.vote, civic.proposal) implements a handler.
 // Future work may allow dynamic loading, but for now this is static.
 
-import { ProcessHandler } from "./types.js";
+import { ProcessHandler, ProcessFactory } from "./types.js";
 import voteProcess from "./voteProcess.js";
+import proposalProcess from "./proposalProcess.js";
 
 const processRegistry: Record<string, ProcessHandler> = {
   "civic.vote": voteProcess,
+  "civic.proposal": proposalProcess,
 };
+
+/**
+ * Process factory — set by the service layer at startup.
+ * Allows handlers to create new processes without importing processService directly.
+ */
+let processFactory: ProcessFactory | null = null;
+
+export function setProcessFactory(factory: ProcessFactory): void {
+  processFactory = factory;
+}
+
+export function getProcessFactory(): ProcessFactory {
+  if (!processFactory) {
+    throw new Error("Process factory not initialized — service layer must call setProcessFactory()");
+  }
+  return processFactory;
+}
 
 /**
  * Look up the handler for a given process type.

@@ -15,12 +15,18 @@ import {
 } from "../models/process.js";
 import { emitEvent } from "../events/eventEmitter.js";
 import { generateId } from "../utils/id.js";
-import { getProcessHandler } from "../processes/registry.js";
+import { getProcessHandler, setProcessFactory } from "../processes/registry.js";
 
 // In-memory process store
 const processes = new Map<string, Process>();
 
 const HUB_ID = "civic-hub-local";
+
+// Map process types to their creation event types
+const CREATION_EVENT_TYPES: Record<string, string> = {
+  "civic.vote": "vote.created",
+  "civic.proposal": "proposal.created",
+};
 
 export function createProcess(input: CreateProcessInput): Process {
   // Look up handler for this process type
@@ -52,8 +58,11 @@ export function createProcess(input: CreateProcessInput): Process {
 
   console.log(`[process] created ${process.definition.type} "${process.title}" (${id})`);
 
+  // Emit creation event — type varies by process type
+  const creationEventType = CREATION_EVENT_TYPES[input.definition.type] ?? "process.created";
+
   emitEvent({
-    type: "vote.created",
+    type: creationEventType,
     actor: input.createdBy,
     object: {
       type: "civic.process",
@@ -66,6 +75,10 @@ export function createProcess(input: CreateProcessInput): Process {
 
   return process;
 }
+
+// Inject createProcess into the registry so handlers can spawn new processes
+// (e.g., proposal → vote promotion) without circular imports.
+setProcessFactory(createProcess);
 
 export function getProcess(id: string): Process | undefined {
   return processes.get(id);

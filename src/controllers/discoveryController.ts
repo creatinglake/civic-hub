@@ -23,7 +23,7 @@ export function handleDiscoveryManifest(_req: Request, res: Response): void {
     feeds: {
       events: `${baseUrl}/events`,
     },
-    capabilities: ["civic.vote"],
+    capabilities: ["civic.vote", "civic.proposal"],
     spec: {
       process: "civic-process-spec-v0.1",
       event: "civic-event-spec-v0.1",

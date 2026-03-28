@@ -5,8 +5,9 @@ import { Request, Response } from "express";
 import { createProcess, executeAction, clearProcesses } from "../services/processService.js";
 import { clearEvents, getEventCount } from "../events/eventStore.js";
 
-// Seed scenarios — each describes a complete process lifecycle
-const SEED_SCENARIOS = [
+// --- Vote seed scenarios ---
+
+const VOTE_SCENARIOS = [
   {
     process: {
       definition: { type: "civic.vote", version: "0.1" },
@@ -15,14 +16,14 @@ const SEED_SCENARIOS = [
       createdBy: "user:alice",
       state: { options: ["yes", "no", "abstain"] },
     },
-    votes: [
-      { actor: "user:alice", option: "yes" },
-      { actor: "user:bob", option: "yes" },
-      { actor: "user:carol", option: "no" },
-      { actor: "user:dave", option: "abstain" },
-      { actor: "user:eve", option: "yes" },
+    actions: [
+      { type: "vote.submit", actor: "user:alice", payload: { option: "yes" } },
+      { type: "vote.submit", actor: "user:bob", payload: { option: "yes" } },
+      { type: "vote.submit", actor: "user:carol", payload: { option: "no" } },
+      { type: "vote.submit", actor: "user:dave", payload: { option: "abstain" } },
+      { type: "vote.submit", actor: "user:eve", payload: { option: "yes" } },
+      { type: "vote.close", actor: "user:alice", payload: {} },
     ],
-    close: true, // closed process — shows completed lifecycle
   },
   {
     process: {
@@ -32,12 +33,11 @@ const SEED_SCENARIOS = [
       createdBy: "user:bob",
       state: { options: ["approve", "reject", "abstain"] },
     },
-    votes: [
-      { actor: "user:alice", option: "approve" },
-      { actor: "user:carol", option: "approve" },
-      { actor: "user:dave", option: "reject" },
+    actions: [
+      { type: "vote.submit", actor: "user:alice", payload: { option: "approve" } },
+      { type: "vote.submit", actor: "user:carol", payload: { option: "approve" } },
+      { type: "vote.submit", actor: "user:dave", payload: { option: "reject" } },
     ],
-    close: false, // open — voters can still participate
   },
   {
     process: {
@@ -47,14 +47,47 @@ const SEED_SCENARIOS = [
       createdBy: "user:carol",
       state: { options: ["tuesday", "saturday", "no preference"] },
     },
-    votes: [
-      { actor: "user:alice", option: "saturday" },
-      { actor: "user:bob", option: "tuesday" },
-      { actor: "user:dave", option: "saturday" },
-      { actor: "user:eve", option: "no preference" },
-      { actor: "user:frank", option: "saturday" },
+    actions: [
+      { type: "vote.submit", actor: "user:alice", payload: { option: "saturday" } },
+      { type: "vote.submit", actor: "user:bob", payload: { option: "tuesday" } },
+      { type: "vote.submit", actor: "user:dave", payload: { option: "saturday" } },
+      { type: "vote.submit", actor: "user:eve", payload: { option: "no preference" } },
+      { type: "vote.submit", actor: "user:frank", payload: { option: "saturday" } },
     ],
-    close: false, // open — still accepting votes
+  },
+];
+
+// --- Proposal seed scenarios ---
+
+const PROPOSAL_SCENARIOS = [
+  {
+    // This one will reach threshold (3 supporters) and auto-promote to a vote
+    process: {
+      definition: { type: "civic.proposal", version: "0.1" },
+      title: "Install solar panels on community center",
+      description: "Proposal to fund and install solar panels on the community center roof to reduce energy costs.",
+      createdBy: "user:alice",
+      state: { proposed_options: ["approve", "reject", "defer"], support_threshold: 3 },
+    },
+    actions: [
+      { type: "proposal.support", actor: "user:bob", payload: {} },
+      { type: "proposal.support", actor: "user:carol", payload: {} },
+      { type: "proposal.support", actor: "user:dave", payload: {} }, // hits threshold → promotes to vote
+    ],
+  },
+  {
+    // This one stays open — not enough support yet
+    process: {
+      definition: { type: "civic.proposal", version: "0.1" },
+      title: "Create a community bike-share program",
+      description: "Proposal to establish a small bike-share program with 10 bikes at key locations around town.",
+      createdBy: "user:eve",
+      state: { proposed_options: ["yes", "no"], support_threshold: 5 },
+    },
+    actions: [
+      { type: "proposal.support", actor: "user:alice", payload: {} },
+      { type: "proposal.support", actor: "user:bob", payload: {} },
+    ],
   },
 ];
 
@@ -67,33 +100,35 @@ export function handleSeed(_req: Request, res: Response): void {
 
   const createdProcesses: Record<string, unknown>[] = [];
 
-  for (const scenario of SEED_SCENARIOS) {
-    // Create process through normal logic
+  // Seed votes
+  for (const scenario of VOTE_SCENARIOS) {
     const process = createProcess(scenario.process);
 
-    // Submit votes through normal action pipeline
-    for (const v of scenario.votes) {
-      executeAction(process.id, {
-        type: "vote.submit",
-        actor: v.actor,
-        payload: { option: v.option },
-      });
-    }
-
-    // Optionally close the process
-    if (scenario.close) {
-      executeAction(process.id, {
-        type: "vote.close",
-        actor: scenario.process.createdBy,
-        payload: {},
-      });
+    for (const action of scenario.actions) {
+      executeAction(process.id, action);
     }
 
     createdProcesses.push({
       id: process.id,
+      type: process.definition.type,
       title: process.title,
       status: process.status,
-      vote_count: scenario.votes.length,
+    });
+  }
+
+  // Seed proposals
+  for (const scenario of PROPOSAL_SCENARIOS) {
+    const process = createProcess(scenario.process);
+
+    for (const action of scenario.actions) {
+      executeAction(process.id, action);
+    }
+
+    createdProcesses.push({
+      id: process.id,
+      type: process.definition.type,
+      title: process.title,
+      status: process.status,
     });
   }
 
