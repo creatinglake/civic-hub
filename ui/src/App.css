@@ -1,9 +1,62 @@
-/* Civic Hub — minimal UI styles */
+/* Civic Hub — UI styles with CSS variable theming */
 
 .app {
-  max-width: 640px;
+  max-width: 800px;
   margin: 0 auto;
-  padding: 2rem 1rem;
+  background: var(--background-color);
+  min-height: 100vh;
+}
+
+/* --- Hub Header --- */
+
+.hub-header {
+  margin-bottom: 2rem;
+}
+
+.hub-banner {
+  width: 100%;
+  height: 200px;
+  overflow: hidden;
+}
+
+.hub-banner-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.hub-info {
+  padding: 1.25rem 1.5rem;
+}
+
+.hub-name {
+  margin: 0;
+  font-size: 1.6rem;
+  color: var(--text-color);
+}
+
+.hub-description {
+  margin: 0.25rem 0 0.5rem;
+  color: var(--muted-text);
+  font-size: 0.95rem;
+}
+
+.hub-members {
+  font-size: 0.85rem;
+  color: var(--light-text);
+}
+
+/* --- Sections --- */
+
+.section {
+  padding: 0 1.5rem 2rem;
+}
+
+.section-title {
+  font-size: 1.15rem;
+  margin: 0 0 1rem;
+  color: var(--text-color);
 }
 
 /* --- Pages --- */
@@ -13,7 +66,7 @@
 }
 
 .subtitle {
-  color: #888;
+  color: var(--light-text);
   margin: 0 0 1.5rem;
 }
 
@@ -35,14 +88,15 @@
 /* --- Process card --- */
 
 .process-card {
-  border: 1px solid #ddd;
+  border: 1px solid var(--border-color);
   border-radius: 8px;
-  padding: 1rem;
+  padding: 1rem 1.25rem;
+  background: var(--card-background);
   transition: border-color 0.15s;
 }
 
 .process-card:hover {
-  border-color: #888;
+  border-color: var(--border-hover);
 }
 
 .process-card-header {
@@ -54,15 +108,15 @@
 
 .process-card-header h3 {
   margin: 0;
-  font-size: 1.1rem;
+  font-size: 1.05rem;
 }
 
 .process-card-meta {
   display: flex;
   gap: 1rem;
-  margin-top: 0.5rem;
+  margin-top: 0.4rem;
   font-size: 0.85rem;
-  color: #888;
+  color: var(--light-text);
 }
 
 /* --- Status badge --- */
@@ -76,27 +130,31 @@
 }
 
 .status-open {
-  background: #e8f5e9;
-  color: #2e7d32;
+  background: var(--success-bg);
+  color: var(--success-color);
 }
 
 .status-closed {
-  background: #fce4ec;
-  color: #c62828;
+  background: var(--danger-bg);
+  color: var(--danger-color);
 }
 
 /* --- Process detail page --- */
 
+.detail-page {
+  padding: 1.5rem;
+}
+
 .back-link {
   display: inline-block;
   margin-bottom: 1rem;
-  color: #555;
+  color: var(--muted-text);
   text-decoration: none;
   font-size: 0.9rem;
 }
 
 .back-link:hover {
-  color: #000;
+  color: var(--text-color);
 }
 
 .process-header {
@@ -108,10 +166,11 @@
 
 .process-header h1 {
   margin: 0;
+  font-size: 1.5rem;
 }
 
 .process-description {
-  color: #555;
+  color: var(--muted-text);
   margin: 0 0 1rem;
 }
 
@@ -119,7 +178,7 @@
   display: flex;
   gap: 1.5rem;
   font-size: 0.85rem;
-  color: #888;
+  color: var(--light-text);
   margin-bottom: 2rem;
   flex-wrap: wrap;
 }
@@ -146,17 +205,17 @@
 
 .vote-button {
   padding: 0.5rem 1.25rem;
-  border: 2px solid #ddd;
+  border: 2px solid var(--border-color);
   border-radius: 6px;
-  background: #fff;
+  background: var(--card-background);
   font-size: 0.95rem;
   cursor: pointer;
   transition: all 0.15s;
 }
 
 .vote-button:hover:not(:disabled) {
-  border-color: #333;
-  background: #f5f5f5;
+  border-color: var(--primary-color);
+  background: var(--page-background);
 }
 
 .vote-button:disabled {
@@ -165,14 +224,14 @@
 }
 
 .vote-button.voted {
-  border-color: #2e7d32;
-  background: #e8f5e9;
+  border-color: var(--success-color);
+  background: var(--success-bg);
   font-weight: 600;
 }
 
 .vote-confirmation {
   margin: 0.5rem 0 0;
-  color: #2e7d32;
+  color: var(--success-color);
   font-size: 0.9rem;
 }
 
@@ -186,7 +245,7 @@
 }
 
 .tally-label {
-  width: 5rem;
+  width: 6rem;
   font-size: 0.9rem;
   text-transform: capitalize;
 }
@@ -194,14 +253,14 @@
 .tally-bar-track {
   flex: 1;
   height: 20px;
-  background: #f0f0f0;
+  background: var(--bar-track);
   border-radius: 4px;
   overflow: hidden;
 }
 
 .tally-bar-fill {
   height: 100%;
-  background: #5c6bc0;
+  background: var(--bar-color);
   border-radius: 4px;
   transition: width 0.3s ease;
   min-width: 2px;
@@ -209,7 +268,7 @@
 
 .tally-count {
   font-size: 0.85rem;
-  color: #555;
+  color: var(--muted-text);
   width: 5rem;
   text-align: right;
 }
@@ -217,16 +276,16 @@
 .tally-total {
   margin: 0.5rem 0 0;
   font-size: 0.85rem;
-  color: #888;
+  color: var(--light-text);
 }
 
 /* --- Results hidden message --- */
 
 .results-hidden {
-  color: #888;
+  color: var(--light-text);
   font-style: italic;
   padding: 1rem;
-  background: #f9f9f9;
+  background: var(--page-background);
   border-radius: 6px;
   text-align: center;
 }
@@ -234,13 +293,13 @@
 /* --- Utility --- */
 
 .error {
-  color: #c62828;
+  color: var(--danger-color);
 }
 
 .empty-state {
   text-align: center;
   padding: 2rem;
-  color: #888;
+  color: var(--light-text);
 }
 
 .hint {
@@ -248,5 +307,5 @@
 }
 
 .hint a {
-  color: #5c6bc0;
+  color: var(--primary-color);
 }

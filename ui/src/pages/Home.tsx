@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { listProcesses, type ProcessSummary } from "../services/api";
+import HubHeader from "../components/HubHeader";
 import ProcessList from "../components/ProcessList";
 
 export default function Home() {
@@ -16,12 +17,15 @@ export default function Home() {
 
   return (
     <div className="page">
-      <h1>Civic Hub</h1>
-      <p className="subtitle">Community votes</p>
+      <HubHeader />
 
-      {loading && <p>Loading...</p>}
-      {error && <p className="error">Failed to load votes: {error}</p>}
-      {!loading && !error && <ProcessList processes={processes} />}
+      <section className="section">
+        <h2 className="section-title">Community votes</h2>
+
+        {loading && <p>Loading...</p>}
+        {error && <p className="error">Failed to load votes: {error}</p>}
+        {!loading && !error && <ProcessList processes={processes} />}
+      </section>
     </div>
   );
 }

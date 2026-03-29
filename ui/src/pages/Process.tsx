@@ -37,7 +37,7 @@ export default function Process() {
   if (!process) return <p>Vote not found.</p>;
 
   return (
-    <div className="page">
+    <div className="page detail-page">
       <Link to="/" className="back-link">&larr; All votes</Link>
 
       <div className="process-header">
