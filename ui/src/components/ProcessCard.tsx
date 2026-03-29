@@ -1,7 +1,7 @@
-import type { ProcessSummary } from "../services/api";
+import type { VoteSummary } from "../services/api";
 
 interface Props {
-  process: ProcessSummary;
+  process: VoteSummary;
 }
 
 function formatShortDate(iso: string): string {

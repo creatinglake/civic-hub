@@ -290,6 +290,177 @@
   text-align: center;
 }
 
+/* --- Proposal card --- */
+
+.proposal-card {
+  border: 1px dashed var(--border-color);
+  border-radius: 8px;
+  padding: 1rem 1.25rem;
+  background: var(--card-background);
+  transition: border-color 0.15s;
+}
+
+.proposal-card:hover {
+  border-color: var(--border-hover);
+}
+
+.proposal-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.proposal-card-header h3 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.proposal-needs {
+  margin: 0.25rem 0 0;
+  font-size: 0.8rem;
+  color: var(--light-text);
+}
+
+.proposal-promoted-text {
+  margin: 0.25rem 0 0;
+  font-size: 0.85rem;
+  color: var(--success-color);
+  font-weight: 500;
+}
+
+/* Status badges for proposals */
+.status-gathering {
+  background: #fff3e0;
+  color: #e65100;
+}
+
+.status-promoted {
+  background: var(--success-bg);
+  color: var(--success-color);
+}
+
+/* --- Proposal progress bar --- */
+
+.proposal-progress {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 0.25rem;
+}
+
+.proposal-progress-track {
+  flex: 1;
+  height: 8px;
+  background: var(--bar-track);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.proposal-progress-fill {
+  height: 100%;
+  background: #ff9800;
+  border-radius: 4px;
+  transition: width 0.3s ease;
+  min-width: 2px;
+}
+
+.proposal-progress-label {
+  font-size: 0.8rem;
+  color: var(--muted-text);
+  white-space: nowrap;
+}
+
+/* --- Proposal detail panel --- */
+
+.proposal-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.proposal-endorsement h4,
+.proposal-options-preview h4 {
+  margin: 0 0 0.75rem;
+  font-size: 1rem;
+}
+
+.proposal-action {
+  margin-top: 0.25rem;
+}
+
+.endorse-button {
+  padding: 0.6rem 1.5rem;
+  border: 2px solid #ff9800;
+  border-radius: 6px;
+  background: #fff3e0;
+  color: #e65100;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.endorse-button:hover:not(:disabled) {
+  background: #ffe0b2;
+  border-color: #e65100;
+}
+
+.endorse-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.endorse-confirmation {
+  color: var(--success-color);
+  font-size: 0.9rem;
+}
+
+/* Promoted state in detail view */
+.proposal-promoted {
+  padding: 1rem;
+  background: var(--success-bg);
+  border-radius: 6px;
+}
+
+.promoted-vote-link {
+  display: inline-block;
+  margin-top: 0.5rem;
+  font-weight: 600;
+  color: var(--primary-color);
+}
+
+/* Proposed options tags */
+.proposal-options-list {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.proposal-option-tag {
+  padding: 0.3rem 0.75rem;
+  background: var(--page-background);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  font-size: 0.85rem;
+  color: var(--muted-text);
+  text-transform: capitalize;
+}
+
+/* --- Section description --- */
+
+.section-description {
+  margin: -0.5rem 0 1rem;
+  font-size: 0.9rem;
+  color: var(--light-text);
+}
+
+.empty-state-inline {
+  color: var(--light-text);
+  font-size: 0.9rem;
+}
+
 /* --- Utility --- */
 
 .error {

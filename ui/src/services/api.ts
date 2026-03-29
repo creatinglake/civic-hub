@@ -23,20 +23,36 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
 
 // --- Read layer (UI-facing) ---
 
-export interface ProcessSummary {
+/** Shared base for all process summaries */
+interface ProcessSummaryBase {
   id: string;
   type: string;
   title: string;
   status: "open" | "closed";
-  total_votes: number;
-  closes_at: string | null;
   created_at: string;
   created_by: string;
 }
 
-export interface ProcessState {
+/** Vote summary (from GET /process list) */
+export interface VoteSummary extends ProcessSummaryBase {
+  type: "civic.vote";
+  total_votes: number;
+  closes_at: string | null;
+}
+
+/** Proposal summary (from GET /process list) */
+export interface ProposalSummary extends ProcessSummaryBase {
+  type: "civic.proposal";
+  support_count: number;
+  support_threshold: number;
+}
+
+export type ProcessSummary = VoteSummary | ProposalSummary;
+
+/** Vote detail state */
+export interface VoteState {
   id: string;
-  type: string;
+  type: "civic.vote";
   title: string;
   description: string;
   status: "open" | "closed";
@@ -48,6 +64,24 @@ export interface ProcessState {
   created_at: string;
   created_by: string;
 }
+
+/** Proposal detail state */
+export interface ProposalState {
+  id: string;
+  type: "civic.proposal";
+  title: string;
+  description: string;
+  status: "open" | "closed";
+  proposed_options: string[];
+  support_count: number;
+  support_threshold: number;
+  has_supported: boolean | null;
+  promoted_vote_id: string | null;
+  created_at: string;
+  created_by: string;
+}
+
+export type ProcessState = VoteState | ProposalState;
 
 export function listProcesses(): Promise<ProcessSummary[]> {
   return request("GET", "/process");
@@ -70,5 +104,13 @@ export function submitVote(processId: string, actor: string, option: string): Pr
     type: "vote.submit",
     actor,
     payload: { option },
+  });
+}
+
+export function endorseProposal(processId: string, actor: string): Promise<ActionResult> {
+  return request("POST", `/process/${processId}/action`, {
+    type: "proposal.support",
+    actor,
+    payload: {},
   });
 }

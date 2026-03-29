@@ -1,9 +1,9 @@
 import { useState } from "react";
-import type { ProcessState } from "../services/api";
+import type { VoteState } from "../services/api";
 import { submitVote } from "../services/api";
 
 interface Props {
-  process: ProcessState;
+  process: VoteState;
   actor: string;
   onVoted: () => void;
 }
