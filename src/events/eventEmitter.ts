@@ -1,5 +1,5 @@
 // Centralized event creation and emission
-// All events flow through here to ensure consistency with the Civic Event Spec.
+// All events flow through here to ensure consistency with the Civic Event Spec v0.1.
 //
 // Events are the PRIMARY public interface of the hub.
 // All external systems should rely on events, not internal process APIs.
@@ -8,7 +8,8 @@ import { CivicEvent, CreateEventInput } from "../models/event.js";
 import { appendEvent } from "./eventStore.js";
 import { generateId } from "../utils/id.js";
 
-const HUB_SOURCE = process.env.BASE_URL ?? "http://localhost:3000";
+const HUB_ID = "civic-hub-local";
+const HUB_URL = process.env.BASE_URL ?? "http://localhost:3000";
 
 /**
  * Create and store a spec-compliant civic event.
@@ -17,19 +18,30 @@ const HUB_SOURCE = process.env.BASE_URL ?? "http://localhost:3000";
 export function emitEvent(input: CreateEventInput): CivicEvent {
   const event: CivicEvent = {
     id: generateId("evt"),
-    type: input.type,
-    actor: { id: input.actor },
-    object: input.object,
-    context: input.context,
-    metadata: {
-      created_at: new Date().toISOString(),
-      source: HUB_SOURCE,
+    version: "1.0",
+    event_type: input.event_type,
+    timestamp: new Date().toISOString(),
+    process_id: input.process_id,
+    actor: input.actor,
+    jurisdiction: input.jurisdiction,
+    action_url: `${HUB_URL}/process/${input.process_id}`,
+    source: {
+      hub_id: input.hub_id,
+      hub_url: HUB_URL,
+    },
+    data: input.data,
+    meta: {
+      visibility: input.visibility ?? "public",
     },
   };
 
+  if (input.dedupe_key) {
+    event.dedupe_key = input.dedupe_key;
+  }
+
   appendEvent(event);
 
-  console.log(`[event] ${event.type} by ${event.actor.id} (${event.id})`);
+  console.log(`[event] ${event.event_type} by ${event.actor} (${event.id})`);
 
   return event;
 }

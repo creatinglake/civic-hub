@@ -1,45 +1,49 @@
-// Civic Event model based on Civic Event Spec v0.1
+// Civic Event model — aligned with Civic Event Spec v0.1
 // Events are immutable records of actions taken within a civic hub.
 //
 // Events are the PRIMARY public interface of the hub.
 // All external systems (feeds, dashboards, federation layers)
 // should rely on events — not internal process APIs.
 
-export interface EventActor {
-  id: string; // e.g., "user:alice" or a DID
-}
-
-export interface EventObject {
-  type: string; // e.g., "vote", "civic.process"
-  id?: string; // ID of the object acted upon
-  [key: string]: unknown; // additional object-specific fields (e.g., option)
-}
-
-export interface EventContext {
-  process_id: string;
+export interface EventSource {
   hub_id: string;
+  hub_url: string;
 }
 
-export interface EventMetadata {
-  created_at: string; // ISO 8601
-  source: string; // base URL of the hub
+export interface EventMeta {
+  visibility: "public" | "restricted";
 }
 
+/**
+ * Spec-compliant Civic Event.
+ * All fields match Civic Event Spec v0.1 § 2–3.
+ */
 export interface CivicEvent {
   id: string;
-  type: string; // e.g., "vote.created", "vote.submitted"
-  actor: EventActor;
-  object: EventObject;
-  context: EventContext;
-  metadata: EventMetadata;
+  version: string;
+  event_type: string;
+  timestamp: string; // ISO 8601
+  process_id: string;
+  actor: string; // userId or DID
+  jurisdiction: string;
+  action_url: string;
+  source: EventSource;
+  dedupe_key?: string;
+  data: Record<string, unknown>;
+  meta: EventMeta;
 }
 
+/**
+ * Input for emitEvent() — callers provide the minimum required fields.
+ * The emitter fills in id, version, timestamp, source, action_url, and meta.
+ */
 export interface CreateEventInput {
-  type: string;
-  actor: string; // raw actor id — wrapped into { id } by the emitter
-  object: EventObject;
-  context: {
-    process_id: string;
-    hub_id: string;
-  };
+  event_type: string;
+  actor: string;
+  process_id: string;
+  hub_id: string;
+  jurisdiction: string;
+  data: Record<string, unknown>;
+  dedupe_key?: string;
+  visibility?: "public" | "restricted";
 }

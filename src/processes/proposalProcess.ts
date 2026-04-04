@@ -4,6 +4,10 @@
 // proposal (support_count >= support_threshold), it automatically converts
 // into a civic.vote process for formal decision-making.
 //
+// This handler is retained for backward compatibility. New code should
+// use the civic.vote module's built-in proposal lifecycle
+// (draft → proposed → threshold_met → active → ...) instead.
+//
 // Actions: proposal.support
 // Lifecycle: open → (threshold reached) → closed + new civic.vote created
 
@@ -11,6 +15,7 @@ import { Process, ProcessAction } from "../models/process.js";
 import { emitEvent } from "../events/eventEmitter.js";
 import { ProcessHandler } from "./types.js";
 import { getProcessFactory } from "./registry.js";
+import { activate, type VoteProcessState } from "../modules/civic.vote/index.js";
 
 // --- State types ---
 
@@ -125,14 +130,18 @@ function supportProposal(
   state.support_count += 1;
 
   emitEvent({
-    type: "proposal.supported",
+    event_type: "civic.process.action_taken",
     actor: action.actor,
-    object: {
-      type: "civic.proposal",
-      support_count: state.support_count,
-      support_threshold: state.support_threshold,
+    process_id: process.id,
+    hub_id: process.hubId,
+    jurisdiction: process.jurisdiction,
+    data: {
+      action: "proposal.supported",
+      proposal: {
+        support_count: state.support_count,
+        support_threshold: state.support_threshold,
+      },
     },
-    context: { process_id: process.id, hub_id: process.hubId },
   });
 
   // Check if threshold reached — promote to vote
@@ -145,8 +154,8 @@ function supportProposal(
 
 /**
  * Promote a proposal to a civic.vote process.
- * Called internally when the support threshold is reached.
- * Uses the process factory (injected by service layer) to create the new vote.
+ * The spawned vote starts in "draft" and is immediately activated,
+ * using the civic.vote module's lifecycle.
  */
 function promoteToVote(
   process: Process,
@@ -155,14 +164,18 @@ function promoteToVote(
 ): Record<string, unknown> {
   // Emit threshold reached
   emitEvent({
-    type: "proposal.threshold_reached",
+    event_type: "civic.process.action_taken",
     actor: action.actor,
-    object: {
-      type: "civic.proposal",
-      support_count: state.support_count,
-      support_threshold: state.support_threshold,
+    process_id: process.id,
+    hub_id: process.hubId,
+    jurisdiction: process.jurisdiction,
+    data: {
+      action: "proposal.threshold_reached",
+      proposal: {
+        support_count: state.support_count,
+        support_threshold: state.support_threshold,
+      },
     },
-    context: { process_id: process.id, hub_id: process.hubId },
   });
 
   // Create the vote using the injected factory
@@ -174,21 +187,40 @@ function promoteToVote(
     description: process.description,
     createdBy: process.createdBy,
     hubId: process.hubId,
-    state: { options: state.proposed_options },
+    jurisdiction: process.jurisdiction,
+    state: {
+      options: state.proposed_options,
+      activation_mode: "direct",
+    },
   });
+
+  // Immediately activate the spawned vote so it's ready for voting
+  const voteState = vote.state as unknown as VoteProcessState;
+  const voteCtx = {
+    process_id: vote.id,
+    hub_id: vote.hubId,
+    jurisdiction: vote.jurisdiction,
+    emit: emitEvent,
+  };
+  activate(voteState, action.actor, voteCtx);
+  vote.status = voteState.status;
 
   state.promoted_vote_id = vote.id;
 
   // Emit promotion event
   emitEvent({
-    type: "proposal.promoted_to_vote",
+    event_type: "civic.process.action_taken",
     actor: action.actor,
-    object: {
-      type: "civic.proposal",
-      vote_id: vote.id,
-      vote_title: vote.title,
+    process_id: process.id,
+    hub_id: process.hubId,
+    jurisdiction: process.jurisdiction,
+    data: {
+      action: "proposal.promoted_to_vote",
+      proposal: {
+        vote_id: vote.id,
+        vote_title: vote.title,
+      },
     },
-    context: { process_id: process.id, hub_id: process.hubId },
   });
 
   // Close the proposal

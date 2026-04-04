@@ -10,7 +10,7 @@ import {
 } from "../services/processService.js";
 
 export function handleCreateProcess(req: Request, res: Response): void {
-  const { definition, title, description, createdBy, state } = req.body;
+  const { definition, title, description, createdBy, jurisdiction, state, content } = req.body;
 
   if (!definition?.type || !title || !createdBy) {
     res.status(400).json({
@@ -24,7 +24,9 @@ export function handleCreateProcess(req: Request, res: Response): void {
     title,
     description: description ?? "",
     createdBy,
+    jurisdiction,
     state,
+    content,
   });
 
   res.status(201).json(process);

@@ -1,136 +1,53 @@
-// Debug controller — creates sample data for testing
+// Debug controller — loads sample data for development testing.
 // NOT for production use. All actions go through normal business logic.
+// Server starts clean with zero processes — seed data must be loaded manually via GET /debug/seed.
 
 import { Request, Response } from "express";
 import { createProcess, executeAction, clearProcesses } from "../services/processService.js";
 import { clearEvents, getEventCount } from "../events/eventStore.js";
+import { clearInputs, submitInput } from "../modules/civic.input/index.js";
+import { clearProposals } from "../modules/civic.proposals/index.js";
+import { clearAuth } from "../modules/civic.auth/index.js";
+import {
+  FLOYD_FLOCK_CAMERA,
+  type SeedScenario,
+} from "../debug/seedData.js";
 
-// --- Vote seed scenarios ---
+function runScenario(scenario: SeedScenario): Record<string, unknown> {
+  const process = createProcess(scenario.process);
 
-const VOTE_SCENARIOS = [
-  {
-    process: {
-      definition: { type: "civic.vote", version: "0.1" },
-      title: "Should we build a community garden?",
-      description: "Advisory vote on creating a new community garden in Riverside Park.",
-      createdBy: "user:alice",
-      state: { options: ["yes", "no", "abstain"] },
-    },
-    actions: [
-      { type: "vote.submit", actor: "user:alice", payload: { option: "yes" } },
-      { type: "vote.submit", actor: "user:bob", payload: { option: "yes" } },
-      { type: "vote.submit", actor: "user:carol", payload: { option: "no" } },
-      { type: "vote.submit", actor: "user:dave", payload: { option: "abstain" } },
-      { type: "vote.submit", actor: "user:eve", payload: { option: "yes" } },
-      { type: "vote.close", actor: "user:alice", payload: {} },
-    ],
-  },
-  {
-    process: {
-      definition: { type: "civic.vote", version: "0.1" },
-      title: "Approve budget allocation for park improvements?",
-      description: "Vote to allocate $50,000 from the community fund for playground equipment and trail repairs.",
-      createdBy: "user:bob",
-      state: { options: ["approve", "reject", "abstain"] },
-    },
-    actions: [
-      { type: "vote.submit", actor: "user:alice", payload: { option: "approve" } },
-      { type: "vote.submit", actor: "user:carol", payload: { option: "approve" } },
-      { type: "vote.submit", actor: "user:dave", payload: { option: "reject" } },
-    ],
-  },
-  {
-    process: {
-      definition: { type: "civic.vote", version: "0.1" },
-      title: "Change town hall meeting schedule?",
-      description: "Should we move the monthly town hall from Tuesday evenings to Saturday mornings?",
-      createdBy: "user:carol",
-      state: { options: ["tuesday", "saturday", "no preference"] },
-    },
-    actions: [
-      { type: "vote.submit", actor: "user:alice", payload: { option: "saturday" } },
-      { type: "vote.submit", actor: "user:bob", payload: { option: "tuesday" } },
-      { type: "vote.submit", actor: "user:dave", payload: { option: "saturday" } },
-      { type: "vote.submit", actor: "user:eve", payload: { option: "no preference" } },
-      { type: "vote.submit", actor: "user:frank", payload: { option: "saturday" } },
-    ],
-  },
-];
+  for (const action of scenario.actions) {
+    executeAction(process.id, action);
+  }
 
-// --- Proposal seed scenarios ---
+  if (scenario.inputs) {
+    for (const input of scenario.inputs) {
+      submitInput(process.id, input.author_id, input.body);
+    }
+  }
 
-const PROPOSAL_SCENARIOS = [
-  {
-    // This one will reach threshold (3 supporters) and auto-promote to a vote
-    process: {
-      definition: { type: "civic.proposal", version: "0.1" },
-      title: "Install solar panels on community center",
-      description: "Proposal to fund and install solar panels on the community center roof to reduce energy costs.",
-      createdBy: "user:alice",
-      state: { proposed_options: ["approve", "reject", "defer"], support_threshold: 3 },
-    },
-    actions: [
-      { type: "proposal.support", actor: "user:bob", payload: {} },
-      { type: "proposal.support", actor: "user:carol", payload: {} },
-      { type: "proposal.support", actor: "user:dave", payload: {} }, // hits threshold → promotes to vote
-    ],
-  },
-  {
-    // This one stays open — not enough support yet
-    process: {
-      definition: { type: "civic.proposal", version: "0.1" },
-      title: "Create a community bike-share program",
-      description: "Proposal to establish a small bike-share program with 10 bikes at key locations around town.",
-      createdBy: "user:eve",
-      state: { proposed_options: ["yes", "no"], support_threshold: 5 },
-    },
-    actions: [
-      { type: "proposal.support", actor: "user:alice", payload: {} },
-      { type: "proposal.support", actor: "user:bob", payload: {} },
-    ],
-  },
-];
+  return {
+    id: process.id,
+    type: process.definition.type,
+    title: process.title,
+    status: process.status,
+  };
+}
 
 export function handleSeed(_req: Request, res: Response): void {
   console.log("\n[seed] Clearing existing data...");
   clearProcesses();
   clearEvents();
+  clearInputs();
+  clearProposals();
+  clearAuth();
 
   console.log("[seed] Seeding system...");
 
   const createdProcesses: Record<string, unknown>[] = [];
 
-  // Seed votes
-  for (const scenario of VOTE_SCENARIOS) {
-    const process = createProcess(scenario.process);
-
-    for (const action of scenario.actions) {
-      executeAction(process.id, action);
-    }
-
-    createdProcesses.push({
-      id: process.id,
-      type: process.definition.type,
-      title: process.title,
-      status: process.status,
-    });
-  }
-
-  // Seed proposals
-  for (const scenario of PROPOSAL_SCENARIOS) {
-    const process = createProcess(scenario.process);
-
-    for (const action of scenario.actions) {
-      executeAction(process.id, action);
-    }
-
-    createdProcesses.push({
-      id: process.id,
-      type: process.definition.type,
-      title: process.title,
-      status: process.status,
-    });
-  }
+  // Floyd County Flock Camera — real pilot issue
+  createdProcesses.push(runScenario(FLOYD_FLOCK_CAMERA));
 
   const eventCount = getEventCount();
 

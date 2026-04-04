@@ -4,9 +4,13 @@
 // Events are the PRIMARY public interface of the hub.
 // External systems should consume from this store (via /events),
 // not from internal process APIs.
+//
+// DEV-ONLY: In-memory storage. All data is lost on restart.
+// Replace with a persistent store (e.g., SQLite, Postgres) before production.
 
 import { CivicEvent } from "../models/event.js";
 
+// DEV-ONLY: In-memory array — replace with persistent storage for production.
 const events: CivicEvent[] = [];
 
 export function appendEvent(event: CivicEvent): void {
@@ -18,7 +22,7 @@ export function getAllEvents(): CivicEvent[] {
 }
 
 export function getEventsByProcessId(processId: string): CivicEvent[] {
-  return events.filter((e) => e.context.process_id === processId);
+  return events.filter((e) => e.process_id === processId);
 }
 
 export function getEventCount(): number {

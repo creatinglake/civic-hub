@@ -17,16 +17,12 @@ import { emitEvent } from "../events/eventEmitter.js";
 import { generateId } from "../utils/id.js";
 import { getProcessHandler, setProcessFactory } from "../processes/registry.js";
 
-// In-memory process store
+// DEV-ONLY: In-memory process store — all data lost on restart.
+// Replace with persistent storage (e.g., SQLite, Postgres) before production.
 const processes = new Map<string, Process>();
 
 const HUB_ID = "civic-hub-local";
-
-// Map process types to their creation event types
-const CREATION_EVENT_TYPES: Record<string, string> = {
-  "civic.vote": "vote.created",
-  "civic.proposal": "proposal.created",
-};
+const DEFAULT_JURISDICTION = "local";
 
 export function createProcess(input: CreateProcessInput): Process {
   // Look up handler for this process type
@@ -41,36 +37,42 @@ export function createProcess(input: CreateProcessInput): Process {
   // Delegate state initialization to the handler
   const initialState = handler.initializeState(input.state ?? {});
 
+  // Use the state's status if available (e.g., civic.vote starts as "draft"),
+  // otherwise default to "open" for legacy process types
+  const stateStatus = (initialState as Record<string, unknown>).status as ProcessStatus | undefined;
+
   const process: Process = {
     id,
     definition: input.definition,
     title: input.title,
     description: input.description,
-    status: "open" as ProcessStatus,
+    status: stateStatus ?? ("open" as ProcessStatus),
     hubId: input.hubId ?? HUB_ID,
+    jurisdiction: input.jurisdiction ?? DEFAULT_JURISDICTION,
     createdBy: input.createdBy,
     createdAt: now,
     updatedAt: now,
     state: initialState,
+    ...(input.content ? { content: input.content } : {}),
   };
 
   processes.set(id, process);
 
   console.log(`[process] created ${process.definition.type} "${process.title}" (${id})`);
 
-  // Emit creation event — type varies by process type
-  const creationEventType = CREATION_EVENT_TYPES[input.definition.type] ?? "process.created";
-
+  // Emit creation event — canonical type for all process types
   emitEvent({
-    type: creationEventType,
+    event_type: "civic.process.created",
     actor: input.createdBy,
-    object: {
-      type: "civic.process",
-      id,
-      process_type: input.definition.type,
-      title: input.title,
+    process_id: id,
+    hub_id: process.hubId,
+    jurisdiction: process.jurisdiction,
+    data: {
+      process: {
+        type: input.definition.type,
+        title: input.title,
+      },
     },
-    context: { process_id: id, hub_id: process.hubId },
   });
 
   return process;
@@ -93,8 +95,9 @@ export function executeAction(
     throw new Error(`Process not found: ${processId}`);
   }
 
-  if (process.status === "closed") {
-    throw new Error(`Process ${processId} is closed and cannot accept actions`);
+  // Only block on truly terminal states — handlers manage their own state validation
+  if (process.status === "finalized") {
+    throw new Error(`Process ${processId} is finalized and cannot accept actions`);
   }
 
   // Look up handler for this process type
@@ -115,14 +118,17 @@ export function executeAction(
   // Emit process.updated only when a meaningful state change occurred
   if (process.status !== previousStatus) {
     emitEvent({
-      type: "process.updated",
+      event_type: "civic.process.updated",
       actor: action.actor,
-      object: {
-        type: "civic.process",
-        id: process.id,
-        status: process.status,
+      process_id: process.id,
+      hub_id: process.hubId,
+      jurisdiction: process.jurisdiction,
+      data: {
+        process: {
+          previous_status: previousStatus,
+          status: process.status,
+        },
       },
-      context: { process_id: process.id, hub_id: process.hubId },
     });
   }
 

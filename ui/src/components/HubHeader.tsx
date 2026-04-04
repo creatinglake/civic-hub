@@ -7,9 +7,9 @@ export default function HubHeader() {
         <img src={hub.banner_url} alt="" className="hub-banner-img" />
       </div>
       <div className="hub-info">
-        <h1 className="hub-name">{hub.name}</h1>
-        <p className="hub-description">{hub.description}</p>
-        <span className="hub-members">{hub.member_count} members</span>
+        <h1 className="hub-name">{hub.jurisdiction}</h1>
+        <span className="hub-label">{hub.label}</span>
+        <p className="hub-tagline">{hub.tagline}</p>
       </div>
     </header>
   );

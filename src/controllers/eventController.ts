@@ -8,14 +8,14 @@ import { getAllEvents, getEventsByProcessId } from "../events/eventStore.js";
 
 export function handleGetEvents(req: Request, res: Response): void {
   const processId = req.query.process_id as string | undefined;
-  const eventType = req.query.type as string | undefined;
+  const eventType = req.query.event_type as string | undefined;
   const pretty = req.query.pretty === "true";
 
   let events = processId ? getEventsByProcessId(processId) : getAllEvents();
 
   // Optional: further filter by event type (combinable with process_id)
   if (eventType) {
-    events = events.filter((e) => e.type === eventType);
+    events = events.filter((e) => e.event_type === eventType);
   }
 
   const body = { events, count: events.length };
