@@ -318,3 +318,34 @@ export function submitInput(processId: string, authorId: string, body: string): 
     body,
   });
 }
+
+// --- Vote Log & Receipts ---
+
+export interface VoteLogEntry {
+  receipt_id: string;
+  choice: string;
+}
+
+export interface VoteLogResponse {
+  process_id: string;
+  status: string;
+  available: boolean;
+  message?: string;
+  total_votes?: number;
+  log: VoteLogEntry[];
+}
+
+export interface ReceiptVerifyResponse {
+  found: boolean;
+  receipt_id?: string;
+  choice?: string;
+  message?: string;
+}
+
+export function getVoteLog(processId: string): Promise<VoteLogResponse> {
+  return request("GET", `/votes/${processId}/log`);
+}
+
+export function verifyReceipt(processId: string, receiptId: string): Promise<ReceiptVerifyResponse> {
+  return request("GET", `/votes/${processId}/verify?receipt=${encodeURIComponent(receiptId)}`);
+}

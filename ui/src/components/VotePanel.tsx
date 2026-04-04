@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import type { VoteState } from "../services/api";
 import { submitVote, supportVote, unsupportVote } from "../services/api";
 import { useRequireAuth } from "../hooks/useRequireAuth";
@@ -14,6 +15,7 @@ export default function VotePanel({ process, actor, onVoted }: Props) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [justVoted, setJustVoted] = useState<string | null>(null);
+  const [receiptId, setReceiptId] = useState<string | null>(null);
   const { requireAuth, showAuthModal, closeAuthModal, handleAuthComplete } = useRequireAuth();
 
   const isActive = process.status === "active";
@@ -26,8 +28,10 @@ export default function VotePanel({ process, actor, onVoted }: Props) {
     setLoading(true);
     setError(null);
     try {
-      await submitVote(process.id, actor, option);
+      const result = await submitVote(process.id, actor, option);
+      const receipt = (result.result as Record<string, unknown>)?.receipt_id as string | undefined;
       setJustVoted(option);
+      if (receipt) setReceiptId(receipt);
       onVoted();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Vote failed");
@@ -150,7 +154,27 @@ export default function VotePanel({ process, actor, onVoted }: Props) {
               </button>
             ))}
           </div>
-          {justVoted && <p className="vote-confirmation">You voted: {justVoted}</p>}
+          {justVoted && (
+            <div className="vote-receipt">
+              <p className="vote-receipt-title">Your vote has been recorded</p>
+              <p className="vote-receipt-explanation">
+                This is your anonymous vote receipt. You can use it to verify that
+                your vote was included in the final results. Your identity is not
+                associated with this receipt.
+              </p>
+              {receiptId && (
+                <>
+                  <p className="vote-receipt-id">Your receipt: <code>{receiptId}</code></p>
+                  <Link
+                    to={`/votes/${process.id}/log?receipt=${encodeURIComponent(receiptId)}`}
+                    className="vote-receipt-verify-link"
+                  >
+                    Verify my vote
+                  </Link>
+                </>
+              )}
+            </div>
+          )}
           {error && <p className="error">{error}</p>}
         </div>
       )}
@@ -159,6 +183,15 @@ export default function VotePanel({ process, actor, onVoted }: Props) {
       {isDone && (
         <div className="vote-options">
           <h4>{process.status === "finalized" ? "Voting finalized" : "Voting closed"}</h4>
+        </div>
+      )}
+
+      {/* View Vote Log — only shown when vote is closed or finalized */}
+      {isDone && (
+        <div className="vote-log-link-section">
+          <Link to={`/votes/${process.id}/log`} className="vote-log-link-button">
+            View Vote Log
+          </Link>
         </div>
       )}
 

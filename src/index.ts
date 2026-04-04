@@ -7,6 +7,7 @@ import inputRoutes from "./routes/inputRoutes.js";
 import proposalRoutes from "./routes/proposalRoutes.js";
 import adminRoutes from "./routes/adminRoutes.js";
 import authRoutes from "./routes/authRoutes.js";
+import voteLogRoutes from "./routes/voteLogRoutes.js";
 import { seedOnStartup } from "./debug/autoSeed.js";
 
 const app = express();
@@ -39,6 +40,9 @@ app.use("/proposals", proposalRoutes);
 
 // Admin endpoints — proposal review and conversion to votes
 app.use("/admin", adminRoutes);
+
+// Vote log and receipt verification
+app.use("/votes", voteLogRoutes);
 
 // --- Primary public interfaces ---
 // Events are the PRIMARY public interface of the hub.
@@ -78,6 +82,8 @@ app.get("/", (_req, res) => {
       "POST /auth/residency": "Affirm Floyd County residency (requires auth)",
       "GET /auth/me": "Get current authenticated user",
       "POST /auth/logout": "Destroy session",
+      "GET /votes/:id/log": "Public vote audit log (available after vote closes)",
+      "GET /votes/:id/verify?receipt=X": "Verify a vote receipt",
       "GET /events": "List all events (primary public interface)",
       "GET /events?process_id=X": "Filter events by process",
       "GET /events?type=X": "Filter events by type (e.g., civic.process.vote_submitted)",

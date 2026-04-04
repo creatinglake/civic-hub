@@ -8,6 +8,7 @@ import { clearEvents, getEventCount } from "../events/eventStore.js";
 import { clearInputs, submitInput } from "../modules/civic.input/index.js";
 import { clearProposals } from "../modules/civic.proposals/index.js";
 import { clearAuth } from "../modules/civic.auth/index.js";
+import { clearReceipts } from "../modules/civic.receipts/index.js";
 import {
   FLOYD_FLOCK_CAMERA,
   type SeedScenario,
@@ -41,6 +42,7 @@ export function handleSeed(_req: Request, res: Response): void {
   clearInputs();
   clearProposals();
   clearAuth();
+  clearReceipts();
 
   console.log("[seed] Seeding system...");
 

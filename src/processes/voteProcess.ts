@@ -20,6 +20,7 @@ import {
   getSummary,
   type VoteProcessState,
 } from "../modules/civic.vote/index.js";
+import { recordVote } from "../modules/civic.receipts/index.js";
 
 // --- Helpers ---
 
@@ -83,7 +84,11 @@ const voteProcess: ProcessHandler = {
         const option = action.payload.option as string;
         const outcome = submitVote(state, action.actor, option, ctx);
         syncStatus(process, outcome.state);
-        result = outcome.result;
+
+        // Generate anonymous receipt — receipt_id is NOT stored with user_id
+        const receipt = recordVote(process.id, action.actor, option);
+
+        result = { ...outcome.result, receipt_id: receipt.receipt_id };
         break;
       }
       case "process.close": {
