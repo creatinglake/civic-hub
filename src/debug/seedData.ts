@@ -15,6 +15,85 @@ export interface SeedScenario {
   inputs?: { author_id: string; body: string }[];
 }
 
+// --- Floyd County Green Box Dumpster Sites (active vote) ---
+
+export const FLOYD_GREEN_BOX: SeedScenario = {
+  process: {
+    definition: { type: "civic.vote", version: "0.1" },
+    title: "Add More Secure Dumpster (Green Box) Sites",
+    description:
+      "Should Floyd County invest in building additional fenced-in dumpster (green box) sites to improve access and reduce wildlife interference?",
+    createdBy: "user:civic-admin",
+    jurisdiction: "us-va-floyd",
+    state: {
+      options: [
+        "Yes \u2014 build additional fenced-in dumpster sites in key areas",
+        "No \u2014 maintain current number and locations",
+        "Unsure / need more information",
+      ],
+      support_threshold: 3,
+      voting_duration_ms: 14 * 24 * 60 * 60 * 1000, // 14 days
+      activation_mode: "direct",
+    },
+    content: {
+      core_question:
+        "Should Floyd County invest in building additional fenced-in dumpster (green box) sites to improve access and reduce wildlife interference?",
+      sections: [
+        {
+          title: "Background",
+          body: [
+            "Floyd County residents rely on green box dumpster sites for waste disposal. In recent years, bears and other wildlife have increasingly accessed these dumpsters, creating mess, safety concerns, and additional maintenance costs.",
+            "The county has built a fenced-in dumpster facility on Christiansburg Pike that has significantly reduced wildlife access and improved cleanliness. However, for many residents, this location is not convenient, requiring longer travel times for regular waste disposal.",
+            "Expanding secure, fenced-in dumpster sites across the county could improve accessibility while also addressing wildlife-related issues.",
+          ],
+        },
+        {
+          title: "Key considerations",
+          body: [
+            "Accessibility: Are current dumpster locations convenient for most residents?",
+            "Wildlife impact: Do fenced-in sites meaningfully reduce bear interference?",
+            "Cost: What is the cost of building and maintaining additional sites?",
+            "Land use: Where would new sites be located?",
+          ],
+        },
+        {
+          title: "Potential locations (examples)",
+          body: [
+            "Northern Floyd County",
+            "Near Check / Indian Valley area",
+            "Additional site in eastern or western portions of the county",
+            "North Route 8 at the old Green Box site",
+          ],
+        },
+        {
+          title: "What your vote means",
+          body: [
+            "This vote provides a community signal to county officials about whether residents support expanding secure dumpster infrastructure.",
+            "Results are advisory but intended to reflect the preferences of participating Floyd County residents.",
+          ],
+        },
+      ],
+      key_tradeoff: "Improved access and wildlife management vs. cost of new infrastructure",
+      links: [],
+      community_input: {
+        prompt: "Do you have suggestions for locations, concerns, or alternatives?",
+        label: "Optional: Share your thoughts (does not affect vote results)",
+      },
+      after_vote: {
+        body: "This vote is advisory and does not directly determine policy. The goal is to provide a clear signal of community sentiment to county officials.",
+        recipients: [
+          "Floyd County Board of Supervisors",
+        ],
+      },
+    },
+  },
+  actions: [
+    // Direct activation — goes straight from draft to active
+    { type: "process.activate", actor: "user:civic-admin", payload: {} },
+  ],
+  inputs: [],
+};
+
 // --- Floyd County Flock Camera Issue (real pilot issue) ---
 
 export const FLOYD_FLOCK_CAMERA: SeedScenario = {

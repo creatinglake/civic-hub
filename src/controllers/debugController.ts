@@ -11,6 +11,7 @@ import { clearAuth } from "../modules/civic.auth/index.js";
 import { clearReceipts } from "../modules/civic.receipts/index.js";
 import {
   FLOYD_FLOCK_CAMERA,
+  FLOYD_GREEN_BOX,
   type SeedScenario,
 } from "../debug/seedData.js";
 
@@ -48,7 +49,10 @@ export function handleSeed(_req: Request, res: Response): void {
 
   const createdProcesses: Record<string, unknown>[] = [];
 
-  // Floyd County Flock Camera — real pilot issue
+  // Floyd County Green Box — active vote
+  createdProcesses.push(runScenario(FLOYD_GREEN_BOX));
+
+  // Floyd County Flock Camera — proposed vote
   createdProcesses.push(runScenario(FLOYD_FLOCK_CAMERA));
 
   const eventCount = getEventCount();

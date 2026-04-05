@@ -3,7 +3,7 @@
 
 import { createProcess, executeAction, getAllProcesses } from "../services/processService.js";
 import { submitInput } from "../modules/civic.input/index.js";
-import { FLOYD_FLOCK_CAMERA, type SeedScenario } from "./seedData.js";
+import { FLOYD_FLOCK_CAMERA, FLOYD_GREEN_BOX, type SeedScenario } from "./seedData.js";
 
 function runScenario(scenario: SeedScenario): void {
   const process = createProcess(scenario.process);
@@ -30,6 +30,7 @@ export function seedOnStartup(): void {
   }
 
   console.log("[auto-seed] Seeding initial data...");
+  runScenario(FLOYD_GREEN_BOX);
   runScenario(FLOYD_FLOCK_CAMERA);
   console.log("[auto-seed] Done\n");
 }
