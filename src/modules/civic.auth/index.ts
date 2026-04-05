@@ -87,8 +87,9 @@ export function verifyCode(
     throw new Error("Verification code expired. Request a new code.");
   }
 
-  // Check code
-  if (pending.code !== code) {
+  // Check code — in DEMO_MODE, accept 000000 as a universal bypass code
+  const isDemoMode = process.env.DEMO_MODE === "true";
+  if (pending.code !== code && !(isDemoMode && code === "000000")) {
     throw new Error("Invalid verification code");
   }
 

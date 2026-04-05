@@ -3,7 +3,7 @@
  * Manages session token in localStorage.
  */
 
-const API_BASE = "http://localhost:3000";
+const API_BASE = import.meta.env.DEV ? "http://localhost:3000" : "/api";
 
 async function request<T>(method: string, path: string, body?: unknown, token?: string): Promise<T> {
   const headers: Record<string, string> = { "Content-Type": "application/json" };

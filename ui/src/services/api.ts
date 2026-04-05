@@ -4,7 +4,7 @@
  * Actions go through the internal process action endpoint.
  */
 
-const API_BASE = "http://localhost:3000";
+const API_BASE = import.meta.env.DEV ? "http://localhost:3000" : "/api";
 
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
