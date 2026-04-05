@@ -14,18 +14,26 @@ import "./App.css";
 function NavBar() {
   const { user, logout } = useAuth();
 
+  const isAdmin = user?.email === "creatinglake@gmail.com";
+
   return (
     <nav className="app-nav">
-      <Link to="/" className="nav-link">Home</Link>
-      <Link to="/propose" className="nav-link">Propose</Link>
-      <Link to="/about" className="nav-link">About</Link>
-      <Link to="/admin/proposals" className="nav-link nav-link-admin">Admin</Link>
-      {user ? (
-        <div className="nav-user">
-          <span className="nav-user-email">{user.email}</span>
-          <button className="nav-logout" onClick={logout}>Log out</button>
-        </div>
-      ) : null}
+      <div className="nav-links">
+        <Link to="/" className="nav-link">Home</Link>
+        <Link to="/propose" className="nav-link">Propose</Link>
+        <Link to="/about" className="nav-link">About</Link>
+      </div>
+      <div className="nav-right">
+        {isAdmin && (
+          <Link to="/admin/proposals" className="nav-link nav-link-admin">Admin</Link>
+        )}
+        {user ? (
+          <div className="nav-user">
+            <span className="nav-user-email">{user.email}</span>
+            <button className="nav-logout" onClick={logout}>Log out</button>
+          </div>
+        ) : null}
+      </div>
     </nav>
   );
 }

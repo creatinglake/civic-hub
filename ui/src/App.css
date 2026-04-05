@@ -796,10 +796,23 @@
 
 .app-nav {
   display: flex;
-  gap: 1.5rem;
+  align-items: center;
+  justify-content: space-between;
   padding: 0.75rem 1.5rem;
   border-bottom: 1px solid var(--border-color);
   background: var(--card-background);
+}
+
+.nav-links {
+  display: flex;
+  gap: 1.5rem;
+  align-items: center;
+}
+
+.nav-right {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
 }
 
 .nav-link {
@@ -1073,7 +1086,6 @@
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  margin-left: auto;
 }
 
 .nav-user-email {
