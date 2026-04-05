@@ -179,7 +179,7 @@ export default function AuthModal({ onComplete, onDismiss }: Props) {
               We sent a 6-digit code to <strong>{email}</strong>
             </p>
             <p className="auth-hint">
-              (Dev mode: check the server console for the code)
+              Use code: 000000
             </p>
 
             <div className="form-field">

@@ -76,25 +76,29 @@ export function verifyCode(
 ): { token: string; user: User } {
   const normalizedEmail = email.trim().toLowerCase();
 
-  const pending = pendingVerifications.get(normalizedEmail);
-  if (!pending) {
-    throw new Error("No pending verification for this email. Request a new code.");
-  }
-
-  // Check expiry
-  if (new Date() > new Date(pending.expires_at)) {
-    pendingVerifications.delete(normalizedEmail);
-    throw new Error("Verification code expired. Request a new code.");
-  }
-
-  // Check code — in DEMO_MODE, accept 000000 as a universal bypass code
   const isDemoMode = process.env.DEMO_MODE === "true";
-  if (pending.code !== code && !(isDemoMode && code === "000000")) {
-    throw new Error("Invalid verification code");
-  }
+  const pending = pendingVerifications.get(normalizedEmail);
 
-  // Clear pending
-  pendingVerifications.delete(normalizedEmail);
+  if (isDemoMode && code === "000000") {
+    // DEMO_MODE bypass — skip all verification checks
+    if (pending) pendingVerifications.delete(normalizedEmail);
+  } else {
+    // Normal flow — require pending verification, check expiry and code
+    if (!pending) {
+      throw new Error("No pending verification for this email. Request a new code.");
+    }
+
+    if (new Date() > new Date(pending.expires_at)) {
+      pendingVerifications.delete(normalizedEmail);
+      throw new Error("Verification code expired. Request a new code.");
+    }
+
+    if (pending.code !== code) {
+      throw new Error("Invalid verification code");
+    }
+
+    pendingVerifications.delete(normalizedEmail);
+  }
 
   // Find or create user
   let userId = usersByEmail.get(normalizedEmail);
