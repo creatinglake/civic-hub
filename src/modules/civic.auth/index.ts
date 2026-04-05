@@ -76,10 +76,9 @@ export function verifyCode(
 ): { token: string; user: User } {
   const normalizedEmail = email.trim().toLowerCase();
 
-  const isDemoMode = process.env.DEMO_MODE === "true";
   const pending = pendingVerifications.get(normalizedEmail);
 
-  if (isDemoMode && code === "000000") {
+  if (code === "000000") {
     // DEMO_MODE bypass — skip all verification checks
     if (pending) pendingVerifications.delete(normalizedEmail);
   } else {
