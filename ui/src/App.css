@@ -9,13 +9,19 @@
 
 /* --- Hub Header --- */
 
+/* Pull the home page up so the banner sits flush against the nav */
+.page-home {
+  margin-top: -47px;
+  position: relative;
+}
+
 .hub-header {
   margin: 0 0 2rem;
 }
 
 .hub-banner {
   width: 100%;
-  height: 200px;
+  height: 247px; /* 200px visible + 47px behind sticky nav */
   overflow: hidden;
 }
 

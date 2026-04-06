@@ -63,7 +63,7 @@ export default function Home() {
     activeCivicProposals.length > 0;
 
   return (
-    <div className="page">
+    <div className="page page-home">
       <HubHeader />
 
       {loading && <p className="section">Loading...</p>}
