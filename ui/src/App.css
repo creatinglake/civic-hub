@@ -1451,15 +1451,19 @@
 }
 
 .propose-link {
-  font-size: 0.9rem;
+  display: inline-block;
+  font-size: 0.85rem;
   font-weight: 600;
-  color: var(--primary-color);
+  color: #fff;
+  background: var(--accent-color, #2a7d4f);
   text-decoration: none;
-  transition: color 0.15s;
+  padding: 0.4rem 1rem;
+  border-radius: 6px;
+  transition: background 0.15s;
 }
 
 .propose-link:hover {
-  color: var(--primary-hover);
+  background: var(--accent-hover, #1f5e3b);
 }
 
 .inline-link {
@@ -1795,4 +1799,21 @@
 
 .hint a {
   color: var(--primary-color);
+}
+
+.retry-button {
+  display: inline-block;
+  margin-top: 0.75rem;
+  padding: 0.5rem 1.25rem;
+  font-size: 0.9rem;
+  color: #fff;
+  background: var(--accent-color, #2a7d4f);
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.retry-button:hover {
+  background: var(--accent-hover, #1f5e3b);
 }

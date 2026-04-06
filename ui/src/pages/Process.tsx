@@ -46,12 +46,22 @@ export default function Process() {
 
   const currentActor = actorId ?? "anonymous";
 
-  const fetchState = useCallback(() => {
+  const fetchState = useCallback(async (retries = 2) => {
     if (!id) return;
-    getProcessState(id, currentActor)
-      .then(setProcess)
-      .catch((err) => setError(err.message))
-      .finally(() => setLoading(false));
+    try {
+      const state = await getProcessState(id, currentActor);
+      setProcess(state);
+      setError(null);
+    } catch (err) {
+      if (retries > 0) {
+        // Retry after a short delay — serverless cold start may need a moment
+        await new Promise((r) => setTimeout(r, 1000));
+        return fetchState(retries - 1);
+      }
+      setError(err instanceof Error ? err.message : "Failed to load");
+    } finally {
+      setLoading(false);
+    }
   }, [id, currentActor]);
 
   useEffect(() => {
@@ -59,7 +69,15 @@ export default function Process() {
   }, [fetchState]);
 
   if (loading) return <p className="detail-page">Loading...</p>;
-  if (error) return <p className="detail-page error">Error: {error}</p>;
+  if (error) return (
+    <div className="page detail-page">
+      <Link to="/" className="back-link">&larr; Back to home</Link>
+      <p className="error">Error: {error}</p>
+      <button className="retry-button" onClick={() => { setLoading(true); setError(null); fetchState(); }}>
+        Try again
+      </button>
+    </div>
+  );
   if (!process) return <p className="detail-page">Not found.</p>;
 
   const isVote = process.type === "civic.vote";
