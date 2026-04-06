@@ -14,7 +14,7 @@ import proposalRoutes from "./routes/proposalRoutes.js";
 import adminRoutes from "./routes/adminRoutes.js";
 import authRoutes from "./routes/authRoutes.js";
 import voteLogRoutes from "./routes/voteLogRoutes.js";
-import { seedOnStartup } from "./debug/autoSeed.js";
+import { seedOnStartup, ensureSeeded } from "./debug/autoSeed.js";
 
 const app = express();
 
@@ -31,6 +31,9 @@ app.use((_req, res, next) => {
 });
 
 app.use(express.json());
+
+// Ensure seed data exists on every request (handles Vercel multi-instance cold starts)
+app.use(ensureSeeded as express.RequestHandler);
 
 // Auth endpoints — email-based authentication
 app.use("/auth", authRoutes);

@@ -25,7 +25,6 @@ export function seedOnStartup(): void {
   // Only seed if the store is empty (don't duplicate on hot-reload)
   const existing = getAllProcesses();
   if (existing.length > 0) {
-    console.log(`[auto-seed] Skipped — ${existing.length} process(es) already loaded`);
     return;
   }
 
@@ -33,4 +32,14 @@ export function seedOnStartup(): void {
   runScenario(FLOYD_GREEN_BOX);
   runScenario(FLOYD_FLOCK_CAMERA);
   console.log("[auto-seed] Done\n");
+}
+
+/**
+ * Express middleware — ensures seed data exists before handling any request.
+ * On Vercel, each serverless instance has its own in-memory store.
+ * This guarantees data is present regardless of cold-start timing.
+ */
+export function ensureSeeded(_req: unknown, _res: unknown, next: () => void): void {
+  seedOnStartup();
+  next();
 }
