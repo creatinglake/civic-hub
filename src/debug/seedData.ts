@@ -3,6 +3,7 @@
 
 export interface SeedScenario {
   process: {
+    id?: string; // Fixed ID for deterministic seeding (survives serverless cold starts)
     definition: { type: string; version: string };
     title: string;
     description: string;
@@ -19,6 +20,7 @@ export interface SeedScenario {
 
 export const FLOYD_GREEN_BOX: SeedScenario = {
   process: {
+    id: "proc_greenbox_floyd_001",
     definition: { type: "civic.vote", version: "0.1" },
     title: "Add More Secure Dumpster (Green Box) Sites",
     description:
@@ -98,6 +100,7 @@ export const FLOYD_GREEN_BOX: SeedScenario = {
 
 export const FLOYD_FLOCK_CAMERA: SeedScenario = {
   process: {
+    id: "proc_flockcam_floyd_001",
     definition: { type: "civic.vote", version: "0.1" },
     title: "Floyd County Flock Camera Use",
     description: "Should Floyd County continue using Flock Safety license plate reader cameras?",

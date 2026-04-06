@@ -31,7 +31,7 @@ export function createProcess(input: CreateProcessInput): Process {
     throw new Error(`Unsupported process type: ${input.definition.type}`);
   }
 
-  const id = generateId("proc");
+  const id = input.id ?? generateId("proc");
   const now = new Date().toISOString();
 
   // Delegate state initialization to the handler

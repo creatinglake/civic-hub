@@ -70,6 +70,7 @@ export interface Process {
 }
 
 export interface CreateProcessInput {
+  id?: string; // Optional fixed ID (used by seed data for deterministic IDs)
   definition: ProcessDefinition;
   title: string;
   description: string;
