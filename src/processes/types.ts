@@ -15,8 +15,14 @@ export interface ProcessHandler {
   /** Initialize process-specific state from creation input */
   initializeState(input: Record<string, unknown>): Record<string, unknown>;
 
-  /** Handle an action — returns result data. May mutate process/state and emit events. */
-  handleAction(process: Process, action: ProcessAction): Record<string, unknown>;
+  /**
+   * Handle an action — returns result data. May mutate process/state and emit events.
+   * Async because event emission is durable (persisted before the promise resolves).
+   */
+  handleAction(
+    process: Process,
+    action: ProcessAction,
+  ): Promise<Record<string, unknown>>;
 
   /** Produce a UI-friendly read model. Actor is optional (for visibility rules). */
   getReadModel(process: Process, actor?: string): Record<string, unknown>;
@@ -29,5 +35,8 @@ export interface ProcessHandler {
  * Factory function type for creating processes from within handlers.
  * Injected by the service layer to avoid circular dependencies.
  * Used by handlers that need to spawn new processes (e.g., proposal → vote).
+ *
+ * Async because creation emits `civic.process.created` via the durable
+ * event store.
  */
-export type ProcessFactory = (input: CreateProcessInput) => Process;
+export type ProcessFactory = (input: CreateProcessInput) => Promise<Process>;

@@ -2,12 +2,13 @@
 //
 // All events flow through the hub's centralized emitEvent().
 // These helpers provide typed wrappers for proposal-specific events.
+// They are async because event emission is durable.
 //
 // GUARDRAIL: This module MUST NOT import from civic.vote.
 
 import type { CreateEventInput } from "../../models/event.js";
 
-export type EmitEventFn = (input: CreateEventInput) => void;
+export type EmitEventFn = (input: CreateEventInput) => Promise<unknown>;
 
 const HUB_ID = "civic-hub-local";
 
@@ -18,12 +19,12 @@ interface EventContext {
   emit: EmitEventFn;
 }
 
-export function emitProposalSubmitted(
+export async function emitProposalSubmitted(
   ctx: EventContext,
   actor: string,
-  data: { title: string }
-): void {
-  ctx.emit({
+  data: { title: string },
+): Promise<void> {
+  await ctx.emit({
     event_type: "civic.proposal.submitted",
     actor,
     process_id: ctx.proposal_id,
@@ -33,12 +34,12 @@ export function emitProposalSubmitted(
   });
 }
 
-export function emitProposalSupported(
+export async function emitProposalSupported(
   ctx: EventContext,
   actor: string,
-  data: { support_count: number; support_threshold: number }
-): void {
-  ctx.emit({
+  data: { support_count: number; support_threshold: number },
+): Promise<void> {
+  await ctx.emit({
     event_type: "civic.proposal.supported",
     actor,
     process_id: ctx.proposal_id,
@@ -48,12 +49,12 @@ export function emitProposalSupported(
   });
 }
 
-export function emitProposalEndorsed(
+export async function emitProposalEndorsed(
   ctx: EventContext,
   actor: string,
-  data: { support_count: number; support_threshold: number }
-): void {
-  ctx.emit({
+  data: { support_count: number; support_threshold: number },
+): Promise<void> {
+  await ctx.emit({
     event_type: "civic.proposal.endorsed",
     actor,
     process_id: ctx.proposal_id,
@@ -63,12 +64,12 @@ export function emitProposalEndorsed(
   });
 }
 
-export function emitProposalConverted(
+export async function emitProposalConverted(
   ctx: EventContext,
   actor: string,
-  data: { vote_process_id: string; vote_title: string }
-): void {
-  ctx.emit({
+  data: { vote_process_id: string; vote_title: string },
+): Promise<void> {
+  await ctx.emit({
     event_type: "civic.proposal.converted",
     actor,
     process_id: ctx.proposal_id,

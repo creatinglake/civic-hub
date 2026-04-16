@@ -17,63 +17,67 @@ import {
 } from "../modules/civic.proposals/index.js";
 import { emitProposalConverted } from "../modules/civic.proposals/events.js";
 import { createProcess } from "../services/processService.js";
+import { getAuthUser } from "../middleware/auth.js";
 
 /**
  * GET /admin/proposals — list proposals for admin review.
  * Returns endorsed proposals first, then submitted.
  */
-export function handleAdminListProposals(req: Request, res: Response): void {
+export async function handleAdminListProposals(
+  req: Request,
+  res: Response,
+): Promise<void> {
   const statusFilter = req.query.status as string | undefined;
 
-  let proposals;
-  if (statusFilter) {
-    proposals = listProposals(statusFilter as any);
-  } else {
-    // Default: show endorsed first (needing review), then submitted
-    const endorsed = listEndorsedProposals();
-    const submitted = listProposals("submitted")
-      .sort((a, b) => b.support_count - a.support_count);
-    proposals = [...endorsed, ...submitted];
-  }
+  try {
+    let proposals;
+    if (statusFilter) {
+      proposals = await listProposals(statusFilter as any);
+    } else {
+      // Default: show endorsed first (needing review), then submitted.
+      const endorsed = await listEndorsedProposals();
+      const submitted = (await listProposals("submitted")).sort(
+        (a, b) => b.support_count - a.support_count,
+      );
+      proposals = [...endorsed, ...submitted];
+    }
 
-  const summaries = proposals.map(getProposalSummary);
-  res.json(summaries);
+    const summaries = proposals.map(getProposalSummary);
+    res.json(summaries);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Unknown error";
+    res.status(500).json({ error: message });
+  }
 }
 
 /**
  * GET /admin/proposals/:id — get full proposal detail for admin review
  */
-export function handleAdminGetProposal(req: Request, res: Response): void {
+export async function handleAdminGetProposal(
+  req: Request,
+  res: Response,
+): Promise<void> {
   const id = req.params.id as string;
-  const readModel = getProposalReadModel(id);
-
-  if (!readModel) {
-    res.status(404).json({ error: "Proposal not found" });
-    return;
+  try {
+    const readModel = await getProposalReadModel(id);
+    if (!readModel) {
+      res.status(404).json({ error: "Proposal not found" });
+      return;
+    }
+    res.json(readModel);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Unknown error";
+    res.status(500).json({ error: message });
   }
-
-  res.json(readModel);
 }
 
 /**
  * POST /admin/proposals/:id/convert — convert a proposal to a civic.vote process.
- *
- * Request body contains the curated vote definition:
- * {
- *   title: string (required),
- *   description: string,
- *   question: string,
- *   options: string[],
- *   sections: ContentSection[],
- *   key_tradeoff: string,
- *   learn_more_links: ContentLink[],
- *   community_input: CommunityInputConfig,
- *   after_vote: AfterVoteInfo,
- *   jurisdiction: string,
- *   actor: string (admin who is converting)
- * }
  */
-export function handleConvertProposal(req: Request, res: Response): void {
+export async function handleConvertProposal(
+  req: Request,
+  res: Response,
+): Promise<void> {
   const proposalId = req.params.id as string;
   const {
     title,
@@ -86,34 +90,31 @@ export function handleConvertProposal(req: Request, res: Response): void {
     community_input,
     after_vote,
     jurisdiction,
-    actor,
     support_threshold,
     voting_duration_ms,
   } = req.body;
 
-  if (!actor) {
-    res.status(400).json({ error: "Missing required field: actor" });
-    return;
-  }
-
-  // Verify proposal exists and is in the right state
-  const proposal = getProposal(proposalId);
-  if (!proposal) {
-    res.status(404).json({ error: "Proposal not found" });
-    return;
-  }
-
-  if (proposal.status !== "endorsed") {
-    res.status(400).json({
-      error: `Cannot convert proposal: must be in "endorsed" state, currently "${proposal.status}"`,
-    });
-    return;
-  }
-
-  const voteTitle = title || proposal.title;
-  const voteDescription = description || proposal.description;
-
   try {
+    // Actor is the authenticated admin user (enforced by requireAdmin middleware).
+    const admin = getAuthUser(res);
+    const actor = admin.id;
+    // Verify proposal exists and is in the right state
+    const proposal = await getProposal(proposalId);
+    if (!proposal) {
+      res.status(404).json({ error: "Proposal not found" });
+      return;
+    }
+
+    if (proposal.status !== "endorsed") {
+      res.status(400).json({
+        error: `Cannot convert proposal: must be in "endorsed" state, currently "${proposal.status}"`,
+      });
+      return;
+    }
+
+    const voteTitle = title || proposal.title;
+    const voteDescription = description || proposal.description;
+
     // Build structured content for the vote
     const content: Record<string, unknown> = {};
     if (question) content.core_question = question;
@@ -124,7 +125,7 @@ export function handleConvertProposal(req: Request, res: Response): void {
     if (after_vote) content.after_vote = after_vote;
 
     // Create the civic.vote process via the process service
-    const voteProcess = createProcess({
+    const voteProcess = await createProcess({
       definition: { type: "civic.vote", version: "0.1" },
       title: voteTitle,
       description: voteDescription,
@@ -141,19 +142,19 @@ export function handleConvertProposal(req: Request, res: Response): void {
       ...(Object.keys(content).length > 0 ? { content } : {}),
     });
 
-    // Mark proposal as converted
-    markConverted(proposalId);
+    // Mark proposal as converted, linking back to the new vote.
+    await markConverted(proposalId, voteProcess.id);
 
     // Emit conversion event
-    emitProposalConverted(
+    await emitProposalConverted(
       { proposal_id: proposalId, emit: emitEvent },
       actor,
-      { vote_process_id: voteProcess.id, vote_title: voteProcess.title }
+      { vote_process_id: voteProcess.id, vote_title: voteProcess.title },
     );
 
     console.log(
       `[admin] Converted proposal "${proposal.title}" (${proposalId}) → ` +
-      `vote "${voteProcess.title}" (${voteProcess.id})`
+      `vote "${voteProcess.title}" (${voteProcess.id})`,
     );
 
     res.status(201).json({
@@ -174,11 +175,14 @@ export function handleConvertProposal(req: Request, res: Response): void {
 /**
  * POST /admin/proposals/:id/archive — archive a proposal (reject/shelve)
  */
-export function handleArchiveProposal(req: Request, res: Response): void {
+export async function handleArchiveProposal(
+  req: Request,
+  res: Response,
+): Promise<void> {
   const id = req.params.id as string;
 
   try {
-    archiveProposal(id);
+    await archiveProposal(id);
     res.json({ message: "Proposal archived", proposal_id: id });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";

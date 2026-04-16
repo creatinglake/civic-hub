@@ -2,6 +2,9 @@
 //
 // Maps lifecycle transitions and actions to canonical event types.
 // Uses the host hub's event emitter via the injected EmitEventFn.
+//
+// All helpers are async — the host hub durably stores events before
+// the promise resolves. Callers must await.
 
 import type { EmitEventFn, VoteProcessState, VoteResult } from "./models.js";
 
@@ -12,12 +15,12 @@ interface EventContext {
   jurisdiction: string;
 }
 
-export function emitProposed(
+export async function emitProposed(
   ctx: EventContext,
   actor: string,
-  state: VoteProcessState
-): void {
-  ctx.emit({
+  state: VoteProcessState,
+): Promise<void> {
+  await ctx.emit({
     event_type: "civic.process.proposed",
     actor,
     process_id: ctx.process_id,
@@ -32,12 +35,12 @@ export function emitProposed(
   });
 }
 
-export function emitThresholdMet(
+export async function emitThresholdMet(
   ctx: EventContext,
   actor: string,
-  state: VoteProcessState
-): void {
-  ctx.emit({
+  state: VoteProcessState,
+): Promise<void> {
+  await ctx.emit({
     event_type: "civic.process.threshold_met",
     actor,
     process_id: ctx.process_id,
@@ -52,12 +55,12 @@ export function emitThresholdMet(
   });
 }
 
-export function emitStarted(
+export async function emitStarted(
   ctx: EventContext,
   actor: string,
-  state: VoteProcessState
-): void {
-  ctx.emit({
+  state: VoteProcessState,
+): Promise<void> {
+  await ctx.emit({
     event_type: "civic.process.started",
     actor,
     process_id: ctx.process_id,
@@ -73,13 +76,13 @@ export function emitStarted(
   });
 }
 
-export function emitVoteSubmitted(
+export async function emitVoteSubmitted(
   ctx: EventContext,
   actor: string,
   option: string,
-  previous_vote: string | null
-): void {
-  ctx.emit({
+  previous_vote: string | null,
+): Promise<void> {
+  await ctx.emit({
     event_type: "civic.process.vote_submitted",
     actor,
     process_id: ctx.process_id,
@@ -91,12 +94,12 @@ export function emitVoteSubmitted(
   });
 }
 
-export function emitEnded(
+export async function emitEnded(
   ctx: EventContext,
   actor: string,
-  result: VoteResult
-): void {
-  ctx.emit({
+  result: VoteResult,
+): Promise<void> {
+  await ctx.emit({
     event_type: "civic.process.ended",
     actor,
     process_id: ctx.process_id,
@@ -111,12 +114,12 @@ export function emitEnded(
   });
 }
 
-export function emitResultPublished(
+export async function emitResultPublished(
   ctx: EventContext,
   actor: string,
-  result: VoteResult
-): void {
-  ctx.emit({
+  result: VoteResult,
+): Promise<void> {
+  await ctx.emit({
     event_type: "civic.process.result_published",
     actor,
     process_id: ctx.process_id,

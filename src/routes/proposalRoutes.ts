@@ -1,9 +1,9 @@
 // Proposal routes — user-facing proposal submission and endorsement
 //
-// POST /proposals           — submit a new proposal
-// GET  /proposals           — list proposals (optional ?status= filter)
-// GET  /proposals/:id       — get proposal detail (optional ?actor= for support status)
-// POST /proposals/:id/support — endorse a proposal
+// POST /proposals           — submit a new proposal         (requireResident)
+// GET  /proposals           — list proposals                (public)
+// GET  /proposals/:id       — get proposal detail           (public)
+// POST /proposals/:id/support — endorse a proposal          (requireResident)
 
 import { Router } from "express";
 import {
@@ -12,12 +12,13 @@ import {
   handleGetProposal,
   handleSupportProposal,
 } from "../controllers/proposalController.js";
+import { requireResident } from "../middleware/auth.js";
 
 const router = Router();
 
-router.post("/", handleSubmitProposal);
+router.post("/", requireResident, handleSubmitProposal);
 router.get("/", handleListProposals);
 router.get("/:id", handleGetProposal);
-router.post("/:id/support", handleSupportProposal);
+router.post("/:id/support", requireResident, handleSupportProposal);
 
 export default router;

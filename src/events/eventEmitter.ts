@@ -1,21 +1,25 @@
-// Centralized event creation and emission
-// All events flow through here to ensure consistency with the Civic Event Spec v0.1.
+// Centralized event creation and emission.
 //
-// Events are the PRIMARY public interface of the hub.
-// All external systems should rely on events, not internal process APIs.
+// All events flow through here to ensure consistency with the Civic Event
+// Spec v0.1 (with known divergences documented in HANDOFF.md).
+//
+// Events are the PRIMARY public interface of the hub. All external systems
+// should rely on events, not internal process APIs.
 
 import { CivicEvent, CreateEventInput } from "../models/event.js";
 import { appendEvent } from "./eventStore.js";
 import { generateId } from "../utils/id.js";
 
-const HUB_ID = "civic-hub-local";
 const HUB_URL = process.env.BASE_URL ?? "http://localhost:3000";
 
 /**
- * Create and store a spec-compliant civic event.
+ * Create and durably store a spec-compliant civic event.
  * This is the ONLY place events should be created.
+ *
+ * Returns the stored event. Throws if the DB write fails — callers should
+ * surface the error (events are the source of truth; never silently drop).
  */
-export function emitEvent(input: CreateEventInput): CivicEvent {
+export async function emitEvent(input: CreateEventInput): Promise<CivicEvent> {
   const event: CivicEvent = {
     id: generateId("evt"),
     version: "1.0",
@@ -39,7 +43,7 @@ export function emitEvent(input: CreateEventInput): CivicEvent {
     event.dedupe_key = input.dedupe_key;
   }
 
-  appendEvent(event);
+  await appendEvent(event);
 
   console.log(`[event] ${event.event_type} by ${event.actor} (${event.id})`);
 

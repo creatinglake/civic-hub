@@ -7,6 +7,9 @@
 // The host hub provides:
 //   - a VoteConfig object
 //   - an EmitEventFn callback for event emission
+//
+// Action functions are async because event emission is durable — the host
+// hub awaits the DB write before the action completes.
 
 import type {
   VoteConfig,
@@ -118,15 +121,15 @@ interface ProcessContext {
  * Propose a vote for community support.
  * Transition: draft → proposed
  */
-export function propose(
+export async function propose(
   state: VoteProcessState,
   actor: string,
   ctx: ProcessContext
-): ActionOutcome {
+): Promise<ActionOutcome> {
   assertTransition(state.status, "proposed", state.config.activation_mode);
   state.status = "proposed";
 
-  emitProposed(ctx, actor, state);
+  await emitProposed(ctx, actor, state);
 
   return { state, result: { status: "proposed" } };
 }
@@ -135,11 +138,11 @@ export function propose(
  * Add support/endorsement to a proposed vote.
  * May trigger proposed → threshold_met (and auto-activation if configured).
  */
-export function addSupport(
+export async function addSupport(
   state: VoteProcessState,
   actor: string,
   ctx: ProcessContext
-): ActionOutcome {
+): Promise<ActionOutcome> {
   if (!isAcceptingSupport(state.status)) {
     throw new Error(`Cannot support: process is in "${state.status}" state, not "proposed"`);
   }
@@ -156,7 +159,7 @@ export function addSupport(
     assertTransition(state.status, "threshold_met", state.config.activation_mode);
     state.status = "threshold_met";
 
-    emitThresholdMet(ctx, actor, state);
+    await emitThresholdMet(ctx, actor, state);
 
     // In proposal_required mode, auto-activate once threshold is met.
     // In direct mode, this path is unreachable (draft → active skips proposal).
@@ -184,11 +187,11 @@ export function addSupport(
  * Only allowed while the process is in "proposed" state (before threshold is met).
  * Once threshold_met or active, endorsements are locked.
  */
-export function removeSupport(
+export async function removeSupport(
   state: VoteProcessState,
   actor: string,
   _ctx: ProcessContext
-): ActionOutcome {
+): Promise<ActionOutcome> {
   if (!isAcceptingSupport(state.status)) {
     throw new Error(
       `Cannot remove endorsement: process is in "${state.status}" state. ` +
@@ -213,11 +216,11 @@ export function removeSupport(
  * Activate the vote — opens the voting window.
  * Transition: draft → active (direct) or threshold_met → active
  */
-export function activate(
+export async function activate(
   state: VoteProcessState,
   actor: string,
   ctx: ProcessContext
-): ActionOutcome {
+): Promise<ActionOutcome> {
   assertTransition(state.status, "active", state.config.activation_mode);
 
   const now = new Date();
@@ -227,7 +230,7 @@ export function activate(
     now.getTime() + state.config.voting_duration_ms
   ).toISOString();
 
-  emitStarted(ctx, actor, state);
+  await emitStarted(ctx, actor, state);
 
   return {
     state,
@@ -242,12 +245,12 @@ export function activate(
 /**
  * Submit a vote during the active period.
  */
-export function submitVote(
+export async function submitVote(
   state: VoteProcessState,
   actor: string,
   option: string,
   ctx: ProcessContext
-): ActionOutcome {
+): Promise<ActionOutcome> {
   if (!isVotingOpen(state.status)) {
     throw new Error(`Cannot submit vote: process is in "${state.status}" state, not "active"`);
   }
@@ -271,7 +274,7 @@ export function submitVote(
   const previous_vote = state.votes[actor] ?? null;
   state.votes[actor] = option;
 
-  emitVoteSubmitted(ctx, actor, option, previous_vote);
+  await emitVoteSubmitted(ctx, actor, option, previous_vote);
 
   return { state, result: { option, previous_vote } };
 }
@@ -280,17 +283,17 @@ export function submitVote(
  * Close the vote — ends the voting window.
  * Transition: active → closed
  */
-export function closeVote(
+export async function closeVote(
   state: VoteProcessState,
   actor: string,
   ctx: ProcessContext
-): ActionOutcome {
+): Promise<ActionOutcome> {
   assertTransition(state.status, "closed", state.config.activation_mode);
 
   state.status = "closed";
   const result = computeTally(state.votes, state.options);
 
-  emitEnded(ctx, actor, result);
+  await emitEnded(ctx, actor, result);
 
   return {
     state,
@@ -302,18 +305,18 @@ export function closeVote(
  * Finalize the vote — compute and publish results.
  * Transition: closed → finalized
  */
-export function finalizeVote(
+export async function finalizeVote(
   state: VoteProcessState,
   actor: string,
   ctx: ProcessContext
-): ActionOutcome {
+): Promise<ActionOutcome> {
   assertTransition(state.status, "finalized", state.config.activation_mode);
 
   const result = computeTally(state.votes, state.options);
   state.status = "finalized";
   state.result = result;
 
-  emitResultPublished(ctx, actor, result);
+  await emitResultPublished(ctx, actor, result);
 
   return {
     state,

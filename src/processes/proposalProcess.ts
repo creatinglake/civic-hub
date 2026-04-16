@@ -57,25 +57,25 @@ const proposalProcess: ProcessHandler = {
     };
   },
 
-  handleAction(
+  async handleAction(
     process: Process,
-    action: ProcessAction
-  ): Record<string, unknown> {
+    action: ProcessAction,
+  ): Promise<Record<string, unknown>> {
     const state = process.state as unknown as ProposalState;
 
     switch (action.type) {
       case "proposal.support":
-        return supportProposal(process, state, action);
+        return await supportProposal(process, state, action);
       default:
         throw new Error(
-          `Unknown action type for civic.proposal: ${action.type}`
+          `Unknown action type for civic.proposal: ${action.type}`,
         );
     }
   },
 
   getReadModel(
     process: Process,
-    actor?: string
+    actor?: string,
   ): Record<string, unknown> {
     const state = process.state as unknown as ProposalState;
 
@@ -113,11 +113,11 @@ const proposalProcess: ProcessHandler = {
 
 // --- Internal action handlers ---
 
-function supportProposal(
+async function supportProposal(
   process: Process,
   state: ProposalState,
-  action: ProcessAction
-): Record<string, unknown> {
+  action: ProcessAction,
+): Promise<Record<string, unknown>> {
   if (state.status === "closed") {
     throw new Error("Cannot support proposal: proposal is closed");
   }
@@ -129,7 +129,7 @@ function supportProposal(
   state.supporters[action.actor] = true;
   state.support_count += 1;
 
-  emitEvent({
+  await emitEvent({
     event_type: "civic.process.action_taken",
     actor: action.actor,
     process_id: process.id,
@@ -146,7 +146,7 @@ function supportProposal(
 
   // Check if threshold reached — promote to vote
   if (state.support_count >= state.support_threshold) {
-    return promoteToVote(process, state, action);
+    return await promoteToVote(process, state, action);
   }
 
   return { support_count: state.support_count };
@@ -157,13 +157,13 @@ function supportProposal(
  * The spawned vote starts in "draft" and is immediately activated,
  * using the civic.vote module's lifecycle.
  */
-function promoteToVote(
+async function promoteToVote(
   process: Process,
   state: ProposalState,
-  action: ProcessAction
-): Record<string, unknown> {
+  action: ProcessAction,
+): Promise<Record<string, unknown>> {
   // Emit threshold reached
-  emitEvent({
+  await emitEvent({
     event_type: "civic.process.action_taken",
     actor: action.actor,
     process_id: process.id,
@@ -181,7 +181,7 @@ function promoteToVote(
   // Create the vote using the injected factory
   const createProcess = getProcessFactory();
 
-  const vote = createProcess({
+  const vote = await createProcess({
     definition: { type: "civic.vote", version: "0.1" },
     title: process.title,
     description: process.description,
@@ -202,13 +202,13 @@ function promoteToVote(
     jurisdiction: vote.jurisdiction,
     emit: emitEvent,
   };
-  activate(voteState, action.actor, voteCtx);
+  await activate(voteState, action.actor, voteCtx);
   vote.status = voteState.status;
 
   state.promoted_vote_id = vote.id;
 
   // Emit promotion event
-  emitEvent({
+  await emitEvent({
     event_type: "civic.process.action_taken",
     actor: action.actor,
     process_id: process.id,

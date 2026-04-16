@@ -20,7 +20,10 @@ import {
  * POST /auth/request-code
  * Body: { email: string }
  */
-export function handleRequestCode(req: Request, res: Response): void {
+export async function handleRequestCode(
+  req: Request,
+  res: Response,
+): Promise<void> {
   const { email } = req.body;
 
   if (!email) {
@@ -29,7 +32,7 @@ export function handleRequestCode(req: Request, res: Response): void {
   }
 
   try {
-    const result = requestVerification(email);
+    const result = await requestVerification(email);
     res.json(result);
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
@@ -41,7 +44,10 @@ export function handleRequestCode(req: Request, res: Response): void {
  * POST /auth/verify
  * Body: { email: string, code: string }
  */
-export function handleVerify(req: Request, res: Response): void {
+export async function handleVerify(
+  req: Request,
+  res: Response,
+): Promise<void> {
   const { email, code } = req.body;
 
   if (!email || !code) {
@@ -50,7 +56,7 @@ export function handleVerify(req: Request, res: Response): void {
   }
 
   try {
-    const result = verifyCode(email, code);
+    const result = await verifyCode(email, code);
     res.json(result);
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
@@ -62,21 +68,24 @@ export function handleVerify(req: Request, res: Response): void {
  * POST /auth/residency
  * Header: Authorization: Bearer <token>
  */
-export function handleAffirmResidency(req: Request, res: Response): void {
+export async function handleAffirmResidency(
+  req: Request,
+  res: Response,
+): Promise<void> {
   const token = extractToken(req);
   if (!token) {
     res.status(401).json({ error: "Authentication required" });
     return;
   }
 
-  const user = getUserFromToken(token);
+  const user = await getUserFromToken(token);
   if (!user) {
     res.status(401).json({ error: "Invalid or expired session" });
     return;
   }
 
   try {
-    const updated = affirmResidency(user.id);
+    const updated = await affirmResidency(user.id);
     res.json({ user: updated });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
@@ -88,14 +97,17 @@ export function handleAffirmResidency(req: Request, res: Response): void {
  * GET /auth/me
  * Header: Authorization: Bearer <token>
  */
-export function handleGetMe(req: Request, res: Response): void {
+export async function handleGetMe(
+  req: Request,
+  res: Response,
+): Promise<void> {
   const token = extractToken(req);
   if (!token) {
     res.status(401).json({ error: "Authentication required" });
     return;
   }
 
-  const user = getUserFromToken(token);
+  const user = await getUserFromToken(token);
   if (!user) {
     res.status(401).json({ error: "Invalid or expired session" });
     return;
@@ -108,10 +120,13 @@ export function handleGetMe(req: Request, res: Response): void {
  * POST /auth/logout
  * Header: Authorization: Bearer <token>
  */
-export function handleLogout(req: Request, res: Response): void {
+export async function handleLogout(
+  req: Request,
+  res: Response,
+): Promise<void> {
   const token = extractToken(req);
   if (token) {
-    logout(token);
+    await logout(token);
   }
   res.json({ message: "Logged out" });
 }

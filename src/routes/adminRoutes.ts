@@ -1,9 +1,6 @@
-// Admin routes — proposal review and conversion
-//
-// GET  /admin/proposals              — list proposals for admin review
-// GET  /admin/proposals/:id          — get full proposal detail
-// POST /admin/proposals/:id/convert  — convert endorsed proposal to civic.vote
-// POST /admin/proposals/:id/archive  — archive (reject/shelve) a proposal
+// Admin routes — proposal review and conversion.
+// Every route requires the authenticated user's email to be listed in
+// the CIVIC_ADMIN_EMAILS env var.
 
 import { Router } from "express";
 import {
@@ -12,8 +9,11 @@ import {
   handleConvertProposal,
   handleArchiveProposal,
 } from "../controllers/adminController.js";
+import { requireAdmin } from "../middleware/auth.js";
 
 const router = Router();
+
+router.use(requireAdmin);
 
 router.get("/proposals", handleAdminListProposals);
 router.get("/proposals/:id", handleAdminGetProposal);

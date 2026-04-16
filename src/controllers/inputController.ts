@@ -3,24 +3,29 @@
 import { Request, Response } from "express";
 import { submitInput, getInputsByProcess } from "../modules/civic.input/index.js";
 import { getProcess } from "../services/processService.js";
+import { getAuthUser } from "../middleware/auth.js";
 
-export function handleSubmitInput(req: Request, res: Response): void {
+export async function handleSubmitInput(
+  req: Request,
+  res: Response,
+): Promise<void> {
   const processId = req.params.id as string;
-  const { author_id, body } = req.body;
+  const { body } = req.body;
 
-  if (!author_id || !body) {
-    res.status(400).json({ error: "Missing required fields: author_id, body" });
-    return;
-  }
-
-  const process = getProcess(processId);
-  if (!process) {
-    res.status(404).json({ error: "Process not found" });
+  if (!body) {
+    res.status(400).json({ error: "Missing required field: body" });
     return;
   }
 
   try {
-    const input = submitInput(processId, author_id, body);
+    const process = await getProcess(processId);
+    if (!process) {
+      res.status(404).json({ error: "Process not found" });
+      return;
+    }
+
+    const user = getAuthUser(res);
+    const input = await submitInput(processId, user.id, body);
     res.status(201).json(input);
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
@@ -28,15 +33,21 @@ export function handleSubmitInput(req: Request, res: Response): void {
   }
 }
 
-export function handleGetInputs(req: Request, res: Response): void {
+export async function handleGetInputs(
+  req: Request,
+  res: Response,
+): Promise<void> {
   const processId = req.params.id as string;
-
-  const process = getProcess(processId);
-  if (!process) {
-    res.status(404).json({ error: "Process not found" });
-    return;
+  try {
+    const process = await getProcess(processId);
+    if (!process) {
+      res.status(404).json({ error: "Process not found" });
+      return;
+    }
+    const inputs = await getInputsByProcess(processId);
+    res.json(inputs);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Unknown error";
+    res.status(500).json({ error: message });
   }
-
-  const inputs = getInputsByProcess(processId);
-  res.json(inputs);
 }

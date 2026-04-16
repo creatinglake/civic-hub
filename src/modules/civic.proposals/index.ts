@@ -6,12 +6,13 @@
 // Proposals are raw, unstructured ideas. They become structured
 // civic.vote processes only after admin review and curation.
 //
+// Storage: Postgres (proposals, proposal_supports tables).
+//
 // GUARDRAIL: This module MUST NOT import from civic.vote.
 // The conversion to a vote is handled by the service/controller layer,
 // which coordinates between this module and the vote module.
-//
-// DEV-ONLY: In-memory storage — all data lost on restart.
 
+import { getDb } from "../../db/client.js";
 import { generateId } from "../../utils/id.js";
 import type {
   Proposal,
@@ -36,12 +37,7 @@ export type {
 } from "./models.js";
 export { DEFAULT_PROPOSAL_CONFIG } from "./models.js";
 
-// --- In-memory stores (DEV-ONLY) ---
-
-const proposals = new Map<string, Proposal>();
-const supportsByProposal = new Map<string, ProposalSupport[]>();
-
-// --- Configuration ---
+// --- Configuration ---------------------------------------------------------
 
 let config: ProposalConfig = { proposal_support_threshold: 5 };
 
@@ -53,43 +49,79 @@ export function getProposalConfig(): ProposalConfig {
   return { ...config };
 }
 
-// --- Proposal CRUD ---
+// --- Row <-> model mapping -------------------------------------------------
+
+interface ProposalRow {
+  id: string;
+  title: string;
+  description: string | null;
+  links: string[] | null;
+  status: ProposalStatus;
+  support_count: number;
+  submitted_by: string | null;
+  converted_to_process_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+function rowToProposal(row: ProposalRow): Proposal {
+  return {
+    id: row.id,
+    title: row.title,
+    description: row.description ?? "",
+    optional_links: row.links ?? [],
+    submitted_by: row.submitted_by ?? "",
+    status: row.status,
+    support_count: row.support_count,
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+  };
+}
+
+// --- Proposal CRUD ---------------------------------------------------------
 
 /**
  * Create a new proposal from user submission.
  */
-export function createProposal(
+export async function createProposal(
   input: CreateProposalInput,
-  emit: EmitEventFn
-): Proposal {
+  emit: EmitEventFn,
+): Promise<Proposal> {
   if (!input.title || input.title.trim().length === 0) {
     throw new Error("Proposal title is required");
   }
 
   const id = generateId("prop");
-  const now = new Date().toISOString();
+  const links = (input.optional_links ?? []).filter((l) => l.trim().length > 0);
 
-  const proposal: Proposal = {
-    id,
-    title: input.title.trim(),
-    description: (input.description ?? "").trim(),
-    optional_links: (input.optional_links ?? []).filter((l) => l.trim().length > 0),
-    submitted_by: input.submitted_by,
-    status: "submitted",
-    support_count: 0,
-    created_at: now,
-    updated_at: now,
-  };
+  const { data, error } = await getDb()
+    .from("proposals")
+    .insert({
+      id,
+      title: input.title.trim(),
+      description: (input.description ?? "").trim(),
+      links,
+      status: "submitted" as ProposalStatus,
+      support_count: 0,
+      submitted_by: input.submitted_by,
+    })
+    .select()
+    .single();
 
-  proposals.set(id, proposal);
-  supportsByProposal.set(id, []);
+  if (error) {
+    throw new Error(`Proposals: failed to create: ${error.message}`);
+  }
 
-  console.log(`[proposal] created "${proposal.title}" (${id}) by ${proposal.submitted_by}`);
+  const proposal = rowToProposal(data as ProposalRow);
 
-  emitProposalSubmitted(
+  console.log(
+    `[proposal] created "${proposal.title}" (${id}) by ${proposal.submitted_by}`,
+  );
+
+  await emitProposalSubmitted(
     { proposal_id: id, emit },
     input.submitted_by,
-    { title: proposal.title }
+    { title: proposal.title },
   );
 
   return proposal;
@@ -98,172 +130,251 @@ export function createProposal(
 /**
  * Get a proposal by ID.
  */
-export function getProposal(id: string): Proposal | undefined {
-  return proposals.get(id);
+export async function getProposal(id: string): Promise<Proposal | undefined> {
+  const { data, error } = await getDb()
+    .from("proposals")
+    .select("*")
+    .eq("id", id)
+    .maybeSingle();
+  if (error) throw new Error(`Proposals: ${error.message}`);
+  if (!data) return undefined;
+  return rowToProposal(data as ProposalRow);
 }
 
 /**
- * List all proposals, optionally filtered by status.
+ * List all proposals, optionally filtered by status. Newest first.
  */
-export function listProposals(statusFilter?: ProposalStatus): Proposal[] {
-  const all = Array.from(proposals.values());
+export async function listProposals(
+  statusFilter?: ProposalStatus,
+): Promise<Proposal[]> {
+  let query = getDb()
+    .from("proposals")
+    .select("*")
+    .order("created_at", { ascending: false });
+
   if (statusFilter) {
-    return all.filter((p) => p.status === statusFilter);
+    query = query.eq("status", statusFilter);
   }
-  return all;
+
+  const { data, error } = await query;
+  if (error) throw new Error(`Proposals: ${error.message}`);
+  return (data ?? []).map((r) => rowToProposal(r as ProposalRow));
 }
 
 /**
- * List proposals that need admin review (endorsed status).
- * Sorted by most supported first, then most recent.
+ * List proposals needing admin review (endorsed).
+ * Most supported first, then most recent.
  */
-export function listEndorsedProposals(): Proposal[] {
-  return Array.from(proposals.values())
-    .filter((p) => p.status === "endorsed")
-    .sort((a, b) => {
-      // Most supported first
-      if (b.support_count !== a.support_count) {
-        return b.support_count - a.support_count;
-      }
-      // Then most recent
-      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-    });
+export async function listEndorsedProposals(): Promise<Proposal[]> {
+  const { data, error } = await getDb()
+    .from("proposals")
+    .select("*")
+    .eq("status", "endorsed")
+    .order("support_count", { ascending: false })
+    .order("created_at", { ascending: false });
+  if (error) throw new Error(`Proposals: ${error.message}`);
+  return (data ?? []).map((r) => rowToProposal(r as ProposalRow));
 }
 
-// --- Support / Endorsement ---
+// --- Support / Endorsement -------------------------------------------------
 
 /**
- * Add support from a user. If threshold is reached, transitions to "endorsed".
- * Returns the updated proposal.
+ * Add support from a user. If the endorsement threshold is reached,
+ * transitions the proposal to "endorsed".
+ *
+ * Race-safe: composite primary key on proposal_supports rejects duplicate
+ * (proposal_id, user_id) pairs atomically. support_count is reconciled
+ * from the authoritative count in the supports table.
  */
-export function supportProposal(
+export async function supportProposal(
   proposalId: string,
   userId: string,
-  emit: EmitEventFn
-): Proposal {
-  const proposal = proposals.get(proposalId);
+  emit: EmitEventFn,
+): Promise<Proposal> {
+  const db = getDb();
+
+  // Load current proposal and validate state.
+  const proposal = await getProposal(proposalId);
   if (!proposal) {
     throw new Error(`Proposal not found: ${proposalId}`);
   }
-
   if (proposal.status !== "submitted") {
     throw new Error(
       `Cannot support proposal: proposal is in "${proposal.status}" state. ` +
-      `Only proposals in "submitted" state accept endorsements.`
+      `Only proposals in "submitted" state accept endorsements.`,
     );
   }
 
-  // Check for duplicate support
-  const supports = supportsByProposal.get(proposalId) ?? [];
-  if (supports.some((s) => s.user_id === userId)) {
-    throw new Error("You have already supported this proposal");
-  }
-
-  // Add support record
-  const support: ProposalSupport = {
-    id: generateId("sup"),
+  // Insert support — composite PK catches duplicates atomically.
+  const { error: supErr } = await db.from("proposal_supports").insert({
     proposal_id: proposalId,
     user_id: userId,
-    created_at: new Date().toISOString(),
-  };
-  supports.push(support);
-  supportsByProposal.set(proposalId, supports);
+  });
 
-  proposal.support_count += 1;
-  proposal.updated_at = new Date().toISOString();
+  if (supErr) {
+    if (supErr.code === "23505") {
+      throw new Error("You have already supported this proposal");
+    }
+    throw new Error(`Proposals: ${supErr.message}`);
+  }
 
-  emitProposalSupported(
+  // Recount from the authoritative source (the supports table).
+  const { count: supportCount, error: countErr } = await db
+    .from("proposal_supports")
+    .select("*", { count: "exact", head: true })
+    .eq("proposal_id", proposalId);
+  if (countErr) throw new Error(`Proposals: ${countErr.message}`);
+  const newCount = supportCount ?? 0;
+
+  const thresholdReached = newCount >= config.proposal_support_threshold;
+  const newStatus: ProposalStatus = thresholdReached ? "endorsed" : "submitted";
+
+  // Update the proposal row with the new count (and status, if crossing threshold).
+  const { data: updated, error: updErr } = await db
+    .from("proposals")
+    .update({
+      support_count: newCount,
+      status: newStatus,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", proposalId)
+    .select()
+    .single();
+  if (updErr) throw new Error(`Proposals: ${updErr.message}`);
+
+  const result = rowToProposal(updated as ProposalRow);
+
+  await emitProposalSupported(
     { proposal_id: proposalId, emit },
     userId,
     {
-      support_count: proposal.support_count,
+      support_count: result.support_count,
       support_threshold: config.proposal_support_threshold,
-    }
+    },
   );
 
-  // Check if threshold reached
-  if (proposal.support_count >= config.proposal_support_threshold) {
-    proposal.status = "endorsed";
-
-    emitProposalEndorsed(
+  // Emit endorsed event exactly once — when we just crossed the threshold.
+  if (thresholdReached && proposal.status === "submitted") {
+    await emitProposalEndorsed(
       { proposal_id: proposalId, emit },
       userId,
       {
-        support_count: proposal.support_count,
+        support_count: result.support_count,
         support_threshold: config.proposal_support_threshold,
-      }
+      },
     );
-
     console.log(
-      `[proposal] "${proposal.title}" reached endorsement threshold ` +
-      `(${proposal.support_count}/${config.proposal_support_threshold})`
+      `[proposal] "${result.title}" reached endorsement threshold ` +
+      `(${result.support_count}/${config.proposal_support_threshold})`,
     );
   }
 
-  return proposal;
+  return result;
 }
 
 /**
  * Check if a user has supported a proposal.
  */
-export function hasUserSupported(proposalId: string, userId: string): boolean {
-  const supports = supportsByProposal.get(proposalId) ?? [];
-  return supports.some((s) => s.user_id === userId);
+export async function hasUserSupported(
+  proposalId: string,
+  userId: string,
+): Promise<boolean> {
+  const { count, error } = await getDb()
+    .from("proposal_supports")
+    .select("*", { count: "exact", head: true })
+    .eq("proposal_id", proposalId)
+    .eq("user_id", userId);
+  if (error) throw new Error(`Proposals: ${error.message}`);
+  return (count ?? 0) > 0;
 }
 
 /**
  * Get the support records for a proposal.
  */
-export function getProposalSupports(proposalId: string): ProposalSupport[] {
-  return supportsByProposal.get(proposalId) ?? [];
+export async function getProposalSupports(
+  proposalId: string,
+): Promise<ProposalSupport[]> {
+  const { data, error } = await getDb()
+    .from("proposal_supports")
+    .select("*")
+    .eq("proposal_id", proposalId)
+    .order("created_at", { ascending: true });
+  if (error) throw new Error(`Proposals: ${error.message}`);
+  return (data ?? []).map((row, i) => ({
+    id: `${row.proposal_id}-${i}`, // synthetic — DB uses composite PK
+    proposal_id: row.proposal_id,
+    user_id: row.user_id,
+    created_at: row.created_at,
+  }));
 }
 
-// --- Status transitions ---
+// --- Status transitions ----------------------------------------------------
 
 /**
  * Mark a proposal as converted (after admin creates a vote from it).
  * Called by the service layer, not directly by API consumers.
  */
-export function markConverted(proposalId: string): void {
-  const proposal = proposals.get(proposalId);
+export async function markConverted(
+  proposalId: string,
+  voteProcessId?: string,
+): Promise<void> {
+  const proposal = await getProposal(proposalId);
   if (!proposal) {
     throw new Error(`Proposal not found: ${proposalId}`);
   }
   if (proposal.status !== "endorsed") {
     throw new Error(
-      `Cannot convert proposal: must be in "endorsed" state, currently "${proposal.status}"`
+      `Cannot convert proposal: must be in "endorsed" state, currently "${proposal.status}"`,
     );
   }
-  proposal.status = "converted";
-  proposal.updated_at = new Date().toISOString();
+
+  const { error } = await getDb()
+    .from("proposals")
+    .update({
+      status: "converted" as ProposalStatus,
+      converted_to_process_id: voteProcessId ?? null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", proposalId);
+  if (error) throw new Error(`Proposals: ${error.message}`);
 }
 
 /**
  * Archive a proposal (admin action — reject or shelve).
  */
-export function archiveProposal(proposalId: string): void {
-  const proposal = proposals.get(proposalId);
+export async function archiveProposal(proposalId: string): Promise<void> {
+  const proposal = await getProposal(proposalId);
   if (!proposal) {
     throw new Error(`Proposal not found: ${proposalId}`);
   }
   if (proposal.status === "converted") {
     throw new Error("Cannot archive a converted proposal");
   }
-  proposal.status = "archived";
-  proposal.updated_at = new Date().toISOString();
+
+  const { error } = await getDb()
+    .from("proposals")
+    .update({
+      status: "archived" as ProposalStatus,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", proposalId);
+  if (error) throw new Error(`Proposals: ${error.message}`);
 }
 
-// --- Read model ---
+// --- Read models -----------------------------------------------------------
 
 /**
- * Get a UI-friendly read model for a proposal.
+ * Get a UI-friendly read model for a proposal. If `actor` is provided,
+ * includes whether that actor has supported.
  */
-export function getProposalReadModel(
+export async function getProposalReadModel(
   proposalId: string,
-  actor?: string
-): Record<string, unknown> | undefined {
-  const proposal = proposals.get(proposalId);
+  actor?: string,
+): Promise<Record<string, unknown> | undefined> {
+  const proposal = await getProposal(proposalId);
   if (!proposal) return undefined;
+
+  const hasSupported = actor ? await hasUserSupported(proposalId, actor) : null;
 
   return {
     id: proposal.id,
@@ -274,14 +385,14 @@ export function getProposalReadModel(
     status: proposal.status,
     support_count: proposal.support_count,
     support_threshold: config.proposal_support_threshold,
-    has_supported: actor ? hasUserSupported(proposalId, actor) : null,
+    has_supported: hasSupported,
     created_at: proposal.created_at,
     updated_at: proposal.updated_at,
   };
 }
 
 /**
- * Get a summary for list views.
+ * Summary for list views. Takes an already-loaded Proposal.
  */
 export function getProposalSummary(proposal: Proposal): Record<string, unknown> {
   return {
@@ -296,10 +407,14 @@ export function getProposalSummary(proposal: Proposal): Record<string, unknown> 
   };
 }
 
-// --- Dev/test utilities ---
+// --- Dev/test utilities ----------------------------------------------------
 
-/** Clear all proposals — used by debug/seed only */
-export function clearProposals(): void {
-  proposals.clear();
-  supportsByProposal.clear();
+/** Clear all proposals — dev/seed only. ON DELETE CASCADE removes supports. */
+export async function clearProposals(): Promise<void> {
+  const db = getDb();
+  // Explicit delete of supports first (belt-and-suspenders; FK cascade would
+  // handle it, but being explicit avoids any surprise if FK is modified).
+  await db.from("proposal_supports").delete().neq("proposal_id", "");
+  const { error } = await db.from("proposals").delete().neq("id", "");
+  if (error) throw new Error(`Proposals: failed to clear: ${error.message}`);
 }

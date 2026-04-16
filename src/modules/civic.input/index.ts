@@ -4,69 +4,96 @@
 // Input is stored independently from votes and is NOT used
 // in vote tallying or lifecycle transitions.
 //
-// GUARDRAIL: This module MUST NOT import from civic.vote or any lifecycle/results code.
-// Community input is a parallel data stream — it does not affect process state.
-// No AI or sentiment processing is implemented.
+// Storage: Postgres (community_inputs table).
+//
+// GUARDRAIL: This module MUST NOT import from civic.vote or any
+// lifecycle/results code. Community input is a parallel data stream.
 
+import { getDb } from "../../db/client.js";
+import { generateId } from "../../utils/id.js";
 import type { CommunityInput } from "./models.js";
 
 export type { CommunityInput } from "./models.js";
 
-// DEV-ONLY: In-memory store — all data lost on restart.
-// Replace with persistent storage before production.
-const inputsByProcess = new Map<string, CommunityInput[]>();
+interface InputRow {
+  id: string;
+  process_id: string;
+  author_id: string | null;
+  body: string;
+  submitted_at: string;
+}
 
-let nextId = 1;
-
-function generateInputId(): string {
-  return `input_${(nextId++).toString().padStart(6, "0")}`;
+function rowToInput(row: InputRow): CommunityInput {
+  return {
+    id: row.id,
+    process_id: row.process_id,
+    author_id: row.author_id ?? "",
+    body: row.body,
+    submitted_at: row.submitted_at,
+  };
 }
 
 /**
  * Submit community input for a process.
  */
-export function submitInput(
+export async function submitInput(
   process_id: string,
   author_id: string,
-  body: string
-): CommunityInput {
+  body: string,
+): Promise<CommunityInput> {
   if (!body || body.trim().length === 0) {
     throw new Error("Input body cannot be empty");
   }
 
-  const input: CommunityInput = {
-    id: generateInputId(),
-    process_id,
-    author_id,
-    body: body.trim(),
-    submitted_at: new Date().toISOString(),
-  };
+  const id = generateId("input");
 
-  const existing = inputsByProcess.get(process_id) ?? [];
-  existing.push(input);
-  inputsByProcess.set(process_id, existing);
+  const { data, error } = await getDb()
+    .from("community_inputs")
+    .insert({
+      id,
+      process_id,
+      author_id,
+      body: body.trim(),
+    })
+    .select()
+    .single();
 
-  return input;
+  if (error) throw new Error(`Input: ${error.message}`);
+  return rowToInput(data as InputRow);
 }
 
 /**
- * Get all community inputs for a process.
+ * Get all community inputs for a process, oldest first.
  */
-export function getInputsByProcess(process_id: string): CommunityInput[] {
-  return inputsByProcess.get(process_id) ?? [];
+export async function getInputsByProcess(
+  process_id: string,
+): Promise<CommunityInput[]> {
+  const { data, error } = await getDb()
+    .from("community_inputs")
+    .select("*")
+    .eq("process_id", process_id)
+    .order("submitted_at", { ascending: true });
+  if (error) throw new Error(`Input: ${error.message}`);
+  return (data ?? []).map((r) => rowToInput(r as InputRow));
 }
 
 /**
- * Get the count of inputs for a process.
+ * Count community inputs for a process.
  */
-export function getInputCount(process_id: string): number {
-  return (inputsByProcess.get(process_id) ?? []).length;
+export async function getInputCount(process_id: string): Promise<number> {
+  const { count, error } = await getDb()
+    .from("community_inputs")
+    .select("*", { count: "exact", head: true })
+    .eq("process_id", process_id);
+  if (error) throw new Error(`Input: ${error.message}`);
+  return count ?? 0;
 }
 
-/**
- * Clear all inputs — used by debug/test endpoints only.
- */
-export function clearInputs(): void {
-  inputsByProcess.clear();
-  nextId = 1;
+/** Clear all inputs — dev/seed only. */
+export async function clearInputs(): Promise<void> {
+  const { error } = await getDb()
+    .from("community_inputs")
+    .delete()
+    .neq("id", "");
+  if (error) throw new Error(`Input: failed to clear: ${error.message}`);
 }

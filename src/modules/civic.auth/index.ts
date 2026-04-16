@@ -5,32 +5,42 @@
 //   2. User verifies with code → account created/logged in
 //   3. User affirms residency → is_resident = true
 //
-// DEV-ONLY: In-memory storage. OTP codes are logged to console (no email sending).
-// No external network calls — compliant with CLAUDE.md constraints.
+// Storage: Postgres via Supabase (tables: users, sessions, pending_verifications)
+// Identity: DID-compatible — user.id is a text field, replaceable with a DID later.
 //
 // GUARDRAIL: This module MUST NOT import from civic.vote or civic.proposals.
 
+import { getDb } from "../../db/client.js";
 import { generateId } from "../../utils/id.js";
 import type { User, PendingVerification, Session } from "./models.js";
 
 export type { User, PendingVerification, Session } from "./models.js";
 
-// --- In-memory stores (DEV-ONLY) ---
+// --- Constants ---
 
-const users = new Map<string, User>();
-const usersByEmail = new Map<string, string>(); // email → user ID
-const pendingVerifications = new Map<string, PendingVerification>(); // email → pending
-const sessions = new Map<string, Session>(); // token → session
+const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+const OTP_TTL_MS = 10 * 60 * 1000; // 10 minutes
 
-// --- OTP generation ---
+// --- OTP / token generation ---
 
 function generateOTP(): string {
-  // 6-digit code
   return Math.floor(100000 + Math.random() * 900000).toString();
 }
 
 function generateToken(): string {
   return generateId("sess");
+}
+
+// --- Row mappers ---
+
+function rowToUser(row: Record<string, unknown>): User {
+  return {
+    id: String(row.id),
+    email: String(row.email),
+    email_verified: Boolean(row.email_verified),
+    is_resident: Boolean(row.is_resident),
+    created_at: String(row.created_at),
+  };
 }
 
 // --- Auth flow ---
@@ -42,7 +52,9 @@ function generateToken(): string {
  *
  * DEV: Code is logged to console. In production, send via email.
  */
-export function requestVerification(email: string): { message: string } {
+export async function requestVerification(
+  email: string,
+): Promise<{ message: string }> {
   const normalizedEmail = email.trim().toLowerCase();
 
   if (!normalizedEmail || !normalizedEmail.includes("@")) {
@@ -51,14 +63,23 @@ export function requestVerification(email: string): { message: string } {
 
   const code = generateOTP();
   const now = new Date();
-  const expires = new Date(now.getTime() + 10 * 60 * 1000); // 10 minutes
+  const expires = new Date(now.getTime() + OTP_TTL_MS);
 
-  pendingVerifications.set(normalizedEmail, {
-    email: normalizedEmail,
-    code,
-    created_at: now.toISOString(),
-    expires_at: expires.toISOString(),
-  });
+  const { error } = await getDb()
+    .from("pending_verifications")
+    .upsert(
+      {
+        email: normalizedEmail,
+        code,
+        expires_at: expires.toISOString(),
+        created_at: now.toISOString(),
+      },
+      { onConflict: "email" },
+    );
+
+  if (error) {
+    throw new Error(`Auth: failed to store verification: ${error.message}`);
+  }
 
   // DEV-ONLY: Log code to console since we can't send email
   console.log(`\n[auth] Verification code for ${normalizedEmail}: ${code}\n`);
@@ -70,66 +91,122 @@ export function requestVerification(email: string): { message: string } {
  * Step 2: Verify the code and create/login user.
  * Returns a session token and user object.
  */
-export function verifyCode(
+export async function verifyCode(
   email: string,
-  code: string
-): { token: string; user: User } {
+  code: string,
+): Promise<{ token: string; user: User }> {
   const normalizedEmail = email.trim().toLowerCase();
+  const db = getDb();
 
-  const pending = pendingVerifications.get(normalizedEmail);
+  // --- Validate the OTP ---
+  const { data: pending, error: pendErr } = await db
+    .from("pending_verifications")
+    .select("*")
+    .eq("email", normalizedEmail)
+    .maybeSingle();
+
+  if (pendErr) throw new Error(`Auth: ${pendErr.message}`);
 
   if (code === "000000") {
     // DEMO_MODE bypass — skip all verification checks
-    if (pending) pendingVerifications.delete(normalizedEmail);
-  } else {
-    // Normal flow — require pending verification, check expiry and code
-    if (!pending) {
-      throw new Error("No pending verification for this email. Request a new code.");
+    if (pending) {
+      await db
+        .from("pending_verifications")
+        .delete()
+        .eq("email", normalizedEmail);
     }
-
+  } else {
+    if (!pending) {
+      throw new Error(
+        "No pending verification for this email. Request a new code.",
+      );
+    }
     if (new Date() > new Date(pending.expires_at)) {
-      pendingVerifications.delete(normalizedEmail);
+      await db
+        .from("pending_verifications")
+        .delete()
+        .eq("email", normalizedEmail);
       throw new Error("Verification code expired. Request a new code.");
     }
-
     if (pending.code !== code) {
       throw new Error("Invalid verification code");
     }
-
-    pendingVerifications.delete(normalizedEmail);
+    await db
+      .from("pending_verifications")
+      .delete()
+      .eq("email", normalizedEmail);
   }
 
-  // Find or create user
-  let userId = usersByEmail.get(normalizedEmail);
+  // --- Find or create the user ---
+  const { data: existing, error: selErr } = await db
+    .from("users")
+    .select("*")
+    .eq("email", normalizedEmail)
+    .maybeSingle();
+
+  if (selErr) throw new Error(`Auth: ${selErr.message}`);
+
   let user: User;
 
-  if (userId && users.has(userId)) {
-    user = users.get(userId)!;
-    // Mark email as verified if not already
-    user.email_verified = true;
+  if (existing) {
+    // Mark email_verified if it wasn't already
+    if (!existing.email_verified) {
+      const { data, error } = await db
+        .from("users")
+        .update({ email_verified: true })
+        .eq("id", existing.id)
+        .select()
+        .single();
+      if (error) throw new Error(`Auth: ${error.message}`);
+      user = rowToUser(data);
+    } else {
+      user = rowToUser(existing);
+    }
   } else {
-    // Create new user
-    userId = generateId("user");
-    user = {
-      id: userId,
+    // Create new user. Race-safe: unique(email) will reject duplicates.
+    const newRow = {
+      id: generateId("user"),
       email: normalizedEmail,
       email_verified: true,
       is_resident: false,
-      created_at: new Date().toISOString(),
     };
-    users.set(userId, user);
-    usersByEmail.set(normalizedEmail, userId);
 
-    console.log(`[auth] New user created: ${userId} (${normalizedEmail})`);
+    const { data, error } = await db
+      .from("users")
+      .insert(newRow)
+      .select()
+      .single();
+
+    if (error) {
+      // 23505 = unique_violation — another request created the user first.
+      if (error.code === "23505") {
+        const { data: refetch, error: refErr } = await db
+          .from("users")
+          .select("*")
+          .eq("email", normalizedEmail)
+          .single();
+        if (refErr) throw new Error(`Auth: ${refErr.message}`);
+        user = rowToUser(refetch);
+      } else {
+        throw new Error(`Auth: ${error.message}`);
+      }
+    } else {
+      user = rowToUser(data);
+      console.log(`[auth] New user created: ${user.id} (${normalizedEmail})`);
+    }
   }
 
-  // Create session
+  // --- Create a session ---
   const token = generateToken();
-  sessions.set(token, {
+  const sessionExpires = new Date(Date.now() + SESSION_TTL_MS).toISOString();
+
+  const { error: sessErr } = await db.from("sessions").insert({
     token,
-    user_id: userId,
-    created_at: new Date().toISOString(),
+    user_id: user.id,
+    expires_at: sessionExpires,
   });
+
+  if (sessErr) throw new Error(`Auth: ${sessErr.message}`);
 
   return { token, user };
 }
@@ -138,51 +215,87 @@ export function verifyCode(
  * Step 3: Affirm residency.
  * Must be called after authentication.
  */
-export function affirmResidency(userId: string): User {
-  const user = users.get(userId);
-  if (!user) {
-    throw new Error("User not found");
-  }
+export async function affirmResidency(userId: string): Promise<User> {
+  const { data, error } = await getDb()
+    .from("users")
+    .update({ is_resident: true })
+    .eq("id", userId)
+    .select()
+    .maybeSingle();
 
-  user.is_resident = true;
+  if (error) throw new Error(`Auth: ${error.message}`);
+  if (!data) throw new Error("User not found");
 
   console.log(`[auth] User ${userId} affirmed residency`);
-
-  return user;
+  return rowToUser(data);
 }
 
 // --- Session management ---
 
 /**
- * Get user from a session token.
- * Returns undefined if token is invalid.
+ * Get user from a session token. Returns undefined if the token is invalid
+ * or expired. Expired sessions are cleaned up opportunistically.
  */
-export function getUserFromToken(token: string): User | undefined {
-  const session = sessions.get(token);
-  if (!session) return undefined;
-  return users.get(session.user_id);
+export async function getUserFromToken(
+  token: string,
+): Promise<User | undefined> {
+  if (!token) return undefined;
+  const db = getDb();
+
+  const { data: session, error } = await db
+    .from("sessions")
+    .select("user_id, expires_at")
+    .eq("token", token)
+    .maybeSingle();
+
+  if (error || !session) return undefined;
+
+  if (new Date() > new Date(session.expires_at)) {
+    // Opportunistic cleanup of the expired session.
+    await db.from("sessions").delete().eq("token", token);
+    return undefined;
+  }
+
+  const { data: user, error: userErr } = await db
+    .from("users")
+    .select("*")
+    .eq("id", session.user_id)
+    .maybeSingle();
+
+  if (userErr || !user) return undefined;
+  return rowToUser(user);
 }
 
 /**
  * Get user by ID.
  */
-export function getUser(userId: string): User | undefined {
-  return users.get(userId);
+export async function getUser(userId: string): Promise<User | undefined> {
+  const { data, error } = await getDb()
+    .from("users")
+    .select("*")
+    .eq("id", userId)
+    .maybeSingle();
+
+  if (error || !data) return undefined;
+  return rowToUser(data);
 }
 
 /**
  * Logout — destroy session.
  */
-export function logout(token: string): void {
-  sessions.delete(token);
+export async function logout(token: string): Promise<void> {
+  if (!token) return;
+  await getDb().from("sessions").delete().eq("token", token);
 }
 
 // --- Dev/test utilities ---
 
-/** Clear all auth data — used by debug/seed only */
-export function clearAuth(): void {
-  users.clear();
-  usersByEmail.clear();
-  pendingVerifications.clear();
-  sessions.clear();
+/** Clear all auth data — used by debug/seed only. */
+export async function clearAuth(): Promise<void> {
+  const db = getDb();
+  // Supabase requires a filter on DELETE to avoid accidental full-table wipes.
+  // neq("<col>", "") matches every row since our IDs/emails are non-empty.
+  await db.from("pending_verifications").delete().neq("email", "");
+  await db.from("sessions").delete().neq("token", "");
+  await db.from("users").delete().neq("id", "");
 }

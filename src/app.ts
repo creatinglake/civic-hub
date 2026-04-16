@@ -14,16 +14,41 @@ import proposalRoutes from "./routes/proposalRoutes.js";
 import adminRoutes from "./routes/adminRoutes.js";
 import authRoutes from "./routes/authRoutes.js";
 import voteLogRoutes from "./routes/voteLogRoutes.js";
-import { seedOnStartup, ensureSeeded } from "./debug/autoSeed.js";
+import { ensureSeeded } from "./debug/autoSeed.js";
+import { pingDb } from "./db/client.js";
 
 const app = express();
 
-// CORS — allow the UI dev server to talk to the API
-app.use((_req, res, next) => {
-  res.header("Access-Control-Allow-Origin", "*");
+// CORS — allowed origins come from CIVIC_ALLOWED_ORIGINS (comma-separated).
+// If the env var is unset and NODE_ENV !== "production", we default to "*"
+// for dev convenience. In production, an unset var is a hard failure.
+const parsedOrigins = (process.env.CIVIC_ALLOWED_ORIGINS ?? "")
+  .split(",")
+  .map((o) => o.trim())
+  .filter((o) => o.length > 0);
+
+const isProd = process.env.NODE_ENV === "production";
+
+if (isProd && parsedOrigins.length === 0) {
+  throw new Error(
+    "CIVIC_ALLOWED_ORIGINS must be set in production (comma-separated list of origins)",
+  );
+}
+
+const allowedOrigins = new Set(parsedOrigins);
+const allowAnyOrigin = !isProd && parsedOrigins.length === 0;
+
+app.use((req, res, next) => {
+  const origin = req.headers.origin as string | undefined;
+  if (allowAnyOrigin) {
+    res.header("Access-Control-Allow-Origin", "*");
+  } else if (origin && allowedOrigins.has(origin)) {
+    res.header("Access-Control-Allow-Origin", origin);
+    res.header("Vary", "Origin");
+  }
   res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
   res.header("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-  if (_req.method === "OPTIONS") {
+  if (req.method === "OPTIONS") {
     res.sendStatus(204);
     return;
   }
@@ -104,12 +129,17 @@ app.get("/", (_req, res) => {
   });
 });
 
-// Health check
-app.get("/health", (_req, res) => {
-  res.json({ status: "ok", timestamp: new Date().toISOString() });
+// Health check — includes a DB ping so you can verify Supabase connectivity
+app.get("/health", async (_req, res) => {
+  const db = await pingDb();
+  res.status(db.ok ? 200 : 503).json({
+    status: db.ok ? "ok" : "degraded",
+    db,
+    timestamp: new Date().toISOString(),
+  });
 });
 
-// Auto-seed on module load (runs once per cold start in serverless)
-seedOnStartup();
+// Auto-seed is triggered by the `ensureSeeded` middleware on first request,
+// and is gated behind CIVIC_ALLOW_SEED so it never runs in production.
 
 export default app;

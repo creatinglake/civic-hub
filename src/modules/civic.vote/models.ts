@@ -45,6 +45,9 @@ export interface VoteProcessState {
 /**
  * Event emission callback — injected by the host hub.
  * The module never imports the hub's event system directly.
+ *
+ * Returns a Promise so the host hub can durably store the event before
+ * the caller proceeds. Modules should always `await` emissions.
  */
 export interface EmitEventFn {
   (input: {
@@ -54,7 +57,7 @@ export interface EmitEventFn {
     hub_id: string;
     jurisdiction: string;
     data: Record<string, unknown>;
-  }): void;
+  }): Promise<unknown>;
 }
 
 /** Result returned by every module action */

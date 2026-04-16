@@ -50,55 +50,58 @@ const voteProcess: ProcessHandler = {
     return createVoteState(input) as unknown as Record<string, unknown>;
   },
 
-  handleAction(process: Process, action: ProcessAction): Record<string, unknown> {
+  async handleAction(
+    process: Process,
+    action: ProcessAction,
+  ): Promise<Record<string, unknown>> {
     const state = getState(process);
     const ctx = makeContext(process);
     let result: Record<string, unknown>;
 
     switch (action.type) {
       case "process.propose": {
-        const outcome = propose(state, action.actor, ctx);
+        const outcome = await propose(state, action.actor, ctx);
         syncStatus(process, outcome.state);
         result = outcome.result;
         break;
       }
       case "process.support": {
-        const outcome = addSupport(state, action.actor, ctx);
+        const outcome = await addSupport(state, action.actor, ctx);
         syncStatus(process, outcome.state);
         result = outcome.result;
         break;
       }
       case "process.unsupport": {
-        const outcome = removeSupport(state, action.actor, ctx);
+        const outcome = await removeSupport(state, action.actor, ctx);
         syncStatus(process, outcome.state);
         result = outcome.result;
         break;
       }
       case "process.activate": {
-        const outcome = activate(state, action.actor, ctx);
+        const outcome = await activate(state, action.actor, ctx);
         syncStatus(process, outcome.state);
         result = outcome.result;
         break;
       }
       case "process.vote": {
         const option = action.payload.option as string;
-        const outcome = submitVote(state, action.actor, option, ctx);
+        const outcome = await submitVote(state, action.actor, option, ctx);
         syncStatus(process, outcome.state);
 
         // Generate anonymous receipt — receipt_id is NOT stored with user_id
-        const receipt = recordVote(process.id, action.actor, option);
+        const receipt = await recordVote(process.id, action.actor, option);
 
         result = { ...outcome.result, receipt_id: receipt.receipt_id };
         break;
       }
       case "process.close": {
-        const outcome = closeVote(state, action.actor, ctx);
+        const outcome = await closeVote(state, action.actor, ctx);
         syncStatus(process, outcome.state);
         result = outcome.result;
         break;
       }
       case "process.finalize": {
-        const outcome = finalizeVote(state, action.actor, ctx);
+        const outcome = await finalizeVote(state, action.actor, ctx);
         syncStatus(process, outcome.state);
         result = outcome.result;
         break;

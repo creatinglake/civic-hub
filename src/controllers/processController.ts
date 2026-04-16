@@ -8,55 +8,77 @@ import {
   listProcessSummaries,
   getProcessState,
 } from "../services/processService.js";
+import { getAuthUser } from "../middleware/auth.js";
 
-export function handleCreateProcess(req: Request, res: Response): void {
-  const { definition, title, description, createdBy, jurisdiction, state, content } = req.body;
+export async function handleCreateProcess(
+  req: Request,
+  res: Response,
+): Promise<void> {
+  const { definition, title, description, jurisdiction, state, content } = req.body;
 
-  if (!definition?.type || !title || !createdBy) {
+  if (!definition?.type || !title) {
     res.status(400).json({
-      error: "Missing required fields: definition.type, title, createdBy",
+      error: "Missing required fields: definition.type, title",
     });
     return;
   }
 
-  const process = createProcess({
-    definition,
-    title,
-    description: description ?? "",
-    createdBy,
-    jurisdiction,
-    state,
-    content,
-  });
+  try {
+    // Actor comes from the authenticated admin session, not the request body.
+    const admin = getAuthUser(res);
+    const process = await createProcess({
+      definition,
+      title,
+      description: description ?? "",
+      createdBy: admin.id,
+      jurisdiction,
+      state,
+      content,
+    });
 
-  res.status(201).json(process);
-}
-
-export function handleGetProcess(req: Request, res: Response): void {
-  const id = req.params.id as string;
-  const process = getProcess(id);
-
-  if (!process) {
-    res.status(404).json({ error: "Process not found" });
-    return;
+    res.status(201).json(process);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Unknown error";
+    res.status(400).json({ error: message });
   }
-
-  res.json(process);
 }
 
-export function handleProcessAction(req: Request, res: Response): void {
-  const { type, actor, payload } = req.body;
+export async function handleGetProcess(
+  req: Request,
+  res: Response,
+): Promise<void> {
+  const id = req.params.id as string;
+  try {
+    const process = await getProcess(id);
+    if (!process) {
+      res.status(404).json({ error: "Process not found" });
+      return;
+    }
+    res.json(process);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Unknown error";
+    res.status(500).json({ error: message });
+  }
+}
+
+export async function handleProcessAction(
+  req: Request,
+  res: Response,
+): Promise<void> {
+  const { type, payload } = req.body;
   const id = req.params.id as string;
 
-  if (!type || !actor) {
-    res.status(400).json({ error: "Missing required fields: type, actor" });
+  if (!type) {
+    res.status(400).json({ error: "Missing required field: type" });
     return;
   }
 
   try {
-    const { process, result } = executeAction(id, {
+    // Actor is the authenticated user — never taken from the request body.
+    const user = getAuthUser(res);
+    const { process, result } = await executeAction(id, {
       type,
-      actor,
+      actor: user.id,
       payload: payload ?? {},
     });
 
@@ -74,19 +96,33 @@ export function handleProcessAction(req: Request, res: Response): void {
 
 // --- Read layer for UI consumption ---
 
-export function handleListProcesses(_req: Request, res: Response): void {
-  res.json(listProcessSummaries());
+export async function handleListProcesses(
+  _req: Request,
+  res: Response,
+): Promise<void> {
+  try {
+    res.json(await listProcessSummaries());
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Unknown error";
+    res.status(500).json({ error: message });
+  }
 }
 
-export function handleGetProcessState(req: Request, res: Response): void {
+export async function handleGetProcessState(
+  req: Request,
+  res: Response,
+): Promise<void> {
   const id = req.params.id as string;
   const actor = req.query.actor as string | undefined;
-  const state = getProcessState(id, actor);
-
-  if (!state) {
-    res.status(404).json({ error: "Process not found" });
-    return;
+  try {
+    const state = await getProcessState(id, actor);
+    if (!state) {
+      res.status(404).json({ error: "Process not found" });
+      return;
+    }
+    res.json(state);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Unknown error";
+    res.status(500).json({ error: message });
   }
-
-  res.json(state);
 }
