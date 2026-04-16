@@ -1,7 +1,7 @@
 {
-  "buildCommand": "cd ui && npm install && npm run build",
+  "buildCommand": "cd ui && npm install --include=dev && npm run build",
   "outputDirectory": "ui/dist",
-  "installCommand": "npm install",
+  "installCommand": "npm install --include=dev",
   "rewrites": [
     { "source": "/api/:path*", "destination": "/api" },
     { "source": "/(.*)", "destination": "/index.html" }
