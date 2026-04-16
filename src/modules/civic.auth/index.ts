@@ -12,6 +12,7 @@
 
 import { getDb } from "../../db/client.js";
 import { generateId } from "../../utils/id.js";
+import { sendEmail } from "../../utils/email.js";
 import type { User, PendingVerification, Session } from "./models.js";
 
 export type { User, PendingVerification, Session } from "./models.js";
@@ -81,10 +82,49 @@ export async function requestVerification(
     throw new Error(`Auth: failed to store verification: ${error.message}`);
   }
 
-  // DEV-ONLY: Log code to console since we can't send email
-  console.log(`\n[auth] Verification code for ${normalizedEmail}: ${code}\n`);
+  // Send the OTP via email. If Resend is not configured (dev), fall back
+  // to logging so local development still works.
+  const result = await sendEmail({
+    to: normalizedEmail,
+    subject: "Your Floyd Civic Hub sign-in code",
+    html: renderOtpEmail(code),
+  });
+
+  if (result.sent) {
+    console.log(`[auth] Sent verification code to ${normalizedEmail} (resend id: ${result.id})`);
+  } else {
+    // Fallback: log to console so dev/preview still works without a key.
+    // In production, misconfiguration here would be silent to the user, so
+    // we log the failure prominently. The user still gets "code sent"
+    // because we don't want to leak whether the address is deliverable.
+    console.warn(
+      `[auth] Email NOT sent for ${normalizedEmail} (${result.error}). ` +
+      `Falling back to console log (dev only).`,
+    );
+    console.log(`\n[auth] Verification code for ${normalizedEmail}: ${code}\n`);
+  }
 
   return { message: "Verification code sent" };
+}
+
+function renderOtpEmail(code: string): string {
+  return `
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 480px; margin: 0 auto; padding: 32px 24px; color: #1f2937;">
+      <h1 style="font-size: 20px; font-weight: 600; margin: 0 0 16px;">Your sign-in code</h1>
+      <p style="font-size: 15px; line-height: 1.5; margin: 0 0 24px;">
+        Enter this code in the Floyd Civic Hub to finish signing in:
+      </p>
+      <div style="font-size: 32px; font-weight: 600; letter-spacing: 8px; background: #f3f4f6; padding: 16px 24px; border-radius: 8px; text-align: center; margin: 0 0 24px;">
+        ${code}
+      </div>
+      <p style="font-size: 13px; color: #6b7280; line-height: 1.5; margin: 0 0 8px;">
+        This code expires in 10 minutes. If you didn't request it, you can ignore this email.
+      </p>
+      <p style="font-size: 13px; color: #6b7280; line-height: 1.5; margin: 0;">
+        — The Floyd Civic Hub
+      </p>
+    </div>
+  `;
 }
 
 /**
@@ -107,8 +147,10 @@ export async function verifyCode(
 
   if (pendErr) throw new Error(`Auth: ${pendErr.message}`);
 
-  if (code === "000000") {
-    // DEMO_MODE bypass — skip all verification checks
+  const demoBypass = process.env.CIVIC_DEMO_BYPASS_CODE;
+  if (demoBypass && code === demoBypass) {
+    // Demo-mode bypass — only active when CIVIC_DEMO_BYPASS_CODE is set
+    // (e.g. in dev/preview). MUST NOT be set in production.
     if (pending) {
       await db
         .from("pending_verifications")
