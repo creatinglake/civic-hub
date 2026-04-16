@@ -9,8 +9,7 @@
 import { CivicEvent, CreateEventInput } from "../models/event.js";
 import { appendEvent } from "./eventStore.js";
 import { generateId } from "../utils/id.js";
-
-const HUB_URL = process.env.BASE_URL ?? "http://localhost:3000";
+import { baseUrl } from "../utils/baseUrl.js";
 
 /**
  * Create and durably store a spec-compliant civic event.
@@ -20,6 +19,7 @@ const HUB_URL = process.env.BASE_URL ?? "http://localhost:3000";
  * surface the error (events are the source of truth; never silently drop).
  */
 export async function emitEvent(input: CreateEventInput): Promise<CivicEvent> {
+  const hub = baseUrl();
   const event: CivicEvent = {
     id: generateId("evt"),
     version: "1.0",
@@ -28,10 +28,10 @@ export async function emitEvent(input: CreateEventInput): Promise<CivicEvent> {
     process_id: input.process_id,
     actor: input.actor,
     jurisdiction: input.jurisdiction,
-    action_url: `${HUB_URL}/process/${input.process_id}`,
+    action_url: `${hub}/process/${input.process_id}`,
     source: {
       hub_id: input.hub_id,
-      hub_url: HUB_URL,
+      hub_url: hub,
     },
     data: input.data,
     meta: {

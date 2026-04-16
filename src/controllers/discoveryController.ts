@@ -2,10 +2,10 @@
 // As defined in the Civic Hub Spec v0.1
 
 import { Request, Response } from "express";
+import { baseUrl } from "../utils/baseUrl.js";
 
 export function handleDiscoveryManifest(_req: Request, res: Response): void {
-  const baseUrl =
-    process.env.BASE_URL ?? "http://localhost:3000";
+  const hub = baseUrl();
 
   const manifest = {
     name: "Civic Hub Reference Implementation",
@@ -17,11 +17,11 @@ export function handleDiscoveryManifest(_req: Request, res: Response): void {
       type: "civic.hub",
     },
     endpoints: {
-      processes: `${baseUrl}/process`,
-      events: `${baseUrl}/events`,
+      processes: `${hub}/process`,
+      events: `${hub}/events`,
     },
     feeds: {
-      events: `${baseUrl}/events`,
+      events: `${hub}/events`,
     },
     capabilities: ["civic.vote", "civic.proposal"],
     spec: {

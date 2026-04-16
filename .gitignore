@@ -3,3 +3,14 @@ dist/
 *.js.map
 *.d.ts.map
 .env
+
+# OS artifacts
+.DS_Store
+
+# TS build output for scripts/
+scripts/*.js
+scripts/*.d.ts
+
+# Vite scaffolding we don't use
+ui/README.md
+ui/src/assets/
