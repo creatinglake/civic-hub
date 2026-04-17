@@ -6,10 +6,34 @@
 
 const API_BASE = import.meta.env.DEV ? "http://localhost:3000" : "/api";
 
+/**
+ * Token storage — shared with services/auth.ts. Must stay in sync with the
+ * TOKEN_KEY defined there. The backend now enforces Bearer tokens on all
+ * action endpoints (POST /process/:id/action, /proposals, /proposals/:id/support,
+ * /process/:id/input, /admin/*). Without this header, those endpoints return
+ * 401 and the UI shows "Authentication required".
+ */
+const TOKEN_KEY = "civic_auth_token";
+
+function getStoredToken(): string | null {
+  try {
+    return localStorage.getItem(TOKEN_KEY);
+  } catch {
+    // localStorage can throw in some privacy modes — fail safe.
+    return null;
+  }
+}
+
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  const token = getStoredToken();
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+
   const res = await fetch(`${API_BASE}${path}`, {
     method,
-    headers: { "Content-Type": "application/json" },
+    headers,
     body: body ? JSON.stringify(body) : undefined,
   });
 
