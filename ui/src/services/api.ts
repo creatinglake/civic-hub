@@ -373,3 +373,48 @@ export function getVoteLog(processId: string): Promise<VoteLogResponse> {
 export function verifyReceipt(processId: string, receiptId: string): Promise<ReceiptVerifyResponse> {
   return request("GET", `/votes/${processId}/verify?receipt=${encodeURIComponent(receiptId)}`);
 }
+
+// --- Civic Events (feed layer) ---
+//
+// Mirrors civic-hub/src/models/event.ts. Events are the primary public
+// interface of the hub; the feed consumes them directly. Keep this shape
+// in sync with the backend Civic Event Spec v0.1 model.
+
+export interface CivicEventSource {
+  hub_id: string;
+  hub_url: string;
+}
+
+export interface CivicEventMeta {
+  visibility: "public" | "restricted";
+}
+
+export interface CivicEvent {
+  id: string;
+  version: string;
+  event_type: string;
+  timestamp: string;
+  process_id: string;
+  actor: string;
+  jurisdiction: string;
+  action_url: string;
+  source: CivicEventSource;
+  dedupe_key?: string;
+  data: Record<string, unknown>;
+  meta: CivicEventMeta;
+}
+
+interface EventsResponse {
+  events: CivicEvent[];
+  count: number;
+}
+
+/**
+ * Fetch the hub's event feed. Returns all events in descending timestamp
+ * order. Pagination is applied client-side in the feed component until the
+ * backend grows server-side pagination.
+ */
+export async function getEvents(): Promise<CivicEvent[]> {
+  const res = await request<EventsResponse>("GET", "/events");
+  return res.events;
+}

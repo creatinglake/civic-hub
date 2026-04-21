@@ -1,0 +1,104 @@
+.feed {
+  padding: var(--space-lg);
+  max-width: 640px;
+  margin: 0 auto;
+}
+
+.feed-status {
+  color: var(--color-text-subtle);
+  font-family: var(--font-body);
+  font-size: var(--font-size-base);
+  text-align: center;
+  padding: var(--space-xl) var(--space-md);
+}
+
+.feed-status-error {
+  color: var(--color-text);
+}
+
+.feed-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.feed-list-item {
+  display: block;
+}
+
+.feed-post {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-card);
+  transition: border-color 0.15s;
+}
+
+.feed-post:hover {
+  border-color: var(--color-border-hover);
+}
+
+.feed-post-link {
+  display: block;
+  padding: var(--space-md) var(--space-lg);
+  color: inherit;
+  text-decoration: none;
+  font-family: var(--font-body);
+}
+
+.feed-post-link:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+  border-radius: var(--radius-md);
+}
+
+.feed-post-title {
+  margin: 0 0 var(--space-xs);
+  font-family: var(--font-heading);
+  font-size: var(--font-size-lg);
+  line-height: var(--line-height-tight);
+  color: var(--color-text);
+}
+
+.feed-post-summary {
+  margin: 0 0 var(--space-sm);
+  font-size: var(--font-size-base);
+  line-height: var(--line-height-base);
+  color: var(--color-text-muted);
+}
+
+.feed-post-time {
+  display: block;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-subtle);
+}
+
+.feed-load-more-row {
+  display: flex;
+  justify-content: center;
+  margin-top: var(--space-lg);
+}
+
+.feed-load-more {
+  padding: var(--space-sm) var(--space-lg);
+  background: var(--color-surface);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-body);
+  font-size: var(--font-size-base);
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.feed-load-more:hover {
+  border-color: var(--color-border-hover);
+}
+
+.feed-load-more:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
