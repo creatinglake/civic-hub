@@ -31,10 +31,13 @@ export function eventToPost(
   getProcessTitle: (processId: string) => string | undefined,
 ): FeedPostView | null {
   switch (event.event_type) {
-    case "civic.process.created": {
-      const process = (event.data as { process?: { type?: string; title?: string } }).process;
-      if (!process || process.type !== "civic.vote") return null;
-      const title = process.title ?? getProcessTitle(event.process_id) ?? "Untitled vote";
+    case "civic.process.started": {
+      // `started` fires when the process enters active participation. Today
+      // civic.vote is the only process type that emits this event, so we
+      // render it as a "New vote: …" post. When additional process types
+      // start emitting `started` (petitions, announcements, etc.), branch
+      // here by the cached process type.
+      const title = getProcessTitle(event.process_id) ?? "Untitled vote";
       return {
         id: event.id,
         title: `New vote: ${title}`,

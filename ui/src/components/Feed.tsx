@@ -70,7 +70,7 @@ export default function Feed({ filter }: Props) {
     const needed: string[] = [];
     for (const ev of visibleEvents) {
       if (
-        (ev.event_type === "civic.process.created" ||
+        (ev.event_type === "civic.process.started" ||
           ev.event_type === "civic.process.result_published") &&
         ev.process_id &&
         !(ev.process_id in processMeta) &&
