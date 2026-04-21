@@ -8,7 +8,7 @@ import {
   type ProposalSummary,
   type CivicProposalSummary,
 } from "../services/api";
-import HubHeader from "../components/HubHeader";
+import HubInfo from "../components/HubInfo";
 import ProcessCard from "../components/ProcessCard";
 import ProposalCard from "../components/ProposalCard";
 
@@ -64,7 +64,7 @@ export default function Votes() {
 
   return (
     <div className="page page-home">
-      <HubHeader />
+      <HubInfo />
 
       {loading && <p className="section">Loading...</p>}
       {error && <p className="section error">Failed to load: {error}</p>}

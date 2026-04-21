@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
 import Nav from "./components/Nav";
+import HubBanner from "./components/HubBanner";
 import Home from "./pages/Home";
 import Votes from "./pages/Votes";
 import Process from "./pages/Process";
@@ -13,6 +14,17 @@ import VoteLog from "./pages/VoteLog";
 import IntroPopup, { hasSeenIntro } from "./components/IntroPopup";
 import "./App.css";
 
+// Routes that show the hub banner above the nav. Detail/action pages
+// (/process/:id, /propose, etc.) stay compact so task-focused flows are
+// not pushed down by 200px of imagery.
+const BANNER_ROUTES = new Set(["/", "/votes"]);
+
+function BannerSlot() {
+  const { pathname } = useLocation();
+  if (!BANNER_ROUTES.has(pathname)) return null;
+  return <HubBanner />;
+}
+
 function AppContent() {
   const [showIntro, setShowIntro] = useState(() => !hasSeenIntro());
 
@@ -20,6 +32,7 @@ function AppContent() {
     <div className="app">
       {showIntro && <IntroPopup onDismiss={() => setShowIntro(false)} />}
 
+      <BannerSlot />
       <Nav />
 
       <main>

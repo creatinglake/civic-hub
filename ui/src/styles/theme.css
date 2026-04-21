@@ -37,6 +37,9 @@
   --color-primary-text: #ffffff;
   --color-primary-hover: #1a68d1;
 
+  /* Brand accent — deeper, civic-feeling blue for identity labels. */
+  --color-brand: #1e3a5f;
+
   /* --- Color: focus ring --- */
   --color-focus: #2c7be5;
 

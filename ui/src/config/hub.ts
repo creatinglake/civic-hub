@@ -7,7 +7,7 @@
 const hub = {
   jurisdiction: "Floyd County, Virginia",
   label: "Civic Hub",
-  tagline: "Vote on local issues and see where our community stands",
+  tagline: "Stay informed on Floyd County government, raise the issues that matter, and see where our community stands.",
   // Local banner image — downtown Floyd, VA (Routes 221 & 8 intersection)
   // Replaces the external Unsplash URL to comply with no-external-network constraint
   banner_url: "/floyd-banner.jpg",
