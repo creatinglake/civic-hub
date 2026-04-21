@@ -1,0 +1,113 @@
+.civic-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  padding: var(--space-sm) var(--space-lg);
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.civic-nav-links {
+  display: flex;
+  gap: var(--space-lg);
+  align-items: center;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.civic-nav-right {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  flex-wrap: wrap;
+}
+
+.civic-nav-link {
+  display: inline-block;
+  padding: var(--space-xs) 0;
+  color: var(--color-text-muted);
+  text-decoration: none;
+  font-family: var(--font-body);
+  font-size: var(--font-size-base);
+  font-weight: 500;
+  border-bottom: 2px solid transparent;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.civic-nav-link:hover {
+  color: var(--color-text);
+}
+
+.civic-nav-link.is-active {
+  color: var(--color-text);
+  border-bottom-color: var(--color-primary);
+}
+
+.civic-nav-link:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+.civic-nav-link-admin {
+  font-size: var(--font-size-sm);
+  opacity: 0.7;
+}
+
+.civic-nav-link-admin:hover,
+.civic-nav-link-admin.is-active {
+  opacity: 1;
+}
+
+.civic-nav-user {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.civic-nav-user-email {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+.civic-nav-logout {
+  background: none;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: var(--space-xs) var(--space-sm);
+  font-size: var(--font-size-sm);
+  font-family: var(--font-body);
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.civic-nav-logout:hover {
+  color: var(--color-text);
+  border-color: var(--color-border-hover);
+}
+
+.civic-nav-logout:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+@media (max-width: 480px) {
+  .civic-nav {
+    padding: var(--space-sm) var(--space-md);
+    gap: var(--space-sm);
+  }
+
+  .civic-nav-links {
+    gap: var(--space-md);
+  }
+
+  .civic-nav-user-email {
+    display: none;
+  }
+}
