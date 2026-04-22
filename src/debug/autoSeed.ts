@@ -13,6 +13,7 @@ import {
   executeAction,
 } from "../services/processService.js";
 import { submitInput } from "../modules/civic.input/index.js";
+import { emitEvent } from "../events/eventEmitter.js";
 import { getEventCount } from "../events/eventStore.js";
 import { getDb } from "../db/client.js";
 import {
@@ -34,7 +35,11 @@ async function runScenario(scenario: SeedScenario): Promise<void> {
 
   if (scenario.inputs) {
     for (const input of scenario.inputs) {
-      await submitInput(proc.id, input.author_id, input.body);
+      await submitInput(proc.id, input.author_id, input.body, {
+        hub_id: proc.hubId,
+        jurisdiction: proc.jurisdiction,
+        emit: emitEvent,
+      });
     }
   }
 

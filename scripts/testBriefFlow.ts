@@ -153,6 +153,40 @@ async function run(): Promise<void> {
   );
   assert(v1.status === 200, "Vote submitted", v1);
 
+  // 5b. Submit a community comment via civic.input (Slice 3.5)
+  step("5b. Submit community comment");
+  const testComment =
+    "Crosswalk would help families walking from the school. Keep the signal timing short so traffic doesn't back up.";
+  const input = await request<{ id: string; body: string }>(
+    "POST",
+    `/process/${voteId}/input`,
+    { body: testComment },
+    admin.token,
+  );
+  assert(input.status === 201, "Comment submitted (201)", input);
+  assert(input.data.body === testComment, "Stored body matches input");
+
+  // 5c. Verify civic.process.comment_added event fired
+  step("5c. Verify comment_added event");
+  const earlyEvs = await request<{ events: Array<{ event_type: string; process_id: string; data: unknown }> }>(
+    "GET",
+    `/events?process_id=${voteId}`,
+  );
+  const commentEvents = earlyEvs.data.events.filter(
+    (e) => e.event_type === "civic.process.comment_added",
+  );
+  assert(
+    commentEvents.length === 1,
+    "Exactly one civic.process.comment_added event fired",
+    earlyEvs.data.events.map((e) => e.event_type),
+  );
+  const commentData = (commentEvents[0].data as { comment?: { id: string; body_preview: string } })?.comment;
+  assert(commentData?.id === input.data.id, "Event data.comment.id matches input id");
+  assert(
+    typeof commentData?.body_preview === "string" && commentData.body_preview.length <= 200,
+    "Event data.comment.body_preview is trimmed to <=200 chars",
+  );
+
   // 6. Close — should auto-spawn a brief
   step("6. Close vote (spawns brief)");
   const close = await request<{ result: { tally: Record<string, number>; total_votes: number; brief_process_id?: string } }>(
@@ -184,6 +218,21 @@ async function run(): Promise<void> {
   assert(briefTypes.includes("civic.process.created"), "Brief emitted .created");
   assert(briefTypes.includes("civic.process.aggregation_completed"), "Brief emitted .aggregation_completed");
   assert(!voteTypes.includes("civic.process.result_published"), "Vote has NOT published yet (brief-gated)");
+
+  // 7b. Brief was seeded with the community comment from Slice 3.5
+  step("7b. Brief content.comments seeded from civic.input");
+  const briefDetail = await request<{ content: { comments: string[] } }>(
+    "GET",
+    `/admin/briefs/${briefId}`,
+    undefined,
+    admin.token,
+  );
+  assert(briefDetail.status === 200, "Admin GET brief succeeds");
+  assert(
+    briefDetail.data.content.comments.includes(testComment),
+    "Brief content.comments includes the submitted comment",
+    briefDetail.data.content.comments,
+  );
 
   // 8. Vote should link to brief via follow_up_process_ids
   step("8. Vote's follow_up_process_ids points at brief");

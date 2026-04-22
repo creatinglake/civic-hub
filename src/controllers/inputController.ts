@@ -4,6 +4,7 @@ import { Request, Response } from "express";
 import { submitInput, getInputsByProcess } from "../modules/civic.input/index.js";
 import { getProcess } from "../services/processService.js";
 import { getAuthUser } from "../middleware/auth.js";
+import { emitEvent } from "../events/eventEmitter.js";
 
 export async function handleSubmitInput(
   req: Request,
@@ -25,7 +26,11 @@ export async function handleSubmitInput(
     }
 
     const user = getAuthUser(res);
-    const input = await submitInput(processId, user.id, body);
+    const input = await submitInput(processId, user.id, body, {
+      hub_id: process.hubId,
+      jurisdiction: process.jurisdiction,
+      emit: emitEvent,
+    });
     res.status(201).json(input);
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";

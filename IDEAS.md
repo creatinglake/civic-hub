@@ -74,12 +74,6 @@ code. Ideas for process plugins worth exploring:
 - Theme consolidation — migrate legacy `--text-color` / `--primary-color`
   vars in `ui/src/index.css` to the semantic tokens in
   `ui/src/styles/theme.css`.
-- Slice 3.5: populate `BriefContent.comments` from the `civic.input`
-  stream at brief generation time. Today the array is empty until admin
-  manually enters entries during review. The generator in
-  `civic-hub/src/modules/civic.brief/service.ts` (`generateBriefContent`)
-  should accept the list of community-input bodies and seed
-  `content.comments` with sanitized entries so the admin review starts warm.
 
 ## Governance / Community
 
@@ -103,3 +97,4 @@ When an idea here becomes a GitHub issue, move the entry down here with a
 link. Keeps a paper trail of what was fuzzy thinking that turned real.
 
 - Separate Supabase projects for preview and production → [#2](https://github.com/creatinglake/civic-hub/issues/2)
+- Pre-populate BriefContent.comments from civic.input at generation → shipped in Slice 3.5 (2026-04-22).
