@@ -101,7 +101,15 @@ export async function handleListProcesses(
   res: Response,
 ): Promise<void> {
   try {
-    res.json(await listProcessSummaries());
+    const all = await listProcessSummaries();
+    // Public list: hide civic.brief processes that aren't yet published.
+    // Pending / approved briefs are an admin-facing concern and must not be
+    // visible to the public before the admin approval step completes.
+    const filtered = all.filter((p) => {
+      if ((p as { type?: string }).type !== "civic.brief") return true;
+      return (p as { publication_status?: string }).publication_status === "published";
+    });
+    res.json(filtered);
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
     res.status(500).json({ error: message });

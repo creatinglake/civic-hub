@@ -25,6 +25,7 @@ import {
   emitStarted,
   emitVoteSubmitted,
   emitEnded,
+  emitAggregationCompleted,
   emitResultPublished,
 } from "./events.js";
 
@@ -52,8 +53,7 @@ export const PROCESS_DESCRIPTOR = {
     { name: "process.unsupport", from: ["proposed"], to: null, description: "Remove endorsement (only before threshold is met)" },
     { name: "process.activate", from: ["draft", "threshold_met"], to: "active", description: "Open the voting window" },
     { name: "process.vote", from: ["active"], to: null, description: "Cast or change a vote" },
-    { name: "process.close", from: ["active"], to: "closed", description: "End the voting window" },
-    { name: "process.finalize", from: ["closed"], to: "finalized", description: "Compute and publish results" },
+    { name: "process.close", from: ["active"], to: "closed", description: "End the voting window; aggregation runs immediately" },
   ],
   config_schema: {
     support_threshold: { type: "number", default: 3, description: "Endorsements required before activation" },
@@ -66,6 +66,7 @@ export const PROCESS_DESCRIPTOR = {
     "civic.process.started",
     "civic.process.vote_submitted",
     "civic.process.ended",
+    "civic.process.aggregation_completed",
     "civic.process.result_published",
   ],
 } as const;
@@ -280,8 +281,13 @@ export async function submitVote(
 }
 
 /**
- * Close the vote — ends the voting window.
+ * Close the vote — ends the voting window and runs aggregation.
  * Transition: active → closed
+ *
+ * Emits Phase 3→4 boundary events: `ended` (participation closed) and
+ * `aggregation_completed` (tally produced). Does NOT emit
+ * `result_published` — that only fires once an accompanying civic.brief
+ * has been approved by an admin, via finalizeVote().
  */
 export async function closeVote(
   state: VoteProcessState,
@@ -292,8 +298,12 @@ export async function closeVote(
 
   state.status = "closed";
   const result = computeTally(state.votes, state.options);
+  // Tally is computed over distinct voter identities (keys of state.votes),
+  // so participant_count == Object.keys(state.votes).length.
+  const participantCount = Object.keys(state.votes).length;
 
   await emitEnded(ctx, actor, result);
+  await emitAggregationCompleted(ctx, actor, result, participantCount);
 
   return {
     state,
@@ -302,8 +312,14 @@ export async function closeVote(
 }
 
 /**
- * Finalize the vote — compute and publish results.
+ * Finalize the vote — publish the result.
  * Transition: closed → finalized
+ *
+ * Library-only entry point: there is no HTTP action wired to this. The
+ * civic.brief module's approval flow calls this directly once an admin
+ * has reviewed and approved the accompanying brief. Result publication is
+ * therefore gated on admin approval; no caller outside the brief flow
+ * should be able to reach this function.
  */
 export async function finalizeVote(
   state: VoteProcessState,

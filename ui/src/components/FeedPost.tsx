@@ -29,14 +29,14 @@ export function eventToPost(
   event: CivicEvent,
   getProcessDescription: (processId: string) => string | undefined,
   getProcessTitle: (processId: string) => string | undefined,
+  getProcessType: (processId: string) => "civic.vote" | "civic.brief" | undefined,
 ): FeedPostView | null {
   switch (event.event_type) {
     case "civic.process.started": {
-      // `started` fires when the process enters active participation. Today
-      // civic.vote is the only process type that emits this event, so we
-      // render it as a "New vote: …" post. When additional process types
-      // start emitting `started` (petitions, announcements, etc.), branch
-      // here by the cached process type.
+      // `started` fires when a process enters active participation. Today
+      // only civic.vote emits this event; render as "New vote: …". When
+      // additional process types start emitting `started` (petitions,
+      // announcements, etc.), branch here by the cached process type.
       const title = getProcessTitle(event.process_id) ?? "Untitled vote";
       return {
         id: event.id,
@@ -48,15 +48,44 @@ export function eventToPost(
     }
 
     case "civic.process.result_published": {
-      const result = (event.data as {
-        result?: { tally?: Record<string, number>; total_votes?: number };
-      }).result;
-      const total = result?.total_votes ?? 0;
-      const title = getProcessTitle(event.process_id) ?? `Process ${event.process_id}`;
+      // Discriminate vote vs brief. Vote results publish "Vote results
+      // published: [title]"; briefs publish "Civic Brief delivered: [title]"
+      // and link to the public /brief/:id page. Briefs' action_url already
+      // points at /brief/:id via the backend's action_url_path override.
+      const data = event.data as {
+        brief_id?: string;
+        result?: { total_votes?: number };
+        participation_count?: number;
+        headline_result?: string;
+      };
+
+      const isBrief =
+        typeof data.brief_id === "string" ||
+        getProcessType(event.process_id) === "civic.brief";
+
+      if (isBrief) {
+        const title = getProcessTitle(event.process_id) ?? "Civic Brief";
+        const count = data.participation_count ?? 0;
+        const noun = count === 1 ? "resident" : "residents";
+        const summary = data.headline_result
+          ? `${count} ${noun} — ${data.headline_result}`
+          : `${count} ${noun} participated — brief delivered to the Board.`;
+        return {
+          id: event.id,
+          title: `Civic Brief delivered: ${title}`,
+          summary,
+          timestamp: event.timestamp,
+          href: event.action_url,
+        };
+      }
+
+      const total = data.result?.total_votes ?? 0;
+      const title =
+        getProcessTitle(event.process_id) ?? `Process ${event.process_id}`;
       const noun = total === 1 ? "participant" : "participants";
       return {
         id: event.id,
-        title: `Results available: ${title}`,
+        title: `Vote results published: ${title}`,
         summary: `${total} ${noun} — results now public.`,
         timestamp: event.timestamp,
         href: event.action_url,
@@ -122,7 +151,13 @@ function absoluteTime(iso: string): string {
 function classifyHref(href: string): { kind: "internal"; to: string } | { kind: "external" } {
   try {
     const url = new URL(href, window.location.origin);
+    // Known SPA routes — treat as internal regardless of origin so the
+    // dev cross-port mismatch (API on 3000, UI on 5173) and single-origin
+    // prod both route via React Router.
     if (/^\/process\/[^/]+\/?$/.test(url.pathname)) {
+      return { kind: "internal", to: url.pathname };
+    }
+    if (/^\/brief\/[^/]+\/?$/.test(url.pathname)) {
       return { kind: "internal", to: url.pathname };
     }
     if (url.origin === window.location.origin) {

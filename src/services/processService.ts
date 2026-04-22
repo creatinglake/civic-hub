@@ -287,6 +287,34 @@ export async function getProcessState(
 // --- Dev/test utilities ----------------------------------------------------
 
 /** Clear all processes — dev/seed only. */
+/**
+ * Persist the current in-memory Process back to storage. Used by flows
+ * that mutate a process outside of the action dispatcher — for example,
+ * the admin brief approval orchestration, which mutates the brief and
+ * the linked vote directly via module functions (not HTTP actions).
+ *
+ * Updates status, state, and updated_at. Does NOT emit any events —
+ * callers that cause status transitions are responsible for emitting
+ * the corresponding lifecycle events themselves.
+ */
+export async function saveProcessState(process: Process): Promise<void> {
+  const now = new Date().toISOString();
+  const { error } = await getDb()
+    .from("processes")
+    .update({
+      status: process.status,
+      state: process.state,
+      updated_at: now,
+    })
+    .eq("id", process.id);
+  if (error) {
+    throw new Error(
+      `ProcessService: failed to save process ${process.id}: ${error.message}`,
+    );
+  }
+  process.updatedAt = now;
+}
+
 export async function clearProcesses(): Promise<void> {
   const { error } = await getDb().from("processes").delete().neq("id", "");
   if (error) {

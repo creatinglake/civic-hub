@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
 import {
   adminListProposals,
   adminGetProposal,
@@ -10,6 +9,7 @@ import {
   type ContentSection,
   type ContentLink,
 } from "../services/api";
+import AdminTabs from "../components/AdminTabs";
 
 const ADMIN_USER = "user:civic-admin";
 
@@ -182,7 +182,7 @@ export default function AdminProposals() {
   if (view === "list") {
     return (
       <div className="page detail-page admin-page">
-        <Link to="/" className="back-link">&larr; Home</Link>
+        <AdminTabs />
         <h1>Admin: Proposal Review</h1>
         <p className="admin-subtitle">
           Endorsed proposals need review. Convert them to official votes or archive them.

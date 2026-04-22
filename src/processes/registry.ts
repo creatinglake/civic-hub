@@ -7,10 +7,16 @@
 import { ProcessHandler, ProcessFactory } from "./types.js";
 import voteProcess from "./voteProcess.js";
 import proposalProcess from "./proposalProcess.js";
+import briefProcess from "./briefProcess.js";
 
+// civic.brief is registered here but can be omitted by hubs that don't want
+// brief generation. When present, the vote adapter's process.close handler
+// spawns a brief after the vote closes. When absent, vote closes simply
+// terminate without a brief.
 const processRegistry: Record<string, ProcessHandler> = {
   "civic.vote": voteProcess,
   "civic.proposal": proposalProcess,
+  "civic.brief": briefProcess,
 };
 
 /**

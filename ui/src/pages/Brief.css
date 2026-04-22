@@ -1,0 +1,117 @@
+.brief-page {
+  padding: var(--space-lg);
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+.brief-status {
+  color: var(--color-text-subtle);
+  font-family: var(--font-body);
+  font-size: var(--font-size-base);
+  text-align: center;
+  padding: var(--space-xl) var(--space-md);
+}
+
+.brief-status-error {
+  color: var(--color-text);
+}
+
+.brief-header {
+  margin: 0 0 var(--space-xl);
+}
+
+.brief-eyebrow {
+  margin: 0;
+  color: var(--color-brand);
+  font-family: var(--font-heading);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.brief-header h1 {
+  margin: var(--space-xs) 0 var(--space-sm);
+  font-size: var(--font-size-xl);
+  line-height: var(--line-height-tight);
+}
+
+.brief-meta {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-base);
+}
+
+.brief-section {
+  margin: 0 0 var(--space-xl);
+}
+
+.brief-section h2 {
+  font-family: var(--font-heading);
+  font-size: var(--font-size-lg);
+  margin: 0 0 var(--space-md);
+  color: var(--color-text);
+}
+
+.brief-bars {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.brief-bar-row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.brief-bar-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--space-md);
+  font-size: var(--font-size-base);
+}
+
+.brief-bar-count {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  white-space: nowrap;
+}
+
+.brief-bar-track {
+  height: 12px;
+  background: var(--color-surface-muted);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.brief-bar-fill {
+  height: 100%;
+  background: var(--color-primary);
+  border-radius: var(--radius-sm);
+  transition: width 0.3s ease;
+  min-width: 2px;
+}
+
+.brief-comments-list {
+  padding-left: 1.25rem;
+  margin: 0;
+  line-height: var(--line-height-base);
+  color: var(--color-text);
+}
+
+.brief-comments-list li {
+  margin-bottom: var(--space-xs);
+}
+
+.brief-admin-notes {
+  margin: 0;
+  color: var(--color-text);
+  line-height: var(--line-height-base);
+  white-space: pre-wrap;
+}

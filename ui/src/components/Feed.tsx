@@ -4,6 +4,7 @@ import {
   type VoteState,
   getEvents,
   getProcessState,
+  getPublicBrief,
 } from "../services/api";
 import FeedPost, { eventToPost, type FeedPostView } from "./FeedPost";
 import "./Feed.css";
@@ -19,9 +20,28 @@ interface Props {
   filter?: (event: CivicEvent) => boolean;
 }
 
+type ProcessKind = "civic.vote" | "civic.brief";
+
 interface ProcessMeta {
+  type?: ProcessKind;
   title?: string;
   description?: string;
+}
+
+/**
+ * Discriminate the underlying process type for an event from its data.
+ * - civic.process.started is only emitted by civic.vote today.
+ * - civic.process.result_published carries `brief_id` on brief emissions
+ *   and `result` (with `tally`) on vote emissions.
+ */
+function kindFromEvent(event: CivicEvent): ProcessKind | null {
+  if (event.event_type === "civic.process.started") return "civic.vote";
+  if (event.event_type === "civic.process.result_published") {
+    const data = event.data as { brief_id?: unknown; result?: unknown };
+    if (typeof data?.brief_id === "string") return "civic.brief";
+    if (data?.result !== undefined) return "civic.vote";
+  }
+  return null;
 }
 
 export default function Feed({ filter }: Props) {
@@ -61,67 +81,70 @@ export default function Feed({ filter }: Props) {
     [renderableEvents, visibleCount],
   );
 
-  // Fetch process metadata lazily for events visible in the feed. Cached per
-  // process id so a second scroll past the same post does not refetch. The
-  // in-flight set uses a ref so StrictMode's effect double-invocation does
-  // not double-fire requests or cancel the first run's fetches.
+  // Fetch per-process metadata lazily for events visible in the feed. The
+  // in-flight set is a ref so StrictMode's double-invoke doesn't double-fire
+  // or cancel requests.
   const inFlight = useRef<Set<string>>(new Set());
   useEffect(() => {
-    const needed: string[] = [];
+    const needed: Array<{ id: string; kind: ProcessKind }> = [];
     for (const ev of visibleEvents) {
-      if (
-        (ev.event_type === "civic.process.started" ||
-          ev.event_type === "civic.process.result_published") &&
-        ev.process_id &&
-        !(ev.process_id in processMeta) &&
-        !inFlight.current.has(ev.process_id)
-      ) {
-        needed.push(ev.process_id);
-      }
+      const kind = kindFromEvent(ev);
+      if (!kind) continue;
+      if (!ev.process_id) continue;
+      if (ev.process_id in processMeta) continue;
+      if (inFlight.current.has(ev.process_id)) continue;
+      needed.push({ id: ev.process_id, kind });
     }
     if (needed.length === 0) return;
 
-    for (const id of needed) inFlight.current.add(id);
+    for (const { id } of needed) inFlight.current.add(id);
 
-    needed.forEach((id) => {
-      getProcessState(id)
-        .then((state) => {
-          if (state.type !== "civic.vote") {
+    for (const { id, kind } of needed) {
+      const lookup =
+        kind === "civic.vote"
+          ? getProcessState(id).then((state) => {
+              if (state.type !== "civic.vote") return null;
+              const vote = state as VoteState;
+              return { type: "civic.vote" as const, title: vote.title, description: vote.description };
+            })
+          : getPublicBrief(id).then((brief) => ({
+              type: "civic.brief" as const,
+              title: brief.title,
+              description: undefined,
+            }));
+
+      lookup
+        .then((meta) => {
+          if (meta) {
+            setProcessMeta((prev) => ({ ...prev, [id]: meta }));
+          } else {
+            // Mark resolved-but-empty so we don't retry every re-render.
             setProcessMeta((prev) => ({ ...prev, [id]: {} }));
-            return;
           }
-          const vote = state as VoteState;
-          setProcessMeta((prev) => ({
-            ...prev,
-            [id]: { title: vote.title, description: vote.description },
-          }));
         })
         .catch(() => {
-          // Best-effort enrichment — mark resolved so we don't retry on every
-          // re-render, and render the post without a summary.
+          // Most commonly: brief not yet published (404). Cache as empty so
+          // the post either skips rendering or shows a fallback title.
           setProcessMeta((prev) => ({ ...prev, [id]: {} }));
         })
         .finally(() => {
           inFlight.current.delete(id);
         });
-    });
+    }
   }, [visibleEvents, processMeta]);
 
   const posts: FeedPostView[] = useMemo(() => {
     const getTitle = (id: string) => processMeta[id]?.title;
     const getDescription = (id: string) => processMeta[id]?.description;
+    const getType = (id: string) => processMeta[id]?.type;
     const out: FeedPostView[] = [];
     for (const ev of visibleEvents) {
-      const post = eventToPost(ev, getDescription, getTitle);
+      const post = eventToPost(ev, getDescription, getTitle, getType);
       if (post) out.push(post);
     }
     return out;
   }, [visibleEvents, processMeta]);
 
-  // Determine if more renderable (filtered) events exist beyond the current
-  // page. We can't know which of the *unloaded* events will pass the post
-  // filter without inspecting them — they're already loaded in `events`, so
-  // we just compare counts of the filtered list.
   const hasMore = renderableEvents.length > visibleCount;
 
   if (loading) {

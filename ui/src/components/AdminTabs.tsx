@@ -1,0 +1,27 @@
+import { NavLink } from "react-router-dom";
+import "./AdminTabs.css";
+
+/**
+ * Shared tab navigation for admin pages. Sits at the top of every admin
+ * surface (Proposals, Briefs, future: users/settings/etc) so the admin
+ * can jump between surfaces without leaving the admin context.
+ *
+ * Each tab is a NavLink so React Router assigns `aria-current="page"`
+ * automatically on the active tab.
+ */
+export default function AdminTabs() {
+  return (
+    <nav className="admin-tabs" aria-label="Admin sections">
+      <NavLink to="/admin/proposals" className={tabClass}>
+        Proposals
+      </NavLink>
+      <NavLink to="/admin/briefs" className={tabClass}>
+        Civic Briefs
+      </NavLink>
+    </nav>
+  );
+}
+
+function tabClass({ isActive }: { isActive: boolean }): string {
+  return `admin-tab${isActive ? " is-active" : ""}`;
+}

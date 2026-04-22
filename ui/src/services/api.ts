@@ -111,7 +111,23 @@ export interface ProposalSummary extends ProcessSummaryBase {
   support_threshold: number;
 }
 
-export type ProcessSummary = VoteSummary | ProposalSummary;
+/** Civic brief summary as it appears in the public process list. The
+ *  public listProcesses endpoint only returns briefs with
+ *  publication_status === "published"; pending/approved briefs are
+ *  filtered out server-side. */
+export interface PublishedBriefSummary {
+  id: string;
+  type: "civic.brief";
+  title: string;
+  source_process_id: string;
+  publication_status: "published";
+  participation_count: number;
+  generated_at: string;
+  published_at: string;
+  created_at: string;
+}
+
+export type ProcessSummary = VoteSummary | ProposalSummary | PublishedBriefSummary;
 
 /** Vote detail state */
 export interface VoteState {
@@ -417,4 +433,100 @@ interface EventsResponse {
 export async function getEvents(): Promise<CivicEvent[]> {
   const res = await request<EventsResponse>("GET", "/events");
   return res.events;
+}
+
+// --- Civic Briefs ---
+
+export type BriefPublicationStatus = "pending" | "approved" | "published";
+
+export interface BriefPositionBreakdown {
+  option_id: string;
+  option_label: string;
+  count: number;
+  percentage: number;
+}
+
+export interface BriefContent {
+  title: string;
+  participation_count: number;
+  position_breakdown: BriefPositionBreakdown[];
+  comments: string[];
+  admin_notes: string;
+}
+
+/** Admin list summary */
+export interface BriefSummary {
+  id: string;
+  type: "civic.brief";
+  title: string;
+  source_process_id: string;
+  publication_status: BriefPublicationStatus;
+  participation_count: number;
+  generated_at: string;
+  approved_at: string | null;
+  published_at: string | null;
+  created_at: string;
+}
+
+/** Admin detail (full brief including editable content) */
+export interface BriefDetail extends BriefSummary {
+  content: BriefContent;
+  delivered_to: string[];
+  created_by: string;
+}
+
+/** Public brief — returned only when publication_status === "published" */
+export interface PublicBrief {
+  id: string;
+  type: "civic.brief";
+  title: string;
+  source_process_id: string;
+  participation_count: number;
+  position_breakdown: BriefPositionBreakdown[];
+  comments: string[];
+  admin_notes: string;
+  generated_at: string;
+  published_at: string;
+}
+
+export interface BriefContentPatch {
+  comments?: string[];
+  admin_notes?: string;
+}
+
+export function adminListBriefs(status?: BriefPublicationStatus): Promise<BriefSummary[]> {
+  const params = status ? `?status=${encodeURIComponent(status)}` : "";
+  return request("GET", `/admin/briefs${params}`);
+}
+
+export function adminGetBrief(id: string): Promise<BriefDetail> {
+  return request("GET", `/admin/briefs/${id}`);
+}
+
+export function adminPatchBrief(id: string, patch: BriefContentPatch): Promise<BriefDetail> {
+  return request("PATCH", `/admin/briefs/${id}`, patch);
+}
+
+export function adminApproveBrief(id: string): Promise<{ message: string; brief: BriefDetail }> {
+  return request("POST", `/admin/briefs/${id}/approve`);
+}
+
+export function getPublicBrief(id: string): Promise<PublicBrief> {
+  return request("GET", `/brief/${id}`);
+}
+
+// --- Admin: hub settings ---
+
+export interface AdminSettings {
+  brief_recipient_emails: string[];
+}
+
+export function adminGetSettings(): Promise<AdminSettings> {
+  return request("GET", "/admin/settings");
+}
+
+export function adminPatchSettings(
+  patch: Partial<AdminSettings>,
+): Promise<AdminSettings> {
+  return request("PATCH", "/admin/settings", patch);
 }

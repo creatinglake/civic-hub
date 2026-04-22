@@ -3,6 +3,7 @@
 
 import { Request, Response } from "express";
 import { baseUrl } from "../utils/baseUrl.js";
+import { getRegisteredTypes } from "../processes/registry.js";
 
 export function handleDiscoveryManifest(_req: Request, res: Response): void {
   const hub = baseUrl();
@@ -23,7 +24,7 @@ export function handleDiscoveryManifest(_req: Request, res: Response): void {
     feeds: {
       events: `${hub}/events`,
     },
-    capabilities: ["civic.vote", "civic.proposal"],
+    capabilities: getRegisteredTypes(),
     spec: {
       process: "civic-process-spec-v0.1",
       event: "civic-event-spec-v0.1",

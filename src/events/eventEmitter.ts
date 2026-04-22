@@ -9,7 +9,7 @@
 import { CivicEvent, CreateEventInput } from "../models/event.js";
 import { appendEvent } from "./eventStore.js";
 import { generateId } from "../utils/id.js";
-import { baseUrl } from "../utils/baseUrl.js";
+import { baseUrl, uiBaseUrl } from "../utils/baseUrl.js";
 
 /**
  * Create and durably store a spec-compliant civic event.
@@ -20,6 +20,11 @@ import { baseUrl } from "../utils/baseUrl.js";
  */
 export async function emitEvent(input: CreateEventInput): Promise<CivicEvent> {
   const hub = baseUrl();
+  const ui = uiBaseUrl();
+  // action_url is the user-facing UI URL (per Civic Event Spec §3 — "link to
+  // take action"). Defaults to /process/:id; callers can override via
+  // action_url_path when a process type has a distinct public page.
+  const path = input.action_url_path ?? `/process/${input.process_id}`;
   const event: CivicEvent = {
     id: generateId("evt"),
     version: "1.0",
@@ -28,7 +33,7 @@ export async function emitEvent(input: CreateEventInput): Promise<CivicEvent> {
     process_id: input.process_id,
     actor: input.actor,
     jurisdiction: input.jurisdiction,
-    action_url: `${hub}/process/${input.process_id}`,
+    action_url: `${ui}${path}`,
     source: {
       hub_id: input.hub_id,
       hub_url: hub,

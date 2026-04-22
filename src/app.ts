@@ -14,6 +14,7 @@ import proposalRoutes from "./routes/proposalRoutes.js";
 import adminRoutes from "./routes/adminRoutes.js";
 import authRoutes from "./routes/authRoutes.js";
 import voteLogRoutes from "./routes/voteLogRoutes.js";
+import briefRoutes from "./routes/briefRoutes.js";
 import { ensureSeeded } from "./debug/autoSeed.js";
 import { pingDb } from "./db/client.js";
 
@@ -47,7 +48,7 @@ app.use((req, res, next) => {
     res.header("Vary", "Origin");
   }
   res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
-  res.header("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  res.header("Access-Control-Allow-Methods", "GET, POST, PATCH, OPTIONS");
   if (req.method === "OPTIONS") {
     res.sendStatus(204);
     return;
@@ -76,6 +77,9 @@ app.use("/admin", adminRoutes);
 
 // Vote log and receipt verification
 app.use("/votes", voteLogRoutes);
+
+// Civic Briefs — public read of published briefs
+app.use("/brief", briefRoutes);
 
 // --- Primary public interfaces ---
 // Events are the PRIMARY public interface of the hub.
@@ -117,6 +121,11 @@ app.get("/", (_req, res) => {
       "POST /auth/logout": "Destroy session",
       "GET /votes/:id/log": "Public vote audit log (available after vote closes)",
       "GET /votes/:id/verify?receipt=X": "Verify a vote receipt",
+      "GET /admin/briefs": "List civic briefs for admin review (optional ?status=)",
+      "GET /admin/briefs/:id": "Get full brief detail for admin",
+      "PATCH /admin/briefs/:id": "Edit brief concerns/suggestions/notes (pending only)",
+      "POST /admin/briefs/:id/approve": "Approve brief: email + publish",
+      "GET /brief/:id": "Public read of a published civic brief",
       "GET /events": "List all events (primary public interface)",
       "GET /events?process_id=X": "Filter events by process",
       "GET /events?type=X": "Filter events by type (e.g., civic.process.vote_submitted)",

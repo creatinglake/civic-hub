@@ -1785,6 +1785,48 @@
   opacity: 1;
 }
 
+/* --- Completed vote card with brief status --- */
+
+.completed-vote-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.completed-vote-brief-row {
+  display: flex;
+  justify-content: flex-end;
+  padding: 0 0.25rem;
+}
+
+.brief-link {
+  display: inline-block;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--color-brand, #1e3a5f);
+  text-decoration: none;
+  padding: 0.3rem 0.6rem;
+  border-radius: 4px;
+  transition: background 0.15s;
+}
+
+.brief-link:hover {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.brief-pending-chip {
+  display: inline-block;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--muted-text);
+  padding: 0.2rem 0.6rem;
+  background: var(--page-background);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  font-style: italic;
+}
+
 /* --- Utility --- */
 
 .error {

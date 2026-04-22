@@ -1,9 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   listProcesses,
   listCivicProposals,
   type ProcessSummary,
+  type PublishedBriefSummary,
   type VoteSummary,
   type ProposalSummary,
   type CivicProposalSummary,
@@ -31,13 +32,33 @@ export default function Votes() {
       .finally(() => setLoading(false));
   }, []);
 
-  // Active and completed votes (active, closed, finalized)
+  // Active votes — accepting participation right now.
   const activeVotes = processes
     .filter((p): p is VoteSummary =>
-      p.type === "civic.vote" &&
-      (p.status === "active" || p.status === "closed" || p.status === "finalized")
+      p.type === "civic.vote" && p.status === "active"
     )
     .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+  // Completed votes — closed or finalized. A brief may or may not be
+  // published against them; the chip tells the story either way.
+  const completedVotes = processes
+    .filter((p): p is VoteSummary =>
+      p.type === "civic.vote" &&
+      (p.status === "closed" || p.status === "finalized")
+    )
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+  // Index published briefs by source vote id so completed-vote cards can
+  // link to their brief in one lookup.
+  const briefsByVote = useMemo(() => {
+    const map = new Map<string, PublishedBriefSummary>();
+    for (const p of processes) {
+      if (p.type === "civic.brief") {
+        map.set(p.source_process_id, p);
+      }
+    }
+    return map;
+  }, [processes]);
 
   // Votes in proposal phase (proposed, threshold_met, draft)
   const proposedVotes = processes
@@ -89,7 +110,7 @@ export default function Votes() {
             )}
           </section>
 
-          {/* Proposed Votes — single unified section */}
+          {/* Proposed Votes */}
           <section className="section">
             <div className="section-header-row">
               <h2 className="section-title">Proposed Votes</h2>
@@ -105,7 +126,6 @@ export default function Votes() {
               </p>
             ) : (
               <ul className="process-list">
-                {/* Vote-lifecycle proposals (civic.vote in proposed/threshold_met/draft) */}
                 {proposedVotes.map((v) => (
                   <li key={v.id}>
                     <Link to={`/process/${v.id}`} className="process-link">
@@ -114,7 +134,6 @@ export default function Votes() {
                   </li>
                 ))}
 
-                {/* Legacy proposals (civic.proposal type) */}
                 {legacyProposals.map((p) => (
                   <li key={p.id}>
                     <Link to={`/process/${p.id}`} className="process-link">
@@ -123,7 +142,6 @@ export default function Votes() {
                   </li>
                 ))}
 
-                {/* Civic proposals (user-submitted via /proposals) */}
                 {activeCivicProposals.map((p) => (
                   <li key={p.id}>
                     <Link to={`/proposal/${p.id}`} className="process-link">
@@ -155,6 +173,40 @@ export default function Votes() {
                     </Link>
                   </li>
                 ))}
+              </ul>
+            )}
+          </section>
+
+          {/* Completed Votes */}
+          <section className="section">
+            <h2 className="section-title">Completed Votes</h2>
+            {completedVotes.length === 0 ? (
+              <p className="empty-state-inline">No completed votes yet.</p>
+            ) : (
+              <ul className="process-list">
+                {completedVotes.map((v) => {
+                  const brief = briefsByVote.get(v.id);
+                  return (
+                    <li key={v.id}>
+                      <div className="completed-vote-card">
+                        <Link to={`/process/${v.id}`} className="process-link">
+                          <ProcessCard process={v} />
+                        </Link>
+                        <div className="completed-vote-brief-row">
+                          {brief ? (
+                            <Link to={`/brief/${brief.id}`} className="brief-link">
+                              View Civic Brief &rarr;
+                            </Link>
+                          ) : (
+                            <span className="brief-pending-chip">
+                              Civic Brief pending review
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </li>
+                  );
+                })}
               </ul>
             )}
           </section>
