@@ -15,12 +15,14 @@ import {
   activate,
   submitVote,
   closeVote,
-  finalizeVote,
   getReadModel,
   getSummary,
   type VoteProcessState,
 } from "../modules/civic.vote/index.js";
 import { recordVote } from "../modules/civic.receipts/index.js";
+import type { BriefProcessState } from "../modules/civic.brief/index.js";
+import { emitBriefAggregationCompleted } from "../modules/civic.brief/events.js";
+import { getProcessFactory, getProcessHandler } from "./registry.js";
 
 // --- Helpers ---
 
@@ -39,6 +41,63 @@ function makeContext(process: Process) {
 
 function syncStatus(process: Process, state: VoteProcessState): void {
   process.status = state.status;
+}
+
+/**
+ * Spawn a civic.brief process from a just-closed vote and link the two
+ * via the parent's follow_up_process_ids array (Civic Process Spec §11.3).
+ *
+ * The generic process factory emits civic.process.created for the brief;
+ * we additionally fire the brief's aggregation_completed here so the
+ * spec's Phase 4 boundary is observable on the event feed.
+ */
+async function spawnBriefFromClosedVote(
+  voteProcess: Process,
+  closeResult: Record<string, unknown>,
+): Promise<Process> {
+  const factory = getProcessFactory();
+  const brief = await factory({
+    definition: { type: "civic.brief", version: "0.1" },
+    title: `Civic Brief: ${voteProcess.title}`,
+    description: voteProcess.description,
+    hubId: voteProcess.hubId,
+    jurisdiction: voteProcess.jurisdiction,
+    createdBy: "system",
+    state: {
+      source_process_id: voteProcess.id,
+      vote_title: voteProcess.title,
+      tally: closeResult.tally,
+      total_votes: closeResult.total_votes,
+    },
+  });
+
+  // Emit aggregation_completed for the brief. (civic.process.created is
+  // already emitted by the generic factory in processService.)
+  const briefState = brief.state as unknown as BriefProcessState;
+  await emitBriefAggregationCompleted(
+    {
+      process_id: brief.id,
+      hub_id: brief.hubId,
+      jurisdiction: brief.jurisdiction,
+      emit: emitEvent,
+    },
+    "system",
+    briefState,
+  );
+
+  // Link the parent vote to the new brief. This mutation of
+  // voteProcess.state is persisted by processService after handleAction
+  // returns. Per Civic Process Spec §11.3, follow_up_process_ids is the
+  // canonical parent→child linkage.
+  const voteState = voteProcess.state as unknown as VoteProcessState & {
+    follow_up_process_ids?: string[];
+  };
+  voteState.follow_up_process_ids = [
+    ...(voteState.follow_up_process_ids ?? []),
+    brief.id,
+  ];
+
+  return brief;
 }
 
 // --- Handler implementation ---
@@ -98,14 +157,22 @@ const voteProcess: ProcessHandler = {
         const outcome = await closeVote(state, action.actor, ctx);
         syncStatus(process, outcome.state);
         result = outcome.result;
+
+        // If civic.brief is registered, spawn a brief from the now-closed
+        // vote. Hubs that don't register civic.brief simply skip this step.
+        const briefHandler = getProcessHandler("civic.brief");
+        if (briefHandler) {
+          const brief = await spawnBriefFromClosedVote(process, outcome.result);
+          result = { ...result, brief_process_id: brief.id };
+        }
         break;
       }
-      case "process.finalize": {
-        const outcome = await finalizeVote(state, action.actor, ctx);
-        syncStatus(process, outcome.state);
-        result = outcome.result;
-        break;
-      }
+      // Note: there is intentionally no `process.finalize` action here.
+      // Finalization publishes the vote result, which must be gated on
+      // admin approval of the accompanying civic.brief. The brief module's
+      // approval flow calls `finalizeVote` directly as a library import;
+      // there is no HTTP path that publishes a vote result without
+      // approved-brief orchestration.
       default:
         throw new Error(`Unknown action type for civic.vote: ${action.type}`);
     }

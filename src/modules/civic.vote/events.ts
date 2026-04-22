@@ -114,6 +114,43 @@ export async function emitEnded(
   });
 }
 
+/**
+ * Emit the Phase 4 (Aggregation) event. Per Civic Event Spec §7.6 and
+ * Civic Process Spec §9, this fires when raw participant inputs have been
+ * processed into structured results. For civic.vote, tallying IS the
+ * aggregation step, so this fires alongside `ended`.
+ */
+export async function emitAggregationCompleted(
+  ctx: EventContext,
+  actor: string,
+  result: VoteResult,
+  participant_count: number,
+): Promise<void> {
+  await ctx.emit({
+    event_type: "civic.process.aggregation_completed",
+    actor,
+    process_id: ctx.process_id,
+    hub_id: ctx.hub_id,
+    jurisdiction: ctx.jurisdiction,
+    data: {
+      aggregation_method: "tallying",
+      participant_count,
+      result_type: "tally",
+      result_summary: summarizeTally(result),
+    },
+  });
+}
+
+function summarizeTally(result: VoteResult): string {
+  const entries = Object.entries(result.tally).sort((a, b) => b[1] - a[1]);
+  if (entries.length === 0 || result.total_votes === 0) {
+    return "No votes recorded.";
+  }
+  const [topOption, topCount] = entries[0];
+  const pct = Math.round((topCount / result.total_votes) * 100);
+  return `${topOption}: ${topCount} of ${result.total_votes} (${pct}%)`;
+}
+
 export async function emitResultPublished(
   ctx: EventContext,
   actor: string,

@@ -36,6 +36,12 @@ export interface CivicEvent {
 /**
  * Input for emitEvent() — callers provide the minimum required fields.
  * The emitter fills in id, version, timestamp, source, action_url, and meta.
+ *
+ * Callers MAY override `action_url_path` when a process type's user-facing
+ * URL differs from the default `/process/:id`. The path is prefixed with
+ * the hub's UI base URL by the emitter. For example, civic.brief uses
+ * `action_url_path: /brief/:id` so feed posts link to the public brief
+ * page instead of the process detail view.
  */
 export interface CreateEventInput {
   event_type: string;
@@ -46,4 +52,5 @@ export interface CreateEventInput {
   data: Record<string, unknown>;
   dedupe_key?: string;
   visibility?: "public" | "restricted";
+  action_url_path?: string; // e.g. "/brief/abc123"; defaults to "/process/:id"
 }
