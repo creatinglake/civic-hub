@@ -42,15 +42,10 @@ function renderText(
   for (const p of c.position_breakdown) {
     lines.push(`  • ${p.option_label}: ${p.count} (${p.percentage}%)`);
   }
-  if (c.concerns.length > 0) {
+  if (c.comments.length > 0) {
     lines.push("");
-    lines.push("Concerns raised:");
-    for (const concern of c.concerns) lines.push(`  • ${concern}`);
-  }
-  if (c.suggestions.length > 0) {
-    lines.push("");
-    lines.push("Suggestions:");
-    for (const s of c.suggestions) lines.push(`  • ${s}`);
+    lines.push("Community comments:");
+    for (const comment of c.comments) lines.push(`  • ${comment}`);
   }
   if (c.admin_notes.trim().length > 0) {
     lines.push("");
@@ -75,11 +70,8 @@ function renderHtml(
         `<li><strong>${escape(p.option_label)}:</strong> ${p.count} (${p.percentage}%)</li>`,
     )
     .join("");
-  const concerns = c.concerns.length
-    ? `<h3>Concerns raised</h3><ul>${c.concerns.map((x) => `<li>${escape(x)}</li>`).join("")}</ul>`
-    : "";
-  const suggestions = c.suggestions.length
-    ? `<h3>Suggestions</h3><ul>${c.suggestions.map((x) => `<li>${escape(x)}</li>`).join("")}</ul>`
+  const comments = c.comments.length
+    ? `<h3>Community comments</h3><ul>${c.comments.map((x) => `<li>${escape(x)}</li>`).join("")}</ul>`
     : "";
   const adminNotes = c.admin_notes.trim().length
     ? `<h3>Notes from the Civic Hub</h3><p>${escape(c.admin_notes.trim()).replace(/\n/g, "<br/>")}</p>`
@@ -92,8 +84,7 @@ function renderHtml(
   <p><strong>Participation:</strong> ${participants}</p>
   <h3>Positions</h3>
   <ul>${positions}</ul>
-  ${concerns}
-  ${suggestions}
+  ${comments}
   ${adminNotes}
   <hr style="border:none; border-top:1px solid #e5e5e5; margin:24px 0;"/>
   <p><a href="${escape(options.publicUrl)}">View this brief online</a></p>

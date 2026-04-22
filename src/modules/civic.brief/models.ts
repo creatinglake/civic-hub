@@ -24,8 +24,13 @@ export interface BriefContent {
   title: string;
   participation_count: number;
   position_breakdown: BriefPositionBreakdown[];
-  concerns: string[];
-  suggestions: string[];
+  /**
+   * Community comments surfaced alongside the brief — a single flat list
+   * rather than separate concern/suggestion buckets. Slice 3.5 will
+   * populate this from the civic.input stream; for now it starts empty
+   * and the admin types entries in during review.
+   */
+  comments: string[];
   admin_notes: string;
 }
 
@@ -115,7 +120,6 @@ export interface CreateBriefFromVoteInput {
 
 /** Partial content update used by PATCH /admin/briefs/:id. */
 export interface BriefContentPatch {
-  concerns?: string[];
-  suggestions?: string[];
+  comments?: string[];
   admin_notes?: string;
 }

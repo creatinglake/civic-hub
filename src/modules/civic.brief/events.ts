@@ -74,8 +74,7 @@ export async function emitBriefUpdated(
     data: {
       brief: {
         publication_status: state.publication_status,
-        concerns_count: state.content.concerns.length,
-        suggestions_count: state.content.suggestions.length,
+        comments_count: state.content.comments.length,
         has_admin_notes: state.content.admin_notes.trim().length > 0,
       },
     },

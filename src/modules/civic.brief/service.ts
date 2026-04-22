@@ -57,8 +57,8 @@ function generateBriefContent(input: CreateBriefFromVoteInput): BriefContent {
     title: input.vote_title,
     participation_count: total,
     position_breakdown,
-    concerns: [], // populated by admin during review (see HANDOFF.md)
-    suggestions: [],
+    // Empty at generation; Slice 3.5 will populate from civic.input.
+    comments: [],
     admin_notes: "",
   };
 }
@@ -90,11 +90,8 @@ export async function editBrief(
   }
 
   const content = { ...state.content };
-  if (patch.concerns !== undefined) {
-    content.concerns = sanitizeList(patch.concerns);
-  }
-  if (patch.suggestions !== undefined) {
-    content.suggestions = sanitizeList(patch.suggestions);
+  if (patch.comments !== undefined) {
+    content.comments = sanitizeList(patch.comments);
   }
   if (patch.admin_notes !== undefined) {
     content.admin_notes = patch.admin_notes;
@@ -243,8 +240,7 @@ export function getPublicReadModel(
     source_process_id: state.source_process_id,
     participation_count: state.content.participation_count,
     position_breakdown: state.content.position_breakdown,
-    concerns: state.content.concerns,
-    suggestions: state.content.suggestions,
+    comments: state.content.comments,
     admin_notes: state.content.admin_notes,
     generated_at: state.generated_at,
     published_at: state.published_at,
