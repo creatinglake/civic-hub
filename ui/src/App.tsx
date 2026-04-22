@@ -10,6 +10,8 @@ import About from "./pages/About";
 import Propose from "./pages/Propose";
 import ProposalDetail from "./pages/ProposalDetail";
 import AdminProposals from "./pages/AdminProposals";
+import AdminBriefs from "./pages/AdminBriefs";
+import Brief from "./pages/Brief";
 import VoteLog from "./pages/VoteLog";
 import IntroPopup, { hasSeenIntro } from "./components/IntroPopup";
 import "./App.css";
@@ -44,6 +46,8 @@ function AppContent() {
           <Route path="/proposal/:id" element={<ProposalDetail />} />
           <Route path="/votes/:id/log" element={<VoteLog />} />
           <Route path="/admin/proposals" element={<AdminProposals />} />
+          <Route path="/admin/briefs" element={<AdminBriefs />} />
+          <Route path="/brief/:id" element={<Brief />} />
           <Route path="/about" element={<About />} />
         </Routes>
       </main>

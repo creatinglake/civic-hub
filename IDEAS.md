@@ -68,15 +68,18 @@ code. Ideas for process plugins worth exploring:
 
 ## Backend / Spec alignment
 
-- Emit `action_url` as the UI-facing URL, not the API origin. Currently the
-  feed has a client-side workaround; fixing at the source is cleaner and
-  critical for federation.
 - Carry the process title in `civic.process.result_published` event data, so
-  federated consumers can render "Results available: [title]" without
-  calling back to the origin hub.
+  federated consumers can render result posts without calling back to the
+  origin hub. Briefs already carry it; votes still don't.
 - Theme consolidation — migrate legacy `--text-color` / `--primary-color`
   vars in `ui/src/index.css` to the semantic tokens in
   `ui/src/styles/theme.css`.
+- Slice 3.5: populate `BriefContent.comments` from the `civic.input`
+  stream at brief generation time. Today the array is empty until admin
+  manually enters entries during review. The generator in
+  `civic-hub/src/modules/civic.brief/service.ts` (`generateBriefContent`)
+  should accept the list of community-input bodies and seed
+  `content.comments` with sanitized entries so the admin review starts warm.
 
 ## Governance / Community
 

@@ -48,7 +48,7 @@ app.use((req, res, next) => {
     res.header("Vary", "Origin");
   }
   res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
-  res.header("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  res.header("Access-Control-Allow-Methods", "GET, POST, PATCH, OPTIONS");
   if (req.method === "OPTIONS") {
     res.sendStatus(204);
     return;
