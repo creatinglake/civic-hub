@@ -155,16 +155,16 @@ async function run(): Promise<void> {
 
   // 6. Close — should auto-spawn a brief
   step("6. Close vote (spawns brief)");
-  const close = await request<{ tally: Record<string, number>; total_votes: number; brief_process_id?: string }>(
+  const close = await request<{ result: { tally: Record<string, number>; total_votes: number; brief_process_id?: string } }>(
     "POST",
     `/process/${voteId}/action`,
     { type: "process.close", actor: admin.userId, payload: {} },
     admin.token,
   );
   assert(close.status === 200, "Close succeeds", close);
-  assert(close.data.total_votes === 1, "Tally has 1 vote");
-  const briefId = close.data.brief_process_id;
-  assert(typeof briefId === "string", "Close response includes brief_process_id");
+  assert(close.data.result?.total_votes === 1, "Tally has 1 vote", close.data);
+  const briefId = close.data.result?.brief_process_id;
+  assert(typeof briefId === "string", "Close response includes brief_process_id", close.data);
   ok(`Brief ID: ${briefId}`);
 
   // 7. Check events — look for the new spec events

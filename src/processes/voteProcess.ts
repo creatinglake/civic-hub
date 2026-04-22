@@ -58,7 +58,11 @@ async function spawnBriefFromClosedVote(
   const factory = getProcessFactory();
   const brief = await factory({
     definition: { type: "civic.brief", version: "0.1" },
-    title: `Civic Brief: ${voteProcess.title}`,
+    // Title mirrors the vote's title. Contextual labels ("Civic Brief
+    // delivered: …" in the feed, "Civic Brief" eyebrow on the public page,
+    // "Civic Briefs" in the admin tab, etc.) handle disambiguation so the
+    // bare title doesn't need to repeat itself.
+    title: voteProcess.title,
     description: voteProcess.description,
     hubId: voteProcess.hubId,
     jurisdiction: voteProcess.jurisdiction,
