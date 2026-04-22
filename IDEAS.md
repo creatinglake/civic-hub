@@ -65,6 +65,15 @@ code. Ideas for process plugins worth exploring:
 - Server-side pagination on `GET /events` once the event store outgrows
   client-side slicing.
 - Event archival / compaction strategy for long-lived hubs.
+- **Scheduled vote closure.** Today `voting_closes_at` is only checked when
+  someone tries to vote after the deadline (fails with "expired") — nothing
+  actually triggers the `process.close` transition, so expired votes sit in
+  `active` state indefinitely with no brief spawned. Right long-term fix is
+  a scheduled task (cron / Vercel cron / Supabase Edge function) that runs
+  nightly, finds `civic.vote` processes past `voting_closes_at`, and closes
+  them via the normal flow (which spawns the brief). For the pilot, an
+  admin "Close voting" emergency button is a workaround — but the clock-
+  driven path is what residents expect.
 
 ## Backend / Spec alignment
 

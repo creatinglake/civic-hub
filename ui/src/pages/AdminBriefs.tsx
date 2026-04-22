@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import {
   adminListBriefs,
   adminGetBrief,
@@ -13,8 +14,6 @@ import {
 import AdminTabs from "../components/AdminTabs";
 import "./AdminBriefs.css";
 
-type View = "list" | "review";
-
 const STATUS_FILTERS: Array<{ id: "all" | BriefPublicationStatus; label: string }> = [
   { id: "all", label: "All" },
   { id: "pending", label: "Pending" },
@@ -23,7 +22,10 @@ const STATUS_FILTERS: Array<{ id: "all" | BriefPublicationStatus; label: string 
 ];
 
 export default function AdminBriefs() {
-  const [view, setView] = useState<View>("list");
+  const navigate = useNavigate();
+  const { id: routeBriefId } = useParams<{ id?: string }>();
+  const view: "list" | "review" = routeBriefId ? "review" : "list";
+
   const [briefs, setBriefs] = useState<BriefSummary[]>([]);
   const [selected, setSelected] = useState<BriefDetail | null>(null);
   const [statusFilter, setStatusFilter] = useState<"all" | BriefPublicationStatus>("all");
@@ -100,25 +102,35 @@ export default function AdminBriefs() {
   function openReview(id: string) {
     setError(null);
     setActionMessage(null);
-    adminGetBrief(id)
+    navigate(`/admin/briefs/${id}`);
+  }
+
+  function backToList() {
+    setConfirmingApprove(false);
+    setActionMessage(null);
+    setError(null);
+    navigate("/admin/briefs");
+  }
+
+  // Load the selected brief whenever the URL id changes. When we navigate
+  // back to /admin/briefs (no id), clear the selection so stale state
+  // doesn't flash on next entry.
+  useEffect(() => {
+    if (!routeBriefId) {
+      setSelected(null);
+      return;
+    }
+    setError(null);
+    setActionMessage(null);
+    adminGetBrief(routeBriefId)
       .then((brief) => {
         setSelected(brief);
         setCommentsText(brief.content.comments.join("\n"));
         setAdminNotes(brief.content.admin_notes);
-        setView("review");
         setConfirmingApprove(false);
       })
-      .catch((err) => setError(err.message));
-  }
-
-  function backToList() {
-    setSelected(null);
-    setView("list");
-    setConfirmingApprove(false);
-    setActionMessage(null);
-    setError(null);
-    loadList();
-  }
+      .catch((err: Error) => setError(err.message));
+  }, [routeBriefId]);
 
   async function saveDraft() {
     if (!selected) return;
