@@ -15,6 +15,10 @@ import {
   handlePatchBrief,
   handleApproveBrief,
 } from "../controllers/adminBriefController.js";
+import {
+  handleGetSettings,
+  handlePatchSettings,
+} from "../controllers/adminSettingsController.js";
 import { requireAdmin } from "../middleware/auth.js";
 
 const router = Router();
@@ -32,5 +36,9 @@ router.get("/briefs", handleAdminListBriefs);
 router.get("/briefs/:id", handleAdminGetBrief);
 router.patch("/briefs/:id", handlePatchBrief);
 router.post("/briefs/:id/approve", handleApproveBrief);
+
+// Hub settings (admin-configurable; overrides env var fallbacks)
+router.get("/settings", handleGetSettings);
+router.patch("/settings", handlePatchSettings);
 
 export default router;

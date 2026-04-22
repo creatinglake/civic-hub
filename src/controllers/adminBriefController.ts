@@ -39,7 +39,8 @@ import {
   saveProcessState,
 } from "../services/processService.js";
 import { getAuthUser } from "../middleware/auth.js";
-import { sendEmail, parseRecipients } from "../services/mailer.js";
+import { sendEmail } from "../services/mailer.js";
+import { getBriefRecipients } from "../services/hubSettings.js";
 import { uiBaseUrl } from "../utils/baseUrl.js";
 
 const HUB_LABEL = "Floyd Civic Hub";
@@ -207,11 +208,15 @@ export async function handleApproveBrief(
       return;
     }
 
-    const recipients = parseRecipients(process.env.BOARD_RECIPIENT_EMAIL);
+    // Recipients: admin-configured DB value first, env var (BOARD_RECIPIENT_EMAIL)
+    // as safety-net fallback so existing deploys keep working before an admin
+    // has opened the settings panel for the first time.
+    const recipients = await getBriefRecipients();
     if (recipients.length === 0) {
       res.status(503).json({
         error:
-          "Approval unavailable: BOARD_RECIPIENT_EMAIL is not configured on the server.",
+          "Approval unavailable: no brief recipients configured. Set them in " +
+          "Admin → Civic Briefs → Settings (or as BOARD_RECIPIENT_EMAIL env var).",
       });
       return;
     }

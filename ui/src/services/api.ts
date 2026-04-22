@@ -514,3 +514,19 @@ export function adminApproveBrief(id: string): Promise<{ message: string; brief:
 export function getPublicBrief(id: string): Promise<PublicBrief> {
   return request("GET", `/brief/${id}`);
 }
+
+// --- Admin: hub settings ---
+
+export interface AdminSettings {
+  brief_recipient_emails: string[];
+}
+
+export function adminGetSettings(): Promise<AdminSettings> {
+  return request("GET", "/admin/settings");
+}
+
+export function adminPatchSettings(
+  patch: Partial<AdminSettings>,
+): Promise<AdminSettings> {
+  return request("PATCH", "/admin/settings", patch);
+}

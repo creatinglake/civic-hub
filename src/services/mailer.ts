@@ -91,15 +91,3 @@ export async function sendEmail(message: EmailMessage): Promise<void> {
   }
 }
 
-/**
- * Parse comma-separated env var into a recipient list. Empty or missing
- * returns an empty array. Used for BOARD_RECIPIENT_EMAIL which may later
- * accept multiple addresses.
- */
-export function parseRecipients(raw: string | undefined): string[] {
-  if (!raw) return [];
-  return raw
-    .split(",")
-    .map((s) => s.trim())
-    .filter((s) => s.length > 0);
-}

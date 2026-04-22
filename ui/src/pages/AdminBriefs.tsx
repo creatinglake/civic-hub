@@ -4,6 +4,8 @@ import {
   adminGetBrief,
   adminPatchBrief,
   adminApproveBrief,
+  adminGetSettings,
+  adminPatchSettings,
   type BriefDetail,
   type BriefPublicationStatus,
   type BriefSummary,
@@ -35,6 +37,47 @@ export default function AdminBriefs() {
   const [saving, setSaving] = useState(false);
   const [approving, setApproving] = useState(false);
   const [confirmingApprove, setConfirmingApprove] = useState(false);
+
+  // Settings (recipient email list)
+  const [recipientsText, setRecipientsText] = useState("");
+  const [recipientsLoaded, setRecipientsLoaded] = useState(false);
+  const [savingRecipients, setSavingRecipients] = useState(false);
+  const [recipientsMessage, setRecipientsMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    adminGetSettings()
+      .then((s) => {
+        setRecipientsText(s.brief_recipient_emails.join(", "));
+        setRecipientsLoaded(true);
+      })
+      .catch((err: Error) => {
+        setError(`Could not load settings: ${err.message}`);
+      });
+  }, []);
+
+  async function saveRecipients() {
+    setSavingRecipients(true);
+    setRecipientsMessage(null);
+    try {
+      const input = recipientsText
+        .split(/[,\n]/)
+        .map((s) => s.trim())
+        .filter((s) => s.length > 0);
+      const saved = await adminPatchSettings({ brief_recipient_emails: input });
+      setRecipientsText(saved.brief_recipient_emails.join(", "));
+      setRecipientsMessage(
+        saved.brief_recipient_emails.length === 0
+          ? "Cleared — approvals will be blocked until a recipient is set."
+          : `Saved. Briefs will be delivered to ${saved.brief_recipient_emails.length} recipient(s).`,
+      );
+    } catch (err) {
+      setRecipientsMessage(
+        err instanceof Error ? err.message : "Failed to save recipients",
+      );
+    } finally {
+      setSavingRecipients(false);
+    }
+  }
 
   function loadList() {
     setLoading(true);
@@ -260,6 +303,39 @@ export default function AdminBriefs() {
           Review briefs generated automatically when votes close. Approval delivers
           the brief to the Board of Supervisors and publishes it to the public feed.
         </p>
+
+        <section className="admin-settings-panel">
+          <h3>Delivery settings</h3>
+          <label className="form-label" htmlFor="brief-recipients">
+            Brief recipient emails
+          </label>
+          <p className="form-hint">
+            Comma- or newline-separated list of addresses that receive the brief
+            on approval. Changes take effect on the next approval.
+          </p>
+          <textarea
+            id="brief-recipients"
+            className="form-textarea"
+            rows={2}
+            value={recipientsText}
+            onChange={(e) => setRecipientsText(e.target.value)}
+            disabled={!recipientsLoaded || savingRecipients}
+            placeholder="board@floyd.gov, clerk@floyd.gov"
+          />
+          <div className="admin-settings-actions">
+            <button
+              type="button"
+              className="admin-convert-button"
+              onClick={saveRecipients}
+              disabled={!recipientsLoaded || savingRecipients}
+            >
+              {savingRecipients ? "Saving…" : "Save recipients"}
+            </button>
+            {recipientsMessage && (
+              <span className="admin-settings-message">{recipientsMessage}</span>
+            )}
+          </div>
+        </section>
 
         <div className="admin-brief-filters">
           {STATUS_FILTERS.map((f) => (
