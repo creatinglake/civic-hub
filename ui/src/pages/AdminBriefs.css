@@ -12,46 +12,6 @@
   margin: 0 0 var(--space-xs);
 }
 
-.admin-settings-panel {
-  margin: var(--space-md) 0 var(--space-lg);
-  padding: var(--space-md) var(--space-lg);
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-}
-
-.admin-settings-panel h3 {
-  margin: 0 0 var(--space-sm);
-  font-family: var(--font-heading);
-  font-size: var(--font-size-base);
-  color: var(--color-brand);
-}
-
-.admin-settings-panel .form-hint {
-  margin: 0 0 var(--space-sm);
-}
-
-.admin-settings-actions {
-  display: flex;
-  align-items: center;
-  gap: var(--space-md);
-  margin-top: var(--space-sm);
-  flex-wrap: wrap;
-}
-
-.admin-settings-message {
-  font-size: var(--font-size-sm);
-  color: var(--color-text-muted);
-}
-
-.announcement-author-row {
-  display: grid;
-  grid-template-columns: 2fr 1.3fr auto;
-  gap: var(--space-sm);
-  margin-bottom: var(--space-sm);
-  align-items: center;
-}
-
 .admin-brief-filters {
   display: flex;
   gap: var(--space-sm);

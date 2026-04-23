@@ -18,6 +18,9 @@ export default function AdminTabs() {
       <NavLink to="/admin/briefs" className={tabClass}>
         Civic Briefs
       </NavLink>
+      <NavLink to="/admin/settings" className={tabClass}>
+        Settings
+      </NavLink>
     </nav>
   );
 }
