@@ -35,6 +35,13 @@ export interface AuthUser {
   created_at: string;
 }
 
+/**
+ * Elevated role for the authenticated user, derived server-side from
+ * CIVIC_ADMIN_EMAILS / CIVIC_BOARD_EMAILS env vars. null for residents
+ * with no special privileges.
+ */
+export type AuthRole = "admin" | "board" | null;
+
 // --- Token storage ---
 
 const TOKEN_KEY = "civic_auth_token";
@@ -60,7 +67,7 @@ export function requestCode(email: string): Promise<{ message: string }> {
 export function verifyCode(
   email: string,
   code: string
-): Promise<{ token: string; user: AuthUser }> {
+): Promise<{ token: string; user: AuthUser; role: AuthRole }> {
   return request("POST", "/auth/verify", { email, code });
 }
 
@@ -68,7 +75,7 @@ export function affirmResidency(token: string): Promise<{ user: AuthUser }> {
   return request("POST", "/auth/residency", undefined, token);
 }
 
-export function getMe(token: string): Promise<{ user: AuthUser }> {
+export function getMe(token: string): Promise<{ user: AuthUser; role: AuthRole }> {
   return request("GET", "/auth/me", undefined, token);
 }
 

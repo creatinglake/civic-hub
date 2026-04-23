@@ -2,11 +2,8 @@ import { NavLink } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import "./Nav.css";
 
-const ADMIN_EMAIL = "creatinglake@gmail.com";
-
 export default function Nav() {
-  const { user, logout } = useAuth();
-  const isAdmin = user?.email === ADMIN_EMAIL;
+  const { user, logout, isAdmin, canPostAnnouncements } = useAuth();
 
   return (
     <nav className="civic-nav" aria-label="Primary">
@@ -28,6 +25,16 @@ export default function Nav() {
         </li>
       </ul>
       <div className="civic-nav-right">
+        {canPostAnnouncements && (
+          <NavLink
+            to="/announcement/new"
+            className={({ isActive }) =>
+              `civic-nav-link civic-nav-link-post${isActive ? " is-active" : ""}`
+            }
+          >
+            Post Announcement
+          </NavLink>
+        )}
         {isAdmin && (
           <NavLink
             to="/admin/proposals"
