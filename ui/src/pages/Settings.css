@@ -1,0 +1,85 @@
+.settings-page {
+  padding: 0;
+}
+
+.settings-body {
+  padding: var(--space-md) var(--space-lg) var(--space-xl);
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+.settings-body h1 {
+  margin: 0 0 var(--space-xs);
+}
+
+.settings-subtitle {
+  color: var(--color-text-muted);
+  margin: 0 0 var(--space-lg);
+}
+
+.settings-status {
+  padding: var(--space-lg);
+  text-align: center;
+  color: var(--color-text-muted);
+}
+
+.settings-panel {
+  margin: var(--space-md) 0 var(--space-lg);
+  padding: var(--space-md) var(--space-lg);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.settings-panel h3 {
+  margin: 0 0 var(--space-sm);
+  font-family: var(--font-heading);
+  font-size: var(--font-size-base);
+  color: var(--color-brand);
+}
+
+.settings-panel .form-hint {
+  margin: 0 0 var(--space-md);
+  color: var(--color-text-muted);
+  line-height: var(--line-height-base);
+}
+
+.settings-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+  cursor: pointer;
+  user-select: none;
+  padding: var(--space-sm) var(--space-md);
+  background: var(--color-surface-muted);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+}
+
+.settings-toggle input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--color-primary);
+  cursor: pointer;
+}
+
+.settings-toggle input[type="checkbox"]:disabled {
+  cursor: not-allowed;
+}
+
+.settings-toggle-label {
+  font-size: var(--font-size-base);
+  color: var(--color-text);
+}
+
+.settings-message {
+  margin: var(--space-md) 0 0;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+.settings-signed-in {
+  margin: var(--space-xl) 0 0;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-subtle);
+}

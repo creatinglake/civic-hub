@@ -41,6 +41,16 @@ function rowToUser(row: Record<string, unknown>): User {
     email_verified: Boolean(row.email_verified),
     is_resident: Boolean(row.is_resident),
     created_at: String(row.created_at),
+    // Default to true for older rows that pre-date the migration. The
+    // DB migration backfills the column, but the Boolean() coercion also
+    // keeps us safe for any response shape that omits the field.
+    digest_subscribed:
+      row.digest_subscribed === undefined || row.digest_subscribed === null
+        ? true
+        : Boolean(row.digest_subscribed),
+    last_digest_sent_at: row.last_digest_sent_at
+      ? String(row.last_digest_sent_at)
+      : null,
   };
 }
 
@@ -206,11 +216,15 @@ export async function verifyCode(
     }
   } else {
     // Create new user. Race-safe: unique(email) will reject duplicates.
+    // digest_subscribed defaults to true (opt-out model, Slice 5). Setting
+    // it explicitly here documents the intent and protects against a
+    // future default change in the migration.
     const newRow = {
       id: generateId("user"),
       email: normalizedEmail,
       email_verified: true,
       is_resident: false,
+      digest_subscribed: true,
     };
 
     const { data, error } = await db
@@ -331,6 +345,57 @@ export async function logout(token: string): Promise<void> {
 }
 
 // --- Dev/test utilities ---
+
+// --- Digest subscription (Slice 5) ---
+
+/**
+ * Set the daily-digest subscription flag for a user.
+ * Called by the UI settings toggle and by the unsubscribe endpoint.
+ */
+export async function setDigestSubscription(
+  userId: string,
+  subscribed: boolean,
+): Promise<User> {
+  const { data, error } = await getDb()
+    .from("users")
+    .update({ digest_subscribed: subscribed })
+    .eq("id", userId)
+    .select()
+    .maybeSingle();
+
+  if (error) throw new Error(`Auth: ${error.message}`);
+  if (!data) throw new Error("User not found");
+  return rowToUser(data);
+}
+
+/**
+ * Record that a digest was successfully delivered to a user. Updates the
+ * "since" cursor so the next run picks up only new activity. Called by
+ * the cron endpoint after a successful Resend send.
+ */
+export async function markDigestSent(
+  userId: string,
+  timestamp: string,
+): Promise<void> {
+  const { error } = await getDb()
+    .from("users")
+    .update({ last_digest_sent_at: timestamp })
+    .eq("id", userId);
+  if (error) throw new Error(`Auth: ${error.message}`);
+}
+
+/**
+ * List every user currently subscribed to the digest. The cron endpoint
+ * iterates this set. Returns an empty array when nobody is subscribed.
+ */
+export async function listSubscribedUsers(): Promise<User[]> {
+  const { data, error } = await getDb()
+    .from("users")
+    .select("*")
+    .eq("digest_subscribed", true);
+  if (error) throw new Error(`Auth: ${error.message}`);
+  return (data ?? []).map((row) => rowToUser(row));
+}
 
 /** Clear all auth data — used by debug/seed only. */
 export async function clearAuth(): Promise<void> {

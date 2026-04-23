@@ -46,6 +46,16 @@ export default function Nav() {
           </NavLink>
         )}
         {user && (
+          <NavLink
+            to="/settings"
+            className={({ isActive }) =>
+              `civic-nav-link civic-nav-link-settings${isActive ? " is-active" : ""}`
+            }
+          >
+            Settings
+          </NavLink>
+        )}
+        {user && (
           <div className="civic-nav-user">
             <span className="civic-nav-user-email">{user.email}</span>
             <button className="civic-nav-logout" onClick={logout}>

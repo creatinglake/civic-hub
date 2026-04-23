@@ -16,6 +16,7 @@ import Brief from "./pages/Brief";
 import VoteLog from "./pages/VoteLog";
 import PostAnnouncement from "./pages/PostAnnouncement";
 import AnnouncementPage from "./pages/Announcement";
+import Settings from "./pages/Settings";
 import IntroPopup, { hasSeenIntro } from "./components/IntroPopup";
 import "./App.css";
 
@@ -56,6 +57,7 @@ function AppContent() {
           <Route path="/announcement/new" element={<PostAnnouncement />} />
           <Route path="/announcement/:id/edit" element={<PostAnnouncement />} />
           <Route path="/announcement/:id" element={<AnnouncementPage />} />
+          <Route path="/settings" element={<Settings />} />
           <Route path="/about" element={<About />} />
         </Routes>
       </main>

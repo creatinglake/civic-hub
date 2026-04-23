@@ -92,6 +92,23 @@ export async function getEventsByProcessId(
   return (data ?? []).map(rowToEvent);
 }
 
+/**
+ * Return all events strictly newer than `sinceIso`. Ordered ascending by
+ * timestamp so callers iterating per-user digest windows can stop early
+ * once they've walked past a user's cursor.
+ *
+ * Used by the Slice 5 digest cron endpoint.
+ */
+export async function getEventsSince(sinceIso: string): Promise<CivicEvent[]> {
+  const { data, error } = await getDb()
+    .from("events")
+    .select("*")
+    .gt("created_at", sinceIso)
+    .order("created_at", { ascending: true });
+  if (error) throw new Error(`EventStore: ${error.message}`);
+  return (data ?? []).map(rowToEvent);
+}
+
 export async function getEventCount(): Promise<number> {
   const { count, error } = await getDb()
     .from("events")

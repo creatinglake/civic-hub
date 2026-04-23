@@ -33,6 +33,12 @@ export interface AuthUser {
   email_verified: boolean;
   is_resident: boolean;
   created_at: string;
+  /**
+   * Slice 5 — subscription to the daily email digest. Opt-out: defaults
+   * to true on account creation. Flipped via the Settings page or the
+   * unsubscribe link in every digest email.
+   */
+  digest_subscribed: boolean;
 }
 
 /**

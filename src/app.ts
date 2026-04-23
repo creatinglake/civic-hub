@@ -16,6 +16,11 @@ import authRoutes from "./routes/authRoutes.js";
 import voteLogRoutes from "./routes/voteLogRoutes.js";
 import briefRoutes from "./routes/briefRoutes.js";
 import announcementRoutes from "./routes/announcementRoutes.js";
+import {
+  digestCronRouter,
+  digestUnsubscribeRouter,
+  userSettingsRouter,
+} from "./routes/digestRoutes.js";
 import { handleListAnnouncements } from "./controllers/announcementController.js";
 import { ensureSeeded } from "./debug/autoSeed.js";
 import { pingDb } from "./db/client.js";
@@ -88,6 +93,14 @@ app.use("/announcement", announcementRoutes);
 // Public list — separate path so it doesn't collide with /announcement/:id
 app.get("/announcements", handleListAnnouncements);
 
+// Digest (Slice 5):
+//   /internal/digest/run    — Vercel Cron → POSTs with CRON_SECRET bearer
+//   /unsubscribe/digest     — public GET, token-as-credential
+//   /user/settings/digest   — authed PATCH from the Settings page
+app.use("/internal", digestCronRouter);
+app.use("/unsubscribe", digestUnsubscribeRouter);
+app.use("/user/settings", userSettingsRouter);
+
 // --- Primary public interfaces ---
 // Events are the PRIMARY public interface of the hub.
 // All external systems (feeds, dashboards, federation) should rely on events.
@@ -137,6 +150,9 @@ app.get("/", (_req, res) => {
       "PATCH /announcement/:id": "Edit an announcement (author only, or any admin)",
       "GET /announcement/:id": "Public read of an announcement",
       "GET /announcements": "List announcements, newest first (optional ?limit=N)",
+      "POST /internal/digest/run": "Cron-triggered daily email digest (CRON_SECRET bearer)",
+      "GET /unsubscribe/digest?token=X": "Unsubscribe from the daily digest",
+      "PATCH /user/settings/digest": "Toggle digest subscription (authed)",
       "GET /events": "List all events (primary public interface)",
       "GET /events?process_id=X": "Filter events by process",
       "GET /events?type=X": "Filter events by type (e.g., civic.process.vote_submitted)",

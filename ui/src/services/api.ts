@@ -612,3 +612,16 @@ export function adminPatchSettings(
 ): Promise<AdminSettings> {
   return request("PATCH", "/admin/settings", patch);
 }
+
+// --- User settings (Slice 5) ---
+
+/**
+ * Toggle the user's daily digest subscription. Returns the new value.
+ * Requires a valid session token (forwarded via the shared Bearer header
+ * in request()). Server always returns the canonical value.
+ */
+export function setDigestSubscription(
+  subscribed: boolean,
+): Promise<{ digest_subscribed: boolean }> {
+  return request("PATCH", "/user/settings/digest", { subscribed });
+}
