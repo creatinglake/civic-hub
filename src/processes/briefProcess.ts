@@ -43,6 +43,9 @@ const briefProcess: ProcessHandler = {
       vote_title: input.vote_title as string,
       tally: input.tally as Record<string, number>,
       total_votes: input.total_votes as number,
+      comments: Array.isArray(input.comments)
+        ? (input.comments as string[])
+        : undefined,
     };
     return createBriefState(briefInput) as unknown as Record<string, unknown>;
   },

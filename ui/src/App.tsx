@@ -47,6 +47,7 @@ function AppContent() {
           <Route path="/votes/:id/log" element={<VoteLog />} />
           <Route path="/admin/proposals" element={<AdminProposals />} />
           <Route path="/admin/briefs" element={<AdminBriefs />} />
+          <Route path="/admin/briefs/:id" element={<AdminBriefs />} />
           <Route path="/brief/:id" element={<Brief />} />
           <Route path="/about" element={<About />} />
         </Routes>

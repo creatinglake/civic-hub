@@ -116,6 +116,14 @@ export interface CreateBriefFromVoteInput {
   vote_title: string;
   tally: Record<string, number>; // option → count
   total_votes: number;
+  /**
+   * Community-submitted comment bodies collected via civic.input while the
+   * vote was active. Seeded into the brief's content.comments so admin
+   * review starts with the actual resident voices, not an empty textarea.
+   * Caller is responsible for reading these from civic.input (the brief
+   * module never imports civic.input directly).
+   */
+  comments?: string[];
 }
 
 /** Partial content update used by PATCH /admin/briefs/:id. */

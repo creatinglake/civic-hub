@@ -22,6 +22,7 @@ import {
 import { recordVote } from "../modules/civic.receipts/index.js";
 import type { BriefProcessState } from "../modules/civic.brief/index.js";
 import { emitBriefAggregationCompleted } from "../modules/civic.brief/events.js";
+import { getInputsByProcess } from "../modules/civic.input/index.js";
 import { getProcessFactory, getProcessHandler } from "./registry.js";
 
 // --- Helpers ---
@@ -55,6 +56,22 @@ async function spawnBriefFromClosedVote(
   voteProcess: Process,
   closeResult: Record<string, unknown>,
 ): Promise<Process> {
+  // Seed the brief with community comments collected during the vote. Best-
+  // effort: if the read fails we proceed with an empty list rather than
+  // block the vote-close flow — admin can still add comments manually.
+  let comments: string[] = [];
+  try {
+    const inputs = await getInputsByProcess(voteProcess.id);
+    comments = inputs
+      .map((i) => i.body.trim())
+      .filter((body) => body.length > 0);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Unknown error";
+    console.warn(
+      `[voteProcess] Could not read civic.input for brief seeding on ${voteProcess.id}: ${message}`,
+    );
+  }
+
   const factory = getProcessFactory();
   const brief = await factory({
     definition: { type: "civic.brief", version: "0.1" },
@@ -72,6 +89,7 @@ async function spawnBriefFromClosedVote(
       vote_title: voteProcess.title,
       tally: closeResult.tally,
       total_votes: closeResult.total_votes,
+      comments,
     },
   });
 

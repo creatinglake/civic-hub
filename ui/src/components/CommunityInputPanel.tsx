@@ -1,15 +1,16 @@
-// CommunityInputPanel — renders community input submission and display.
+// CommunityInputPanel — renders the community comments collected via
+// civic.input for a process.
 //
-// Community input is stored separately from votes and does NOT affect
-// vote tallying or lifecycle transitions. This is an explicit design guardrail.
+// Read-only as of Slice 3.5. Comment submission now happens inside the vote
+// flow in VotePanel so comments are always tied to the act of voting.
+// This panel just displays what residents have already said.
 
-import { useState, useEffect, useCallback } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { CommunityInput, CommunityInputConfig } from "../services/api";
-import { getInputs, submitInput } from "../services/api";
+import { getInputs } from "../services/api";
 
 interface Props {
   processId: string;
-  actor: string;
   config?: CommunityInputConfig;
 }
 
@@ -24,12 +25,8 @@ function formatRelativeTime(iso: string): string {
   return `${days}d ago`;
 }
 
-export default function CommunityInputPanel({ processId, actor, config }: Props) {
+export default function CommunityInputPanel({ processId, config }: Props) {
   const [inputs, setInputs] = useState<CommunityInput[]>([]);
-  const [body, setBody] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [submitted, setSubmitted] = useState(false);
 
   const fetchInputs = useCallback(() => {
     getInputs(processId)
@@ -41,69 +38,26 @@ export default function CommunityInputPanel({ processId, actor, config }: Props)
     fetchInputs();
   }, [fetchInputs]);
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!body.trim()) return;
+  if (inputs.length === 0) return null;
 
-    setLoading(true);
-    setError(null);
-    try {
-      await submitInput(processId, actor, body.trim());
-      setBody("");
-      setSubmitted(true);
-      fetchInputs();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to submit");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  const prompt = config?.prompt ?? "Share your perspective on this issue";
-  const label = config?.label ?? "Optional: Your input does not affect vote results";
+  const label = config?.label ?? "Shared alongside residents' votes. Does not affect vote results.";
 
   return (
     <div className="community-input-panel">
-      <h3>Community input</h3>
+      <h3>Community comments</h3>
       <p className="input-label">{label}</p>
 
-      {/* Submission form */}
-      <form className="input-form" onSubmit={handleSubmit}>
-        <textarea
-          className="input-textarea"
-          value={body}
-          onChange={(e) => setBody(e.target.value)}
-          placeholder={prompt}
-          rows={3}
-          disabled={loading}
-        />
-        <div className="input-form-actions">
-          <button
-            type="submit"
-            className="input-submit-button"
-            disabled={loading || !body.trim()}
-          >
-            {loading ? "Submitting..." : "Submit"}
-          </button>
-          {submitted && <span className="input-confirmation">Thank you for sharing your perspective</span>}
-          {error && <span className="error">{error}</span>}
-        </div>
-      </form>
-
-      {/* Existing inputs */}
-      {inputs.length > 0 && (
-        <div className="input-list">
-          <p className="input-count">{inputs.length} response{inputs.length !== 1 ? "s" : ""}</p>
-          {inputs.map((input) => (
-            <div key={input.id} className="input-item">
-              <p className="input-body">{input.body}</p>
-              <span className="input-meta">
-                {input.author_id} &middot; {formatRelativeTime(input.submitted_at)}
-              </span>
-            </div>
-          ))}
-        </div>
-      )}
+      <div className="input-list">
+        <p className="input-count">{inputs.length} comment{inputs.length !== 1 ? "s" : ""}</p>
+        {inputs.map((input) => (
+          <div key={input.id} className="input-item">
+            <p className="input-body">{input.body}</p>
+            <span className="input-meta">
+              {input.author_id} &middot; {formatRelativeTime(input.submitted_at)}
+            </span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

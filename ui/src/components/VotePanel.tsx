@@ -1,9 +1,11 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import type { VoteState } from "../services/api";
-import { submitVote, supportVote, unsupportVote } from "../services/api";
+import { submitVote, supportVote, unsupportVote, submitInput } from "../services/api";
 import { useRequireAuth } from "../hooks/useRequireAuth";
 import AuthModal from "./AuthModal";
+
+const COMMENT_MAX = 500;
 
 interface Props {
   process: VoteState;
@@ -16,6 +18,9 @@ export default function VotePanel({ process, actor, onVoted }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [justVoted, setJustVoted] = useState<string | null>(null);
   const [receiptId, setReceiptId] = useState<string | null>(null);
+  const [comment, setComment] = useState("");
+  const [commentSubmitted, setCommentSubmitted] = useState(false);
+  const [commentWarning, setCommentWarning] = useState<string | null>(null);
   const { requireAuth, showAuthModal, closeAuthModal, handleAuthComplete } = useRequireAuth();
 
   const isActive = process.status === "active";
@@ -27,11 +32,30 @@ export default function VotePanel({ process, actor, onVoted }: Props) {
   async function doVote(option: string) {
     setLoading(true);
     setError(null);
+    setCommentWarning(null);
     try {
       const result = await submitVote(process.id, actor, option);
       const receipt = (result.result as Record<string, unknown>)?.receipt_id as string | undefined;
       setJustVoted(option);
       if (receipt) setReceiptId(receipt);
+
+      // If the resident also typed a comment, submit it after the vote
+      // succeeds. Parallel data stream via civic.input — a comment failure
+      // does NOT roll back the vote; we surface a non-fatal warning instead.
+      const trimmed = comment.trim();
+      if (trimmed.length > 0) {
+        try {
+          await submitInput(process.id, actor, trimmed);
+          setCommentSubmitted(true);
+          setComment("");
+        } catch (commentErr) {
+          const msg = commentErr instanceof Error ? commentErr.message : "Failed to submit comment";
+          setCommentWarning(
+            `Your vote was recorded, but the comment couldn't be saved: ${msg}`,
+          );
+        }
+      }
+
       onVoted();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Vote failed");
@@ -142,6 +166,28 @@ export default function VotePanel({ process, actor, onVoted }: Props) {
         <div className="vote-options">
           <h4>Cast your vote</h4>
           <p className="vote-privacy-notice">Votes are private. Only total results are shown.</p>
+
+          {!justVoted && (
+            <div className="vote-comment-field">
+              <label className="vote-comment-label" htmlFor="vote-comment">
+                Your comment <span className="vote-comment-optional">(optional)</span>
+              </label>
+              <textarea
+                id="vote-comment"
+                className="vote-comment-textarea"
+                value={comment}
+                onChange={(e) => setComment(e.target.value.slice(0, COMMENT_MAX))}
+                placeholder="Share concerns, suggestions, context, or any thoughts worth passing on to the Board. Submitted when you cast your vote."
+                rows={3}
+                maxLength={COMMENT_MAX}
+                disabled={loading}
+              />
+              <span className="vote-comment-counter">
+                {comment.length} / {COMMENT_MAX}
+              </span>
+            </div>
+          )}
+
           <div className="vote-buttons">
             {process.options.map((option) => (
               <button
@@ -154,6 +200,14 @@ export default function VotePanel({ process, actor, onVoted }: Props) {
               </button>
             ))}
           </div>
+          {justVoted && commentSubmitted && (
+            <p className="vote-confirmation">
+              Your vote and comment have been submitted.
+            </p>
+          )}
+          {commentWarning && (
+            <p className="vote-comment-warning">{commentWarning}</p>
+          )}
           {justVoted && (
             <div className="vote-receipt">
               <p className="vote-receipt-title">Your vote has been recorded</p>

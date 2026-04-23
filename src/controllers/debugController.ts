@@ -10,6 +10,7 @@ import {
   clearProcesses,
 } from "../services/processService.js";
 import { clearEvents, getEventCount } from "../events/eventStore.js";
+import { emitEvent } from "../events/eventEmitter.js";
 import { clearInputs, submitInput } from "../modules/civic.input/index.js";
 import { clearProposals } from "../modules/civic.proposals/index.js";
 import { clearAuth } from "../modules/civic.auth/index.js";
@@ -31,7 +32,11 @@ async function runScenario(
 
   if (scenario.inputs) {
     for (const input of scenario.inputs) {
-      await submitInput(process.id, input.author_id, input.body);
+      await submitInput(process.id, input.author_id, input.body, {
+        hub_id: process.hubId,
+        jurisdiction: process.jurisdiction,
+        emit: emitEvent,
+      });
     }
   }
 

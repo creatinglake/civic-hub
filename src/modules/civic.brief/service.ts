@@ -57,8 +57,8 @@ function generateBriefContent(input: CreateBriefFromVoteInput): BriefContent {
     title: input.vote_title,
     participation_count: total,
     position_breakdown,
-    // Empty at generation; Slice 3.5 will populate from civic.input.
-    comments: [],
+    // Seeded from civic.input. Admin can edit these in the review UI.
+    comments: sanitizeList(input.comments ?? []),
     admin_notes: "",
   };
 }

@@ -148,12 +148,13 @@ export default function Process() {
         <IssueContent content={voteState.content} />
       )}
 
-      {/* Community input (only for processes that enable it) */}
-      {isVote && id && voteState?.content?.community_input && (
+      {/* Community comments — show for any vote with collected inputs.
+          Submission now happens inline with voting via VotePanel's comment
+          textarea; this panel is read-only display of past comments. */}
+      {isVote && id && (
         <CommunityInputPanel
           processId={id}
-          actor={currentActor}
-          config={voteState.content.community_input}
+          config={voteState?.content?.community_input}
         />
       )}
     </div>

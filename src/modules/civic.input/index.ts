@@ -11,9 +11,10 @@
 
 import { getDb } from "../../db/client.js";
 import { generateId } from "../../utils/id.js";
-import type { CommunityInput } from "./models.js";
+import type { CommunityInput, InputContext } from "./models.js";
+import { BODY_PREVIEW_LEN } from "./models.js";
 
-export type { CommunityInput } from "./models.js";
+export type { CommunityInput, EmitEventFn, InputContext } from "./models.js";
 
 interface InputRow {
   id: string;
@@ -35,17 +36,27 @@ function rowToInput(row: InputRow): CommunityInput {
 
 /**
  * Submit community input for a process.
+ *
+ * Emits `civic.process.comment_added` on success, per Civic Event Spec §4.2
+ * and Civic Process Spec §7.5 (participation actions MUST emit events).
+ * The full body stays in the community_inputs table; the event only carries
+ * an ID reference and a short body preview to keep event payloads small.
+ *
+ * The host hub injects its `emit` function through `ctx` so the module
+ * stays portable — it never imports the hub's event system directly.
  */
 export async function submitInput(
   process_id: string,
   author_id: string,
   body: string,
+  ctx: InputContext,
 ): Promise<CommunityInput> {
   if (!body || body.trim().length === 0) {
     throw new Error("Input body cannot be empty");
   }
 
   const id = generateId("input");
+  const trimmed = body.trim();
 
   const { data, error } = await getDb()
     .from("community_inputs")
@@ -53,13 +64,33 @@ export async function submitInput(
       id,
       process_id,
       author_id,
-      body: body.trim(),
+      body: trimmed,
     })
     .select()
     .single();
 
   if (error) throw new Error(`Input: ${error.message}`);
-  return rowToInput(data as InputRow);
+
+  const input = rowToInput(data as InputRow);
+
+  // Emit the participation event. The preview is truncated so events stay
+  // cheap to index and distribute; consumers that want the full body read
+  // /process/:id/input.
+  await ctx.emit({
+    event_type: "civic.process.comment_added",
+    actor: author_id,
+    process_id,
+    hub_id: ctx.hub_id,
+    jurisdiction: ctx.jurisdiction,
+    data: {
+      comment: {
+        id: input.id,
+        body_preview: trimmed.slice(0, BODY_PREVIEW_LEN),
+      },
+    },
+  });
+
+  return input;
 }
 
 /**
