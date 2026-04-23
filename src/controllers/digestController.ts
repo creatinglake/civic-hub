@@ -80,15 +80,44 @@ function clampSince(user: {
   return anchor < floor ? floor : anchor;
 }
 
-function toDigestEvent(e: CivicEvent): DigestEvent {
+function toDigestEvent(e: CivicEvent, targetBase: string): DigestEvent {
   return {
     id: e.id,
     event_type: e.event_type,
     timestamp: e.timestamp,
     process_id: e.process_id,
-    action_url: e.action_url,
+    action_url: rewriteLocalhostOrigin(e.action_url, targetBase),
     data: e.data,
   };
+}
+
+/**
+ * Rewrite a stored event's action_url to the current hub origin when the
+ * stored origin is a localhost sentinel. Events are append-only (a DB
+ * trigger blocks UPDATE/DELETE), so an event emitted on a deploy that
+ * didn't have BASE_URL set would permanently carry localhost:3000 in its
+ * action_url. Links inside emails must be absolute, so we correct the
+ * origin at render time. Path + query are preserved.
+ *
+ * The Feed's FeedPost.classifyHref already does the equivalent trick —
+ * it routes by pathname and ignores the origin. Email clients don't have
+ * that luxury, so we do it here.
+ */
+function rewriteLocalhostOrigin(rawUrl: string, targetBase: string): string {
+  if (!rawUrl) return rawUrl;
+  try {
+    const parsed = new URL(rawUrl);
+    if (parsed.hostname !== "localhost" && parsed.hostname !== "127.0.0.1") {
+      return rawUrl;
+    }
+    const target = new URL(targetBase);
+    parsed.protocol = target.protocol;
+    parsed.hostname = target.hostname;
+    parsed.port = target.port;
+    return parsed.toString();
+  } catch {
+    return rawUrl;
+  }
 }
 
 // --- POST /internal/digest/run ---------------------------------------------
@@ -172,7 +201,7 @@ export async function handleRunDigest(
         const since = clampSince(user);
         const windowEvents: DigestEvent[] = [];
         for (const e of allRecent) {
-          if (e.timestamp > since) windowEvents.push(toDigestEvent(e));
+          if (e.timestamp > since) windowEvents.push(toDigestEvent(e, uiBase));
         }
 
         const hub: DigestHubContext = {
