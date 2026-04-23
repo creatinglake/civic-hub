@@ -61,23 +61,32 @@ export function eventToPost(
         announcement?: {
           id?: string;
           title?: string;
-          author_role?: "board" | "admin";
+          author_role?: string;
         };
       };
 
       const cachedType = getProcessType(event.process_id);
 
-      // Announcement result_published
+      // Announcement result_published — render with the free-form author
+      // label. Admins show as "Announcement: …"; everyone else uses their
+      // configured label ("Board member announcement: …",
+      // "Planning Committee announcement: …", etc.). Legacy "board" from
+      // Slice 4 normalizes to "Board member" for grammar.
       if (data.announcement || cachedType === "civic.announcement") {
         const title =
           data.announcement?.title ??
           getProcessTitle(event.process_id) ??
           "Announcement";
-        const role = data.announcement?.author_role;
-        const label = role === "admin" ? "Announcement" : "Board announcement";
+        const rawLabel = data.announcement?.author_role;
+        const label =
+          rawLabel === "board" ? "Board member" : rawLabel ?? "Admin";
+        const postTitle =
+          label === "Admin"
+            ? `Announcement: ${title}`
+            : `${label} announcement: ${title}`;
         return {
           id: event.id,
-          title: `${label}: ${title}`,
+          title: postTitle,
           summary: summaryFromDescription(
             getProcessDescription(event.process_id),
           ),

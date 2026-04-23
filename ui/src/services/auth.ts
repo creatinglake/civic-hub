@@ -36,11 +36,12 @@ export interface AuthUser {
 }
 
 /**
- * Elevated role for the authenticated user, derived server-side from
- * CIVIC_ADMIN_EMAILS / CIVIC_BOARD_EMAILS env vars. null for residents
- * with no special privileges.
+ * Permission role derived server-side. "admin" = full admin panel
+ * access. "author" = user authorized to post announcements (via the
+ * admin-managed list in hub_settings, with CIVIC_BOARD_EMAILS as a
+ * fallback). null = regular resident with no special privileges.
  */
-export type AuthRole = "admin" | "board" | null;
+export type AuthRole = "admin" | "author" | null;
 
 // --- Token storage ---
 
@@ -67,7 +68,12 @@ export function requestCode(email: string): Promise<{ message: string }> {
 export function verifyCode(
   email: string,
   code: string
-): Promise<{ token: string; user: AuthUser; role: AuthRole }> {
+): Promise<{
+  token: string;
+  user: AuthUser;
+  role: AuthRole;
+  author_label: string | null;
+}> {
   return request("POST", "/auth/verify", { email, code });
 }
 
@@ -75,7 +81,9 @@ export function affirmResidency(token: string): Promise<{ user: AuthUser }> {
   return request("POST", "/auth/residency", undefined, token);
 }
 
-export function getMe(token: string): Promise<{ user: AuthUser; role: AuthRole }> {
+export function getMe(
+  token: string,
+): Promise<{ user: AuthUser; role: AuthRole; author_label: string | null }> {
   return request("GET", "/auth/me", undefined, token);
 }
 

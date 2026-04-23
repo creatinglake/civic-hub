@@ -44,6 +44,14 @@
   color: var(--color-text-muted);
 }
 
+.announcement-author-row {
+  display: grid;
+  grid-template-columns: 2fr 1.3fr auto;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-sm);
+  align-items: center;
+}
+
 .admin-brief-filters {
   display: flex;
   gap: var(--space-sm);

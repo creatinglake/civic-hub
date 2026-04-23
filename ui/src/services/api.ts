@@ -517,7 +517,15 @@ export function getPublicBrief(id: string): Promise<PublicBrief> {
 
 // --- Announcements ---
 
-export type AnnouncementAuthorRole = "board" | "admin";
+/**
+ * Free-form display label for the announcement author ("Admin", "Board
+ * member", "Planning Committee", etc.). Server-side admins always get
+ * "Admin"; non-admin authors get the label configured in the admin's
+ * announcement_authors list. Rendered verbatim on the feed and the
+ * public announcement page. Older Slice 4 announcements may carry
+ * "board" — renders fine either way.
+ */
+export type AnnouncementAuthorRole = string;
 
 export interface AnnouncementLink {
   label: string;
@@ -585,8 +593,14 @@ export function listAnnouncements(limit?: number): Promise<AnnouncementSummary[]
 
 // --- Admin: hub settings ---
 
+export interface AnnouncementAuthor {
+  email: string;
+  label: string;
+}
+
 export interface AdminSettings {
   brief_recipient_emails: string[];
+  announcement_authors: AnnouncementAuthor[];
 }
 
 export function adminGetSettings(): Promise<AdminSettings> {
