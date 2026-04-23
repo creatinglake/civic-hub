@@ -20,6 +20,7 @@
 import { Request, Response } from "express";
 import { getEventsSince } from "../events/eventStore.js";
 import type { CivicEvent } from "../models/event.js";
+import { getAllProcesses } from "../services/processService.js";
 import {
   assembleDigestForUser,
   buildUnsubscribeUrl,
@@ -145,6 +146,26 @@ export async function handleRunDigest(
     const allRecent =
       users.length === 0 ? [] : await getEventsSince(earliest);
 
+    // One-shot lookup of process_id → title. civic.vote and civic.brief
+    // events don't carry the title inline; the module uses this as a
+    // fallback when its own payload doesn't have one. We fetch every
+    // process once per cron run (cheap for MVP scale) instead of per
+    // user or per event.
+    const processTitles: Record<string, string> = {};
+    if (users.length > 0) {
+      try {
+        const allProcesses = await getAllProcesses();
+        for (const p of allProcesses) {
+          processTitles[p.id] = p.title;
+        }
+      } catch (err) {
+        // Non-fatal: fall back to generic labels in the digest. The
+        // batch continues.
+        const message = err instanceof Error ? err.message : "unknown error";
+        console.warn(`[digest] title lookup failed: ${message}`);
+      }
+    }
+
     for (const user of users) {
       processed += 1;
       try {
@@ -176,6 +197,7 @@ export async function handleRunDigest(
           events: windowEvents,
           hub,
           since,
+          process_titles: processTitles,
         });
 
         if (!digest) {

@@ -89,4 +89,12 @@ export interface DigestAssemblyInput {
    * assembly by the caller.
    */
   since: string;
+  /**
+   * Fallback lookup of process_id → human-readable title. Used when the
+   * event's own `data` payload doesn't carry the title (true for most
+   * civic.vote and civic.brief events — only civic.announcement events
+   * include the title inline). The caller pre-fetches this once for the
+   * whole batch to avoid per-user DB round-trips.
+   */
+  process_titles?: Record<string, string>;
 }

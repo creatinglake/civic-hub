@@ -33,12 +33,13 @@ import type {
 export function assembleDigestForUser(
   input: DigestAssemblyInput,
 ): DigestEmail | null {
+  const titles = input.process_titles ?? {};
   const items: DigestItem[] = [];
   for (const event of input.events) {
     if (!isDigestRenderable(event)) continue;
     const kind = classifyItemKind(event);
     if (!kind) continue;
-    items.push(eventToItem(event, kind));
+    items.push(eventToItem(event, kind, titles));
   }
 
   if (items.length === 0) return null;
@@ -58,7 +59,11 @@ export function assembleDigestForUser(
   };
 }
 
-function eventToItem(event: DigestEvent, kind: DigestItemKind): DigestItem {
+function eventToItem(
+  event: DigestEvent,
+  kind: DigestItemKind,
+  titles: Record<string, string>,
+): DigestItem {
   const d = event.data as {
     process?: { title?: unknown };
     announcement?: { title?: unknown; body_preview?: unknown };
@@ -68,31 +73,31 @@ function eventToItem(event: DigestEvent, kind: DigestItemKind): DigestItem {
     result?: { total_votes?: unknown };
   };
 
-  // Pulled from the event payload where possible; falls back to a
-  // generic label so the digest stays readable even for older events
-  // whose data shape was lighter.
+  // Prefer the event payload (authoritative at emit-time); fall back to
+  // the caller-supplied process_titles map (covers civic.vote and
+  // civic.brief events, whose emitted payloads don't include the title).
+  // Last-ditch: a generic label so the digest still renders.
   const rawTitle =
-    typeof d?.announcement?.title === "string"
-      ? d.announcement.title
-      : typeof d?.process?.title === "string"
-        ? d.process.title
-        : null;
+    (typeof d?.announcement?.title === "string" && d.announcement.title) ||
+    (typeof d?.process?.title === "string" && d.process.title) ||
+    (event.process_id && titles[event.process_id]) ||
+    null;
 
   let title: string;
   let summary: string;
 
   switch (kind) {
     case "vote_opened": {
-      title = rawTitle ? `New vote: ${rawTitle}` : "New vote open";
-      summary = "Voting is now open — cast your ballot.";
+      title = rawTitle ?? "New vote open";
+      summary = "New vote now open — cast your ballot.";
       break;
     }
     case "vote_result_published": {
       const total =
         typeof d?.result?.total_votes === "number" ? d.result.total_votes : 0;
       const noun = total === 1 ? "participant" : "participants";
-      title = rawTitle ? `Vote results: ${rawTitle}` : "Vote results published";
-      summary = `${total} ${noun} — results now public.`;
+      title = rawTitle ?? "Vote results published";
+      summary = `Results published · ${total} ${noun}.`;
       break;
     }
     case "brief_published": {
@@ -103,10 +108,10 @@ function eventToItem(event: DigestEvent, kind: DigestItemKind): DigestItem {
       const noun = count === 1 ? "resident" : "residents";
       const headline =
         typeof d?.headline_result === "string" ? d.headline_result : "";
-      title = rawTitle ? `Civic Brief: ${rawTitle}` : "Civic Brief delivered";
+      title = rawTitle ?? "Civic Brief";
       summary = headline
-        ? `${count} ${noun} — ${headline}`
-        : `${count} ${noun} participated — brief delivered to the Board.`;
+        ? `Civic Brief delivered · ${count} ${noun} — ${headline}`
+        : `Civic Brief delivered · ${count} ${noun} participated.`;
       break;
     }
     case "announcement": {
@@ -114,7 +119,7 @@ function eventToItem(event: DigestEvent, kind: DigestItemKind): DigestItem {
         typeof d?.announcement?.body_preview === "string"
           ? d.announcement.body_preview
           : "";
-      title = rawTitle ? `Announcement: ${rawTitle}` : "New announcement";
+      title = rawTitle ?? "New announcement";
       summary = truncate(preview, 160);
       break;
     }
@@ -189,19 +194,19 @@ export function formatDigestHtml(
 }
 
 function renderGroupHtml(label: string, items: DigestItem[]): string {
+  // The title itself is the click target — no separate "Read more" link.
+  // Keeping a single anchor per item makes the email skimmable and cuts
+  // visual clutter when there are several rows.
   const rows = items
     .map(
       (item) => `
-        <li style="margin:0 0 12px;padding:0;list-style:none;">
-          <a href="${escapeAttr(item.action_url)}" style="color:#1e3a5f;text-decoration:none;font-weight:600;font-size:15px;">${escapeHtml(item.title)}</a>
+        <li style="margin:0 0 14px;padding:0;list-style:none;">
+          <a href="${escapeAttr(item.action_url)}" style="color:#1e3a5f;text-decoration:none;font-weight:600;font-size:15px;line-height:1.35;display:inline-block;">${escapeHtml(item.title)}</a>
           ${
             item.summary
-              ? `<div style="font-size:13px;color:#555;line-height:1.45;margin:2px 0 0;">${escapeHtml(item.summary)}</div>`
+              ? `<div style="font-size:13px;color:#555;line-height:1.45;margin:3px 0 0;">${escapeHtml(item.summary)}</div>`
               : ""
           }
-          <div style="font-size:12px;margin:4px 0 0;">
-            <a href="${escapeAttr(item.action_url)}" style="color:#2c7be5;text-decoration:none;">Read more →</a>
-          </div>
         </li>
       `,
     )
@@ -230,8 +235,11 @@ export function formatDigestText(
     const label = GROUP_LABELS[kind].toUpperCase();
     const rows = group
       .map((item) => {
+        // Plain-text counterpart of the single-link HTML: title on one
+        // line, then the URL on the next line so email clients
+        // auto-linkify it. Summary sits between them when present.
         const body = item.summary ? `\n  ${item.summary}` : "";
-        return `- ${item.title}${body}\n  ${item.action_url}`;
+        return `• ${item.title}${body}\n  ${item.action_url}`;
       })
       .join("\n\n");
     sections.push(`${label}\n${"-".repeat(label.length)}\n${rows}`);
