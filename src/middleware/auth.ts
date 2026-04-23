@@ -11,6 +11,7 @@
 
 import { NextFunction, Request, Response } from "express";
 import { getUserFromToken, type User } from "../modules/civic.auth/index.js";
+import { lookupAuthorLabel } from "../services/hubSettings.js";
 
 function extractToken(req: Request): string | null {
   const auth = req.headers.authorization;
@@ -38,16 +39,36 @@ function boardEmails(): Set<string> {
 }
 
 /**
- * Derive the effective role for a user based on their email. Admins win
- * if their email is in both lists (so an admin who's also listed as a
- * Board member gets full admin privileges, not the narrower Board role).
- * Returns null if the user has no elevated role.
+ * Quick sync admin check. Use when the DB-backed author list is not needed
+ * (e.g. gating /admin/*). For announcement posting where the author label
+ * matters, use `resolveAuthorship()` below.
  */
-export function roleForEmail(email: string | undefined | null): "admin" | "board" | null {
+export function isAdminEmail(email: string | undefined | null): boolean {
+  if (!email) return false;
+  return adminEmails().has(email.toLowerCase());
+}
+
+/**
+ * Resolve a user's effective role for announcement posting.
+ *
+ * Returns:
+ *   - { role: "admin", label: "Admin" } when the user is in
+ *     CIVIC_ADMIN_EMAILS. Admins always post as "Admin" regardless of
+ *     whether their email also appears in the author list.
+ *   - { role: "author", label: <configured label> } when the user's email
+ *     is in the admin-managed author list (hub_settings), falling back to
+ *     CIVIC_BOARD_EMAILS with a default label of "Board member".
+ *   - null when the user has no posting privilege.
+ *
+ * Async because the author list lives in hub_settings (Postgres).
+ */
+export async function resolveAuthorship(
+  email: string | undefined | null,
+): Promise<{ role: "admin" | "author"; label: string } | null> {
   if (!email) return null;
-  const lower = email.toLowerCase();
-  if (adminEmails().has(lower)) return "admin";
-  if (boardEmails().has(lower)) return "board";
+  if (isAdminEmail(email)) return { role: "admin", label: "Admin" };
+  const label = await lookupAuthorLabel(email);
+  if (label) return { role: "author", label };
   return null;
 }
 
@@ -134,18 +155,20 @@ export async function requireAdmin(
 }
 
 /**
- * Require an authenticated user whose email is in either
- * CIVIC_BOARD_EMAILS or CIVIC_ADMIN_EMAILS. Used for announcement
- * operations (post / edit).
+ * Require an authenticated user authorized to post announcements —
+ * either an admin, or a user in the admin-managed author list (with
+ * CIVIC_BOARD_EMAILS as an env-var fallback for the author list).
  *
- * Sets `res.locals.effectiveRole` to `"admin"` or `"board"` so handlers
- * can stamp the author role on new announcements without recomputing.
+ * Sets two values on res.locals for the handler to use:
+ *   - `effectiveRole`: "admin" | "author"
+ *   - `authorLabel`: the display label to stamp on new announcements
+ *     ("Admin" for admins; the configured label otherwise)
  *
- * This is intentionally separate from requireAdmin: Board members get
- * this one capability (announcements) and nothing else. /admin/* routes
- * keep using requireAdmin (strict) so Board members can't reach them.
+ * This is intentionally separate from requireAdmin. A user whose email
+ * is on the author list can post / edit announcements but cannot reach
+ * any /admin/* route.
  */
-export async function requireBoardOrAdmin(
+export async function requireAnnouncementPoster(
   req: Request,
   res: Response,
   next: NextFunction,
@@ -154,16 +177,26 @@ export async function requireBoardOrAdmin(
     const user = res.locals.authUser as User | undefined;
     if (!user) return;
 
-    const role = roleForEmail(user.email);
-    if (role === null) {
-      res.status(403).json({ error: "Board or admin access required" });
+    const authorship = await resolveAuthorship(user.email);
+    if (!authorship) {
+      res.status(403).json({
+        error:
+          "You are not authorized to post announcements. Ask an admin to add your email.",
+      });
       return;
     }
 
-    res.locals.effectiveRole = role;
+    res.locals.effectiveRole = authorship.role;
+    res.locals.authorLabel = authorship.label;
     next();
   });
 }
+
+// Backward-compat alias. Old callers imported `requireBoardOrAdmin`; the
+// new name is `requireAnnouncementPoster` which reflects the DB-backed,
+// flexible-label semantics. Leave this re-export in place so external
+// deploys that still reference the old name continue to work.
+export const requireBoardOrAdmin = requireAnnouncementPoster;
 
 /**
  * Helper: pull the authenticated user from res.locals, or throw 500.

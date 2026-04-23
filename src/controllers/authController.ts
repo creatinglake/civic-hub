@@ -15,7 +15,7 @@ import {
   getUserFromToken,
   logout,
 } from "../modules/civic.auth/index.js";
-import { roleForEmail } from "../middleware/auth.js";
+import { resolveAuthorship } from "../middleware/auth.js";
 
 /**
  * POST /auth/request-code
@@ -58,9 +58,14 @@ export async function handleVerify(
 
   try {
     const result = await verifyCode(email, code);
-    // Include role alongside the token + user so the UI gets the admin /
-    // board bit without a follow-up /auth/me roundtrip on login.
-    res.json({ ...result, role: roleForEmail(result.user?.email) });
+    // Include role + author_label alongside the token + user so the UI
+    // gets the posting-privilege bit without a follow-up /auth/me call.
+    const authorship = await resolveAuthorship(result.user?.email);
+    res.json({
+      ...result,
+      role: authorship?.role ?? null,
+      author_label: authorship?.label ?? null,
+    });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
     res.status(400).json({ error: message });
@@ -116,9 +121,15 @@ export async function handleGetMe(
     return;
   }
 
-  // Include the derived role so the UI can gate admin-only / Board-or-admin
-  // controls without hardcoding emails. null for residents.
-  res.json({ user, role: roleForEmail(user.email) });
+  // Include the derived role + author label so the UI can gate the admin
+  // link, the Post Announcement link, and the author-label display
+  // without hardcoding anything. null for residents.
+  const authorship = await resolveAuthorship(user.email);
+  res.json({
+    user,
+    role: authorship?.role ?? null,
+    author_label: authorship?.label ?? null,
+  });
 }
 
 /**

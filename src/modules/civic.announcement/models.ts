@@ -10,7 +10,18 @@
 // event emit function via AnnouncementProcessContext; the module never
 // imports the hub's event system directly.
 
-export type AnnouncementAuthorRole = "board" | "admin";
+/**
+ * Free-form display label for the announcement author. For admins this is
+ * always "Admin". For non-admin authors, the label comes from the
+ * admin-configured announcement_authors list (hub_settings) and can be
+ * any text — "Board member", "Planning Committee", "Guest speaker", etc.
+ * Rendered verbatim on the feed post and the public announcement page.
+ *
+ * Older announcements may still carry "board" as the value (from the
+ * Slice 4 union type); the UI treats both "board" and the literal label
+ * "Board member" the same way.
+ */
+export type AnnouncementAuthorRole = string;
 
 export interface AnnouncementLink {
   label: string;

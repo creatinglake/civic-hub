@@ -10,9 +10,25 @@ import { getDb } from "../db/client.js";
 
 export const SETTING_KEYS = {
   BRIEF_RECIPIENT_EMAILS: "brief_recipient_emails",
+  ANNOUNCEMENT_AUTHORS: "announcement_authors",
 } as const;
 
 export type SettingKey = (typeof SETTING_KEYS)[keyof typeof SETTING_KEYS];
+
+/**
+ * A non-admin user the admin has authorized to post Civic Hub
+ * announcements. `label` is rendered verbatim on the feed and the public
+ * announcement page ("{label} announcement: …", eyebrow "{LABEL}
+ * ANNOUNCEMENT"). Free-form so a hub can use "Board member", "Planning
+ * Committee", "Guest speaker", etc.
+ *
+ * Admins always post and are displayed as "Admin" regardless of whether
+ * they appear in this list.
+ */
+export interface AnnouncementAuthor {
+  email: string;
+  label: string;
+}
 
 interface SettingRow {
   key: string;
@@ -95,4 +111,81 @@ export async function setBriefRecipients(
     updatedBy,
   );
   return cleaned;
+}
+
+/**
+ * Read the admin-configured author list. Falls back to the
+ * CIVIC_BOARD_EMAILS env var (each entry labeled "Board member") when no
+ * DB row exists, so deploys before an admin has visited the settings
+ * panel keep working with their prior env-var configuration.
+ */
+export async function getAnnouncementAuthors(): Promise<AnnouncementAuthor[]> {
+  const stored = await getSetting(SETTING_KEYS.ANNOUNCEMENT_AUTHORS);
+  if (stored) {
+    try {
+      const parsed = JSON.parse(stored) as unknown;
+      if (Array.isArray(parsed)) {
+        return normalizeAuthors(parsed);
+      }
+    } catch {
+      // Fall through to env var — corrupt row shouldn't lock out Board
+      // members who worked yesterday.
+    }
+  }
+  // Env var fallback: CIVIC_BOARD_EMAILS → all entries labeled "Board member"
+  const envRaw = process.env.CIVIC_BOARD_EMAILS ?? "";
+  const envList = envRaw
+    .split(",")
+    .map((e) => e.trim())
+    .filter((e) => e.length > 0)
+    .map((email) => ({ email, label: "Board member" }));
+  return normalizeAuthors(envList);
+}
+
+export async function setAnnouncementAuthors(
+  authors: AnnouncementAuthor[],
+  updatedBy: string | null,
+): Promise<AnnouncementAuthor[]> {
+  const cleaned = normalizeAuthors(authors);
+  await setSetting(
+    SETTING_KEYS.ANNOUNCEMENT_AUTHORS,
+    JSON.stringify(cleaned),
+    updatedBy,
+  );
+  return cleaned;
+}
+
+/** Trim, dedup by lowercase email, drop empty. Preserve caller order. */
+function normalizeAuthors(raw: unknown[]): AnnouncementAuthor[] {
+  const seen = new Set<string>();
+  const out: AnnouncementAuthor[] = [];
+  for (const entry of raw) {
+    if (!entry || typeof entry !== "object") continue;
+    const e = entry as { email?: unknown; label?: unknown };
+    const email = typeof e.email === "string" ? e.email.trim() : "";
+    const label = typeof e.label === "string" ? e.label.trim() : "";
+    if (!email || !label) continue;
+    const lower = email.toLowerCase();
+    if (seen.has(lower)) continue;
+    seen.add(lower);
+    out.push({ email, label });
+  }
+  return out;
+}
+
+/**
+ * Look up an email in the announcement author list. Returns the label to
+ * stamp on new announcements and render on their public page, or null if
+ * the email isn't authorized.
+ */
+export async function lookupAuthorLabel(
+  email: string | undefined | null,
+): Promise<string | null> {
+  if (!email) return null;
+  const lower = email.toLowerCase();
+  const authors = await getAnnouncementAuthors();
+  for (const a of authors) {
+    if (a.email.toLowerCase() === lower) return a.label;
+  }
+  return null;
 }
