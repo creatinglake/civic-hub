@@ -64,7 +64,7 @@ export async function emitPublicationEvents(
  */
 export async function updateAnnouncement(
   state: AnnouncementProcessState,
-  editor: { id: string; role: "board" | "admin" },
+  editor: { id: string; role: "admin" | "author" },
   patch: AnnouncementContentPatch,
   ctx: AnnouncementProcessContext,
 ): Promise<AnnouncementActionOutcome> {

@@ -8,14 +8,20 @@
 //   - The original author can always edit their own announcement.
 //   - A user with admin role can edit any announcement (e.g. to correct
 //     a factual error or enforce policy).
-//   - A Board member cannot edit another Board member's announcement.
+//   - A non-admin author cannot edit another author's announcement.
 
-import type { AnnouncementProcessState, AnnouncementAuthorRole } from "./models.js";
+import type { AnnouncementProcessState } from "./models.js";
+
+/**
+ * Permission role distinct from the display label (author_role). Used
+ * only for authorization decisions.
+ */
+export type AnnouncementEditorRole = "admin" | "author";
 
 export function canEdit(
   state: AnnouncementProcessState,
   editorId: string,
-  editorRole: AnnouncementAuthorRole,
+  editorRole: AnnouncementEditorRole,
 ): boolean {
   if (editorRole === "admin") return true;
   return state.author_id === editorId;

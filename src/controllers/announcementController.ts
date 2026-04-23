@@ -63,7 +63,15 @@ export async function handleCreateAnnouncement(
 ): Promise<void> {
   try {
     const user = getAuthUser(res);
-    const role = res.locals.effectiveRole as AnnouncementAuthorRole;
+    // The middleware resolved the user's display label — "Admin" for
+    // admins, or the admin-configured label (e.g. "Board member",
+    // "Planning Committee") for authors in the hub_settings list.
+    const authorLabel = res.locals.authorLabel as AnnouncementAuthorRole | undefined;
+    if (!authorLabel) {
+      throw new Error(
+        "authorLabel missing on res.locals — requireAnnouncementPoster must run before this handler.",
+      );
+    }
     const body = (req.body ?? {}) as { title?: unknown; body?: unknown };
 
     if (typeof body.title !== "string" || typeof body.body !== "string") {
@@ -85,7 +93,7 @@ export async function handleCreateAnnouncement(
         title: body.title,
         body: body.body,
         author_id: user.id,
-        author_role: role,
+        author_role: authorLabel,
         links: links ?? [],
       },
     });
@@ -132,7 +140,9 @@ export async function handleUpdateAnnouncement(
       return;
     }
     const user = getAuthUser(res);
-    const role = res.locals.effectiveRole as AnnouncementAuthorRole;
+    // effectiveRole is the permission role ("admin" | "author"), distinct
+    // from authorLabel which is the free-form display string.
+    const role = res.locals.effectiveRole as "admin" | "author";
 
     const body = (req.body ?? {}) as {
       title?: unknown;

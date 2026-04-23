@@ -55,8 +55,11 @@ export default function AnnouncementPage() {
     );
   }
 
+  // Legacy Slice-4 announcements may have author_role === "board" —
+  // normalize for display. Everything else renders verbatim.
   const roleLabel =
-    announcement.author_role === "board" ? "Board member" : "Admin";
+    announcement.author_role === "board" ? "Board member" : announcement.author_role;
+  const isAdminLabel = roleLabel === "Admin";
   const canEdit =
     isAdmin || (!!user?.id && user.id === announcement.author_id);
   const wasEdited = announcement.edit_count > 0;
@@ -68,9 +71,7 @@ export default function AnnouncementPage() {
       </Link>
       <header className="announcement-header">
         <p className="announcement-eyebrow">
-          {announcement.author_role === "board"
-            ? "Board announcement"
-            : "Announcement"}
+          {isAdminLabel ? "Announcement" : `${roleLabel} announcement`}
         </p>
         <h1>{announcement.title}</h1>
         <p className="announcement-meta">

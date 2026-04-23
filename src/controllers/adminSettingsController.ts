@@ -1,22 +1,32 @@
 // Admin settings controller — read/write admin-configurable hub settings.
 //
-// Slice 3 exposes only brief recipient emails. More settings can be added
-// by extending the SettingsResponse shape and the PATCH body handler.
+// Exposes:
+//   - brief_recipient_emails  (Slice 3 addendum)
+//   - announcement_authors    (Slice 4.1: {email, label} list of non-admin
+//                              users authorized to post announcements)
+//
+// More settings can be added by extending SettingsResponse + the PATCH
+// body handler.
 
 import { Request, Response } from "express";
 import {
+  type AnnouncementAuthor,
+  getAnnouncementAuthors,
   getBriefRecipients,
+  setAnnouncementAuthors,
   setBriefRecipients,
 } from "../services/hubSettings.js";
 import { getAuthUser } from "../middleware/auth.js";
 
 interface SettingsResponse {
   brief_recipient_emails: string[];
+  announcement_authors: AnnouncementAuthor[];
 }
 
 async function loadSettings(): Promise<SettingsResponse> {
   return {
     brief_recipient_emails: await getBriefRecipients(),
+    announcement_authors: await getAnnouncementAuthors(),
   };
 }
 
@@ -38,7 +48,10 @@ export async function handlePatchSettings(
 ): Promise<void> {
   try {
     const actor = getAuthUser(res).id;
-    const body = (req.body ?? {}) as { brief_recipient_emails?: unknown };
+    const body = (req.body ?? {}) as {
+      brief_recipient_emails?: unknown;
+      announcement_authors?: unknown;
+    };
 
     if (body.brief_recipient_emails !== undefined) {
       if (!Array.isArray(body.brief_recipient_emails)) {
@@ -51,6 +64,25 @@ export async function handlePatchSettings(
         (e): e is string => typeof e === "string",
       );
       await setBriefRecipients(input, actor);
+    }
+
+    if (body.announcement_authors !== undefined) {
+      if (!Array.isArray(body.announcement_authors)) {
+        res.status(400).json({
+          error:
+            "announcement_authors must be an array of { email, label } objects.",
+        });
+        return;
+      }
+      const input: AnnouncementAuthor[] = [];
+      for (const entry of body.announcement_authors) {
+        if (!entry || typeof entry !== "object") continue;
+        const e = entry as { email?: unknown; label?: unknown };
+        if (typeof e.email === "string" && typeof e.label === "string") {
+          input.push({ email: e.email, label: e.label });
+        }
+      }
+      await setAnnouncementAuthors(input, actor);
     }
 
     res.json(await loadSettings());

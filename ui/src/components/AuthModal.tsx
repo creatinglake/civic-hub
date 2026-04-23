@@ -78,7 +78,7 @@ export default function AuthModal({ onComplete, onDismiss }: Props) {
     setLoading(true);
     try {
       const result = await verifyCode(email.trim(), code.trim());
-      login(result.token, result.user, result.role);
+      login(result.token, result.user, result.role, result.author_label);
 
       if (result.user.is_resident) {
         // Already a resident (returning user) — done
