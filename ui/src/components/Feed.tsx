@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   type CivicEvent,
   type VoteState,
+  getAnnouncement,
   getEvents,
   getProcessState,
   getPublicBrief,
@@ -20,7 +21,7 @@ interface Props {
   filter?: (event: CivicEvent) => boolean;
 }
 
-type ProcessKind = "civic.vote" | "civic.brief";
+type ProcessKind = "civic.vote" | "civic.brief" | "civic.announcement";
 
 interface ProcessMeta {
   type?: ProcessKind;
@@ -31,13 +32,18 @@ interface ProcessMeta {
 /**
  * Discriminate the underlying process type for an event from its data.
  * - civic.process.started is only emitted by civic.vote today.
- * - civic.process.result_published carries `brief_id` on brief emissions
- *   and `result` (with `tally`) on vote emissions.
+ * - civic.process.result_published is emitted by all three process types;
+ *   we use the event's data shape to tell them apart.
  */
 function kindFromEvent(event: CivicEvent): ProcessKind | null {
   if (event.event_type === "civic.process.started") return "civic.vote";
   if (event.event_type === "civic.process.result_published") {
-    const data = event.data as { brief_id?: unknown; result?: unknown };
+    const data = event.data as {
+      brief_id?: unknown;
+      result?: unknown;
+      announcement?: unknown;
+    };
+    if (data?.announcement !== undefined) return "civic.announcement";
     if (typeof data?.brief_id === "string") return "civic.brief";
     if (data?.result !== undefined) return "civic.vote";
   }
@@ -100,18 +106,31 @@ export default function Feed({ filter }: Props) {
     for (const { id } of needed) inFlight.current.add(id);
 
     for (const { id, kind } of needed) {
-      const lookup =
-        kind === "civic.vote"
-          ? getProcessState(id).then((state) => {
-              if (state.type !== "civic.vote") return null;
-              const vote = state as VoteState;
-              return { type: "civic.vote" as const, title: vote.title, description: vote.description };
-            })
-          : getPublicBrief(id).then((brief) => ({
-              type: "civic.brief" as const,
-              title: brief.title,
-              description: undefined,
-            }));
+      let lookup: Promise<ProcessMeta | null>;
+      if (kind === "civic.vote") {
+        lookup = getProcessState(id).then((state) => {
+          if (state.type !== "civic.vote") return null;
+          const vote = state as VoteState;
+          return {
+            type: "civic.vote" as const,
+            title: vote.title,
+            description: vote.description,
+          };
+        });
+      } else if (kind === "civic.brief") {
+        lookup = getPublicBrief(id).then((brief) => ({
+          type: "civic.brief" as const,
+          title: brief.title,
+          description: undefined,
+        }));
+      } else {
+        // civic.announcement — body serves as the feed summary.
+        lookup = getAnnouncement(id).then((a) => ({
+          type: "civic.announcement" as const,
+          title: a.title,
+          description: a.body,
+        }));
+      }
 
       lookup
         .then((meta) => {

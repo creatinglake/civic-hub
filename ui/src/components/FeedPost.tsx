@@ -25,18 +25,20 @@ interface Props {
  * The filter map is open for extension: new process-type plugins can be
  * surfaced by adding entries here without restructuring the Feed.
  */
+type FeedProcessKind = "civic.vote" | "civic.brief" | "civic.announcement";
+
 export function eventToPost(
   event: CivicEvent,
   getProcessDescription: (processId: string) => string | undefined,
   getProcessTitle: (processId: string) => string | undefined,
-  getProcessType: (processId: string) => "civic.vote" | "civic.brief" | undefined,
+  getProcessType: (processId: string) => FeedProcessKind | undefined,
 ): FeedPostView | null {
   switch (event.event_type) {
     case "civic.process.started": {
       // `started` fires when a process enters active participation. Today
       // only civic.vote emits this event; render as "New vote: …". When
       // additional process types start emitting `started` (petitions,
-      // announcements, etc.), branch here by the cached process type.
+      // etc.), branch here by the cached process type.
       const title = getProcessTitle(event.process_id) ?? "Untitled vote";
       return {
         id: event.id,
@@ -48,20 +50,45 @@ export function eventToPost(
     }
 
     case "civic.process.result_published": {
-      // Discriminate vote vs brief. Vote results publish "Vote results
-      // published: [title]"; briefs publish "Civic Brief delivered: [title]"
-      // and link to the public /brief/:id page. Briefs' action_url already
-      // points at /brief/:id via the backend's action_url_path override.
+      // Discriminate across the three process types that emit this event.
+      // Primary discriminator is the event's own data shape; fallback is
+      // the cached process type from GET /process/:id.
       const data = event.data as {
         brief_id?: string;
         result?: { total_votes?: number };
         participation_count?: number;
         headline_result?: string;
+        announcement?: {
+          id?: string;
+          title?: string;
+          author_role?: "board" | "admin";
+        };
       };
 
+      const cachedType = getProcessType(event.process_id);
+
+      // Announcement result_published
+      if (data.announcement || cachedType === "civic.announcement") {
+        const title =
+          data.announcement?.title ??
+          getProcessTitle(event.process_id) ??
+          "Announcement";
+        const role = data.announcement?.author_role;
+        const label = role === "admin" ? "Announcement" : "Board announcement";
+        return {
+          id: event.id,
+          title: `${label}: ${title}`,
+          summary: summaryFromDescription(
+            getProcessDescription(event.process_id),
+          ),
+          timestamp: event.timestamp,
+          href: event.action_url,
+        };
+      }
+
+      // Civic Brief result_published
       const isBrief =
-        typeof data.brief_id === "string" ||
-        getProcessType(event.process_id) === "civic.brief";
+        typeof data.brief_id === "string" || cachedType === "civic.brief";
 
       if (isBrief) {
         const title = getProcessTitle(event.process_id) ?? "Civic Brief";
@@ -79,6 +106,7 @@ export function eventToPost(
         };
       }
 
+      // Vote result_published
       const total = data.result?.total_votes ?? 0;
       const title =
         getProcessTitle(event.process_id) ?? `Process ${event.process_id}`;
@@ -158,6 +186,9 @@ function classifyHref(href: string): { kind: "internal"; to: string } | { kind: 
       return { kind: "internal", to: url.pathname };
     }
     if (/^\/brief\/[^/]+\/?$/.test(url.pathname)) {
+      return { kind: "internal", to: url.pathname };
+    }
+    if (/^\/announcement\/[^/]+\/?$/.test(url.pathname)) {
       return { kind: "internal", to: url.pathname };
     }
     if (url.origin === window.location.origin) {

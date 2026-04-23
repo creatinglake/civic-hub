@@ -15,6 +15,8 @@ import adminRoutes from "./routes/adminRoutes.js";
 import authRoutes from "./routes/authRoutes.js";
 import voteLogRoutes from "./routes/voteLogRoutes.js";
 import briefRoutes from "./routes/briefRoutes.js";
+import announcementRoutes from "./routes/announcementRoutes.js";
+import { handleListAnnouncements } from "./controllers/announcementController.js";
 import { ensureSeeded } from "./debug/autoSeed.js";
 import { pingDb } from "./db/client.js";
 
@@ -81,6 +83,11 @@ app.use("/votes", voteLogRoutes);
 // Civic Briefs — public read of published briefs
 app.use("/brief", briefRoutes);
 
+// Board / Admin announcements — post, edit, read one
+app.use("/announcement", announcementRoutes);
+// Public list — separate path so it doesn't collide with /announcement/:id
+app.get("/announcements", handleListAnnouncements);
+
 // --- Primary public interfaces ---
 // Events are the PRIMARY public interface of the hub.
 // All external systems (feeds, dashboards, federation) should rely on events.
@@ -126,6 +133,10 @@ app.get("/", (_req, res) => {
       "PATCH /admin/briefs/:id": "Edit brief concerns/suggestions/notes (pending only)",
       "POST /admin/briefs/:id/approve": "Approve brief: email + publish",
       "GET /brief/:id": "Public read of a published civic brief",
+      "POST /announcement": "Post a Board announcement (Board or admin)",
+      "PATCH /announcement/:id": "Edit an announcement (author only, or any admin)",
+      "GET /announcement/:id": "Public read of an announcement",
+      "GET /announcements": "List announcements, newest first (optional ?limit=N)",
       "GET /events": "List all events (primary public interface)",
       "GET /events?process_id=X": "Filter events by process",
       "GET /events?type=X": "Filter events by type (e.g., civic.process.vote_submitted)",

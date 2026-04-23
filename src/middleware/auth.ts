@@ -20,14 +20,35 @@ function extractToken(req: Request): string | null {
   return null;
 }
 
-function adminEmails(): Set<string> {
-  const raw = process.env.CIVIC_ADMIN_EMAILS ?? "";
+function parseEmailList(raw: string | undefined): Set<string> {
   return new Set(
-    raw
+    (raw ?? "")
       .split(",")
       .map((e) => e.trim().toLowerCase())
       .filter((e) => e.length > 0),
   );
+}
+
+function adminEmails(): Set<string> {
+  return parseEmailList(process.env.CIVIC_ADMIN_EMAILS);
+}
+
+function boardEmails(): Set<string> {
+  return parseEmailList(process.env.CIVIC_BOARD_EMAILS);
+}
+
+/**
+ * Derive the effective role for a user based on their email. Admins win
+ * if their email is in both lists (so an admin who's also listed as a
+ * Board member gets full admin privileges, not the narrower Board role).
+ * Returns null if the user has no elevated role.
+ */
+export function roleForEmail(email: string | undefined | null): "admin" | "board" | null {
+  if (!email) return null;
+  const lower = email.toLowerCase();
+  if (adminEmails().has(lower)) return "admin";
+  if (boardEmails().has(lower)) return "board";
+  return null;
 }
 
 /**
@@ -108,6 +129,38 @@ export async function requireAdmin(
       res.status(403).json({ error: "Admin access required" });
       return;
     }
+    next();
+  });
+}
+
+/**
+ * Require an authenticated user whose email is in either
+ * CIVIC_BOARD_EMAILS or CIVIC_ADMIN_EMAILS. Used for announcement
+ * operations (post / edit).
+ *
+ * Sets `res.locals.effectiveRole` to `"admin"` or `"board"` so handlers
+ * can stamp the author role on new announcements without recomputing.
+ *
+ * This is intentionally separate from requireAdmin: Board members get
+ * this one capability (announcements) and nothing else. /admin/* routes
+ * keep using requireAdmin (strict) so Board members can't reach them.
+ */
+export async function requireBoardOrAdmin(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  await requireAuth(req, res, async () => {
+    const user = res.locals.authUser as User | undefined;
+    if (!user) return;
+
+    const role = roleForEmail(user.email);
+    if (role === null) {
+      res.status(403).json({ error: "Board or admin access required" });
+      return;
+    }
+
+    res.locals.effectiveRole = role;
     next();
   });
 }

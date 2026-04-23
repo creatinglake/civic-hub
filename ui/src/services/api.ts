@@ -515,6 +515,74 @@ export function getPublicBrief(id: string): Promise<PublicBrief> {
   return request("GET", `/brief/${id}`);
 }
 
+// --- Announcements ---
+
+export type AnnouncementAuthorRole = "board" | "admin";
+
+export interface AnnouncementLink {
+  label: string;
+  url: string;
+}
+
+/** Full read of one announcement (GET /announcement/:id). */
+export interface Announcement {
+  id: string;
+  type: "civic.announcement";
+  title: string;
+  body: string;
+  links: AnnouncementLink[];
+  author_id: string;
+  author_role: AnnouncementAuthorRole;
+  created_at: string;
+  last_edited_at: string | null;
+  edit_count: number;
+}
+
+/** Summary row (GET /announcements). */
+export interface AnnouncementSummary {
+  id: string;
+  type: "civic.announcement";
+  title: string;
+  author_role: AnnouncementAuthorRole;
+  created_at: string;
+  last_edited_at: string | null;
+  edit_count: number;
+}
+
+export interface CreateAnnouncementInput {
+  title: string;
+  body: string;
+  links?: AnnouncementLink[];
+}
+
+export interface UpdateAnnouncementInput {
+  title?: string;
+  body?: string;
+  links?: AnnouncementLink[];
+}
+
+export function createAnnouncement(
+  input: CreateAnnouncementInput,
+): Promise<Announcement> {
+  return request("POST", "/announcement", input);
+}
+
+export function updateAnnouncement(
+  id: string,
+  input: UpdateAnnouncementInput,
+): Promise<Announcement> {
+  return request("PATCH", `/announcement/${id}`, input);
+}
+
+export function getAnnouncement(id: string): Promise<Announcement> {
+  return request("GET", `/announcement/${id}`);
+}
+
+export function listAnnouncements(limit?: number): Promise<AnnouncementSummary[]> {
+  const q = typeof limit === "number" ? `?limit=${limit}` : "";
+  return request("GET", `/announcements${q}`);
+}
+
 // --- Admin: hub settings ---
 
 export interface AdminSettings {
