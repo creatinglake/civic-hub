@@ -36,8 +36,8 @@ code. Ideas for process plugins worth exploring:
 
 - `civic.petition` — signature-collection process with a support threshold
   and a public outcome.
-- `civic.announcement` — non-interactive news posts that surface in the feed
-  but don't accept actions.
+- ~~`civic.announcement` — non-interactive news posts that surface in the feed
+  but don't accept actions.~~ Shipped in Slice 4 (2026-04-22).
 - `civic.deliberation` — structured discussion with framing prompts, before a
   vote opens.
 - `civic.budget` — participatory budgeting (allocate a fixed pool across
@@ -88,6 +88,29 @@ code. Ideas for process plugins worth exploring:
 - Politician / official profiles tied to jurisdictions, with verified
   channels for posting responses to community votes.
 - Credential issuance (residency, voter registration) as civic-issued VCs.
+- **User-record roles (replaces env-var email lists).** Today admin and
+  Board roles come from `CIVIC_ADMIN_EMAILS` / `CIVIC_BOARD_EMAILS`
+  env vars. For the pilot that's fine — the lists are tiny. As the hub
+  scales or federates, migrate to a per-user role column in the users
+  table so role assignment is a DB operation (admin-editable UI) and
+  doesn't require a redeploy per change.
+- **Announcement retraction.** Slice 4 supports edits but not deletion
+  or retraction. An announcement that was sent in error may need to be
+  withdrawn transparently (emit `civic.process.retracted`, keep the
+  record visible but marked "retracted", preserve edit history). Spec
+  would need a new canonical event type for this.
+
+## Protocol / Federation (further)
+
+- **Informational `process_kind`.** Spec §5 assumes all processes
+  implement Phases 0–6 with meaningful civic activity in each. Slice 4's
+  `civic.announcement` skips Phases 1–5 because they don't correspond to
+  anything real for an instant-publish informational post. Worth
+  proposing a spec extension that formalizes three process kinds:
+  participation-driven (civic.vote, civic.petition),
+  derivative (civic.brief), and informational (civic.announcement), each
+  with its own phase-compliance rules. Makes conformance checks clearer
+  and helps federated consumers interpret incoming process descriptors.
 
 ## Observability of civic impact
 

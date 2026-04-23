@@ -8,15 +8,19 @@ import { ProcessHandler, ProcessFactory } from "./types.js";
 import voteProcess from "./voteProcess.js";
 import proposalProcess from "./proposalProcess.js";
 import briefProcess from "./briefProcess.js";
+import announcementProcess from "./announcementProcess.js";
 
-// civic.brief is registered here but can be omitted by hubs that don't want
-// brief generation. When present, the vote adapter's process.close handler
-// spawns a brief after the vote closes. When absent, vote closes simply
-// terminate without a brief.
+// civic.brief + civic.announcement are registered here but can be omitted
+// by hubs that don't want those capabilities. When civic.brief is present,
+// the vote adapter spawns a brief on close; when absent, vote closes
+// terminate without a brief. civic.announcement is entirely self-contained
+// via /announcement routes — a hub without it just 404s those URLs and
+// nothing else breaks.
 const processRegistry: Record<string, ProcessHandler> = {
   "civic.vote": voteProcess,
   "civic.proposal": proposalProcess,
   "civic.brief": briefProcess,
+  "civic.announcement": announcementProcess,
 };
 
 /**

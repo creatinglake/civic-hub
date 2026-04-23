@@ -1,0 +1,79 @@
+// civic.announcement process handler — thin adapter around the module.
+//
+// Announcements are not driven through the generic /process/:id/action
+// dispatcher. The admin HTTP surface (/announcement/*) orchestrates the
+// create / edit lifecycle directly via the module's service functions.
+// This adapter exists so announcements live in the same process store
+// and register as a known process type for discovery / feed rendering.
+
+import { Process, ProcessAction } from "../models/process.js";
+import { ProcessHandler } from "./types.js";
+import {
+  createAnnouncementState,
+  getPublicReadModel,
+  getPublicSummary,
+  type AnnouncementAuthorRole,
+  type AnnouncementLink,
+  type AnnouncementProcessState,
+  type CreateAnnouncementInput,
+} from "../modules/civic.announcement/index.js";
+
+function getState(process: Process): AnnouncementProcessState {
+  return process.state as unknown as AnnouncementProcessState;
+}
+
+const announcementProcess: ProcessHandler = {
+  type: "civic.announcement",
+
+  initializeState(input: Record<string, unknown>): Record<string, unknown> {
+    // Expected shape mirrors CreateAnnouncementInput. The hub's announcement
+    // controller is the only caller; any other path is an error.
+    const required = ["title", "body", "author_id", "author_role"] as const;
+    for (const key of required) {
+      if (!(key in input)) {
+        throw new Error(
+          `civic.announcement initializeState requires "${key}"`,
+        );
+      }
+    }
+    const createInput: CreateAnnouncementInput = {
+      title: input.title as string,
+      body: input.body as string,
+      author_id: input.author_id as string,
+      author_role: input.author_role as AnnouncementAuthorRole,
+      links: Array.isArray(input.links)
+        ? (input.links as AnnouncementLink[])
+        : undefined,
+    };
+    return createAnnouncementState(createInput) as unknown as Record<string, unknown>;
+  },
+
+  async handleAction(
+    _process: Process,
+    action: ProcessAction,
+  ): Promise<Record<string, unknown>> {
+    // No HTTP actions reach announcements via the generic dispatcher.
+    throw new Error(
+      `civic.announcement does not accept process actions (received "${action.type}"). ` +
+        `Create / edit happens via /announcement HTTP endpoints.`,
+    );
+  },
+
+  getReadModel(process: Process): Record<string, unknown> {
+    const state = getState(process);
+    return getPublicReadModel(state, {
+      id: process.id,
+      createdAt: process.createdAt,
+    });
+  },
+
+  getSummary(process: Process): Record<string, unknown> {
+    const state = getState(process);
+    return getPublicSummary(state, {
+      id: process.id,
+      createdAt: process.createdAt,
+    });
+  },
+};
+
+export default announcementProcess;
