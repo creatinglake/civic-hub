@@ -15,10 +15,13 @@ const ANTHROPIC_VERSION = "2023-06-01";
 
 /**
  * Pinned default model. Operators can override via ANTHROPIC_MODEL.
- * Current as of 2026-04 (Slice 6 build). Sonnet-tier balances cost and
- * quality for multi-document summarization.
+ * Sonnet-tier balances cost and quality for multi-document summarization.
+ * Bumped from sonnet-4-5 to sonnet-4-6 on 2026-04-24 after the former
+ * returned 404 from /v1/messages (model name didn't resolve on the
+ * live API). If Anthropic releases a Sonnet 4.7+ later, operators can
+ * override via the ANTHROPIC_MODEL env var without touching code.
  */
-export const DEFAULT_MODEL = "claude-sonnet-4-5-20251022";
+export const DEFAULT_MODEL = "claude-sonnet-4-6";
 
 export interface CallClaudeInput {
   model: string;
