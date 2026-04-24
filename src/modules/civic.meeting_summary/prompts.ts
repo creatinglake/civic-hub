@@ -45,7 +45,17 @@ For each meeting entry visible on the page, extract:
 
 Ignore anything that is not a specific meeting entry (site chrome, navigation, footer links, general "how to attend" instructions, unrelated pages).
 
-Return a JSON array of entries. If the page contains no meeting entries, return []. Emit ONLY the JSON array — no prose, no markdown fences, no explanation. Your entire response MUST parse as JSON.`;
+Return a JSON array of entries. If the page contains no meeting entries, return [].
+
+STRICT JSON RULES — your response must be machine-parseable:
+- Emit ONLY the JSON array. No prose. No markdown fences. No explanation before or after.
+- Every string value MUST be a single-line string — no literal newlines inside strings. Use a space instead if needed.
+- Every double-quote character that appears inside a string value MUST be escaped as \\" .
+- Every backslash inside a string value MUST be escaped as \\\\ .
+- No trailing commas after the last element of an array or object.
+- Do NOT include any keys not listed above.
+
+Your entire response will be fed to JSON.parse(). If it fails to parse, the run fails.`;
 }
 
 /**

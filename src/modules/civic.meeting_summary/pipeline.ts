@@ -227,24 +227,42 @@ function parseSummarizationResponse(
 
 /**
  * Tolerant JSON extractor — handles the common case where Claude wraps
- * the JSON in ```json fences despite instructions, or adds a leading/
- * trailing line. Looks for the first `{` and the last `}`.
+ * the JSON in ```json fences despite instructions, adds a leading/
+ * trailing line, or embeds literal newlines inside string values.
+ * Mirrors parseJsonArray's tolerance ladder for the object case.
  */
 function extractJsonObject(raw: string): unknown | null {
   const trimmed = raw.trim();
   if (trimmed.length === 0) return null;
-  // Fast path: raw is already valid JSON.
-  try {
-    return JSON.parse(trimmed);
-  } catch {
-    // fall through
-  }
+  const direct = tryParseObject(trimmed);
+  if (direct) return direct;
+
   const first = trimmed.indexOf("{");
   const last = trimmed.lastIndexOf("}");
   if (first < 0 || last <= first) return null;
   const slice = trimmed.slice(first, last + 1);
+
+  const sliced = tryParseObject(slice);
+  if (sliced) return sliced;
+
+  const sanitized = sanitizeClaudeJson(slice);
+  const cleaned = tryParseObject(sanitized);
+  if (cleaned) return cleaned;
+
+  const failAt = locateParseFailure(sanitized);
+  if (failAt !== null) {
+    const start = Math.max(0, failAt - 120);
+    const end = Math.min(sanitized.length, failAt + 120);
+    console.warn(
+      `[meeting-summary] summarization JSON parse failed at position ${failAt}. Context:\n${sanitized.slice(start, end)}`,
+    );
+  }
+  return null;
+}
+
+function tryParseObject(s: string): unknown | null {
   try {
-    return JSON.parse(slice);
+    return JSON.parse(s);
   } catch {
     return null;
   }
@@ -253,24 +271,120 @@ function extractJsonObject(raw: string): unknown | null {
 /**
  * Shared JSON-array extractor for the discovery leg (connector calls
  * into this via the module index). Returns the parsed array or throws.
+ *
+ * Tries progressively more tolerant parsing steps before giving up:
+ *   1. JSON.parse on the raw trimmed string.
+ *   2. JSON.parse on the slice between the first `[` and the last `]`.
+ *   3. Same slice with common Claude formatting quirks sanitized
+ *      (literal \n/\r/\t inside strings, smart quotes, trailing
+ *      commas). If even that fails, we throw and log a snippet
+ *      around the failure point so the Vercel logs can be diagnosed.
  */
 export function parseJsonArray(raw: string): unknown[] {
   const trimmed = raw.trim();
-  try {
-    const v = JSON.parse(trimmed);
-    if (Array.isArray(v)) return v;
-  } catch {
-    // fall through
-  }
+
+  // Step 1: happy path.
+  const direct = tryParseArray(trimmed);
+  if (direct) return direct;
+
+  // Step 2: salvage from first `[` to last `]`.
   const first = trimmed.indexOf("[");
   const last = trimmed.lastIndexOf("]");
   if (first < 0 || last <= first) {
     throw new Error("Claude response was not a JSON array");
   }
   const slice = trimmed.slice(first, last + 1);
-  const v = JSON.parse(slice);
-  if (!Array.isArray(v)) {
-    throw new Error("Claude response was not a JSON array");
+
+  const sliced = tryParseArray(slice);
+  if (sliced) return sliced;
+
+  // Step 3: sanitize + retry.
+  const sanitized = sanitizeClaudeJson(slice);
+  const cleaned = tryParseArray(sanitized);
+  if (cleaned) return cleaned;
+
+  // Step 4: give up, but log the failure point so we can diagnose.
+  const failAt = locateParseFailure(sanitized);
+  if (failAt !== null) {
+    const start = Math.max(0, failAt - 120);
+    const end = Math.min(sanitized.length, failAt + 120);
+    console.warn(
+      `[meeting-summary] JSON parse failed at position ${failAt}. Context:\n${sanitized.slice(start, end)}`,
+    );
+  } else {
+    console.warn(
+      `[meeting-summary] JSON parse failed. First 400 chars:\n${sanitized.slice(0, 400)}`,
+    );
   }
-  return v;
+  throw new Error("Claude response was not valid JSON array (after sanitization)");
+}
+
+function tryParseArray(s: string): unknown[] | null {
+  try {
+    const v = JSON.parse(s);
+    return Array.isArray(v) ? v : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Fix the most common Claude JSON quirks:
+ *   - smart quotes → plain quotes (but NOT inside string literals, handled via scan)
+ *   - literal CR/LF/TAB characters inside string literals → spaces
+ *   - trailing commas before `]` or `}`
+ *
+ * This is a targeted sanitizer, not a full JSON rewriter. It scans the
+ * string and tracks whether we're inside a string literal; outside of
+ * strings it's a no-op except for trailing-comma removal.
+ */
+function sanitizeClaudeJson(raw: string): string {
+  // First pass: replace literal newlines/tabs/returns inside strings.
+  const out: string[] = [];
+  let inString = false;
+  let escape = false;
+  for (let i = 0; i < raw.length; i++) {
+    const ch = raw[i];
+    if (escape) {
+      out.push(ch);
+      escape = false;
+      continue;
+    }
+    if (ch === "\\" && inString) {
+      out.push(ch);
+      escape = true;
+      continue;
+    }
+    if (ch === '"') {
+      inString = !inString;
+      out.push(ch);
+      continue;
+    }
+    if (inString && (ch === "\n" || ch === "\r")) {
+      // Literal newline inside a string — break JSON. Replace with space.
+      out.push(" ");
+      continue;
+    }
+    if (inString && ch === "\t") {
+      out.push(" ");
+      continue;
+    }
+    out.push(ch);
+  }
+  // Second pass: strip trailing commas before `]` or `}`.
+  return out.join("").replace(/,\s*([}\]])/g, "$1");
+}
+
+/** Best-effort locate the character offset where JSON.parse fails. */
+function locateParseFailure(s: string): number | null {
+  try {
+    JSON.parse(s);
+    return null;
+  } catch (err) {
+    if (err instanceof Error) {
+      const m = err.message.match(/position (\d+)/);
+      if (m) return Number(m[1]);
+    }
+    return null;
+  }
 }

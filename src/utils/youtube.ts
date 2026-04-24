@@ -20,7 +20,13 @@
 // which Node cannot expose as named ESM imports. Pointing at the ESM
 // build directly is the robust workaround and survives package updates
 // so long as the ESM file name stays stable.
-// eslint-disable-next-line import/no-unresolved
+//
+// The package's type definitions only cover the root entry, not the
+// deep ESM path — declare it as `any` so tsc accepts the import.
+// `YoutubeTranscript.fetchTranscript` is still shaped well enough for
+// our one use site; we map it through the `TranscriptSegment` type
+// below.
+// @ts-expect-error — deep import has no declaration file; see above
 import { YoutubeTranscript } from "youtube-transcript/dist/youtube-transcript.esm.js";
 import type { TranscriptSegment } from "../modules/civic.meeting_summary/index.js";
 
