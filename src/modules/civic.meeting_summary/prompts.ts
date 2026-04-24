@@ -27,6 +27,11 @@ export function buildDiscoveryPrompt(input: {
 }): string {
   return `You are extracting a structured list of government meetings from an agendas-and-minutes page.
 
+CRITICAL CONSTRAINTS (apply before anything else):
+- Produce AT MOST 50 entries in the output array. If the page contains more, return only the most recent 50.
+- Honor the date and content restrictions stated in <admin_instructions> below. If the admin's instructions say to exclude meetings before a date, do not include them — not as placeholders, not as null entries, not at all.
+- Output nothing but the JSON array. No commentary, no preamble, no "Here are the entries:".
+
 ${instructionsBlock(input.extraction_instructions)}
 
 <source_url>${input.source_url}</source_url>

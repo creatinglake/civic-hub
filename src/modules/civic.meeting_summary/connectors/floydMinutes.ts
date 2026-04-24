@@ -156,10 +156,12 @@ export const floydMinutesConnector: MeetingSourceConnector = {
     const { text } = await deps.callClaude({
       model: cfg.model,
       userText: prompt,
-      // Long meeting lists (Floyd carries 40+ historical entries) can
-      // overrun 8k. 32k gives headroom without risking hitting Sonnet's
-      // per-response cap.
-      maxTokens: 32_000,
+      // 12k leaves room for ~50 entries of well-escaped JSON without
+      // letting Claude slip into a 5-minute generation spree. If a
+      // jurisdiction ever needs more, bump here — but note that long
+      // discovery outputs are a smell: the filter prompt should be
+      // doing more work.
+      maxTokens: 12_000,
     });
 
     let parsed: unknown[];

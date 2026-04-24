@@ -12,6 +12,13 @@
 
 const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
 const ANTHROPIC_VERSION = "2023-06-01";
+/**
+ * Hard per-call ceiling. If a single Claude invocation doesn't return
+ * within this many milliseconds we abort and throw — better to fail
+ * one meeting (isolated) than to let a stuck call burn the whole
+ * Vercel function's 300s budget.
+ */
+const CALL_TIMEOUT_MS = 180_000;
 
 /**
  * Pinned default model. Operators can override via ANTHROPIC_MODEL.
@@ -100,15 +107,30 @@ async function callClaudeOnce(
   };
   if (input.system) body.system = input.system;
 
-  const res = await fetch(ANTHROPIC_URL, {
-    method: "POST",
-    headers: {
-      "x-api-key": apiKey,
-      "anthropic-version": ANTHROPIC_VERSION,
-      "content-type": "application/json",
-    },
-    body: JSON.stringify(body),
-  });
+  const controller = new AbortController();
+  const timeoutHandle = setTimeout(() => controller.abort(), CALL_TIMEOUT_MS);
+  let res: Response;
+  try {
+    res = await fetch(ANTHROPIC_URL, {
+      method: "POST",
+      headers: {
+        "x-api-key": apiKey,
+        "anthropic-version": ANTHROPIC_VERSION,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+  } catch (err) {
+    if (err instanceof Error && err.name === "AbortError") {
+      throw new Error(
+        `Anthropic API call exceeded ${CALL_TIMEOUT_MS}ms — aborted`,
+      );
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeoutHandle);
+  }
 
   if (!res.ok) {
     const errText = await res.text();
