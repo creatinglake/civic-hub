@@ -96,8 +96,9 @@ export async function summarizeMeeting(
       mediaType: pdf.mime || "application/pdf",
       filename: filenameFromUrl(entry.source_minutes_url) ?? "minutes.pdf",
     },
-    // 8192 is generous for a dozen topic blocks; headroom for verbose PDFs.
-    maxTokens: 8192,
+    // 16k gives headroom for verbose minutes with 15+ topic blocks
+    // without ever flirting with the model's per-response ceiling.
+    maxTokens: 16_000,
   });
 
   const blocks = parseSummarizationResponse(text, hasVideo);

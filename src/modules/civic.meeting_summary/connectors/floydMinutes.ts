@@ -42,19 +42,41 @@ const TAGS_TO_STRIP = [
   "svg",
   "img",
   "iframe",
+  "picture",
+  "source",
+  "video",
+  "audio",
+  "canvas",
+  "template",
+  "head",
 ];
 
 /**
  * Strip Wix chrome / scripts / SVGs / images; prefer <main>, fall back
  * to <body>. Preserves <a href> attributes (Claude needs them to
- * produce the PDF + YouTube URL outputs).
+ * produce the PDF + YouTube URL outputs). Also drops Wix-specific
+ * `data-*` attributes and stylistic attributes (class, style, id,
+ * aria-*, role) — they add no information Claude needs but bloat the
+ * payload by 3–5x on Wix sites.
  */
 export function trimMinutesHtml(rawHtml: string): string {
   const $ = cheerio.load(rawHtml);
   for (const tag of TAGS_TO_STRIP) $(tag).remove();
-  // Drop everything hidden / aria-hidden to keep Wix accessibility-tree
-  // dumps from leaking in.
   $("[aria-hidden='true']").remove();
+
+  // Strip per-element noise attributes. Retain only `href`, `title`, and
+  // `alt` on every element — everything else on a Wix page is visual
+  // plumbing. This matters: a single Wix section can carry 30+ `data-`
+  // attributes per tag which collectively dwarf the actual content.
+  const KEEP = new Set(["href", "title", "alt"]);
+  $("*").each((_i, el) => {
+    if (el.type !== "tag") return;
+    const attribs = (el as unknown as { attribs: Record<string, string> }).attribs;
+    if (!attribs) return;
+    for (const name of Object.keys(attribs)) {
+      if (!KEEP.has(name)) delete attribs[name];
+    }
+  });
 
   const region = $("main").first();
   const target = region.length > 0 ? region : $("body");
@@ -134,7 +156,10 @@ export const floydMinutesConnector: MeetingSourceConnector = {
     const { text } = await deps.callClaude({
       model: cfg.model,
       userText: prompt,
-      maxTokens: 8192,
+      // Long meeting lists (Floyd carries 40+ historical entries) can
+      // overrun 8k. 32k gives headroom without risking hitting Sonnet's
+      // per-response cap.
+      maxTokens: 32_000,
     });
 
     let parsed: unknown[];
