@@ -591,6 +591,103 @@ export function listAnnouncements(limit?: number): Promise<AnnouncementSummary[]
   return request("GET", `/announcements${q}`);
 }
 
+// --- Meeting summaries (Slice 6) ---
+
+export type MeetingSummaryApprovalStatus = "pending" | "approved" | "published";
+
+export interface SummaryBlock {
+  topic_title: string;
+  topic_summary: string;
+  start_time_seconds: number | null;
+  action_taken: string | null;
+}
+
+/** Admin list row. */
+export interface MeetingSummarySummary {
+  id: string;
+  type: "civic.meeting_summary";
+  title: string;
+  meeting_title: string;
+  meeting_date: string;
+  approval_status: MeetingSummaryApprovalStatus;
+  block_count: number;
+  has_video: boolean;
+  generated_at: string;
+  approved_at: string | null;
+  published_at: string | null;
+  edit_count: number;
+  created_at: string;
+}
+
+/** Admin detail (full read). */
+export interface MeetingSummaryDetail extends MeetingSummarySummary {
+  source_id: string;
+  source_minutes_url: string;
+  source_video_url: string | null;
+  additional_video_urls: string[];
+  blocks: SummaryBlock[];
+  admin_notes: string;
+  last_edited_at: string | null;
+  ai_instructions_used: string;
+  ai_model: string;
+  ai_attribution_label: string;
+  created_by: string;
+}
+
+/** Public payload — only returned for published summaries. */
+export interface PublicMeetingSummary {
+  id: string;
+  type: "civic.meeting_summary";
+  title: string;
+  meeting_title: string;
+  meeting_date: string;
+  source_minutes_url: string;
+  source_video_url: string | null;
+  additional_video_urls: string[];
+  blocks: SummaryBlock[];
+  admin_notes: string;
+  generated_at: string;
+  published_at: string;
+  ai_model: string;
+  ai_attribution_label: string;
+}
+
+export interface MeetingSummaryPatch {
+  meeting_title?: string;
+  blocks?: SummaryBlock[];
+  admin_notes?: string;
+}
+
+export function adminListMeetingSummaries(
+  status?: MeetingSummaryApprovalStatus,
+): Promise<MeetingSummarySummary[]> {
+  const params = status ? `?status=${encodeURIComponent(status)}` : "";
+  return request("GET", `/admin/meeting-summaries${params}`);
+}
+
+export function adminGetMeetingSummary(
+  id: string,
+): Promise<MeetingSummaryDetail> {
+  return request("GET", `/admin/meeting-summaries/${id}`);
+}
+
+export function adminPatchMeetingSummary(
+  id: string,
+  patch: MeetingSummaryPatch,
+): Promise<MeetingSummaryDetail> {
+  return request("PATCH", `/admin/meeting-summaries/${id}`, patch);
+}
+
+export function adminApproveMeetingSummary(
+  id: string,
+): Promise<{ message: string; meeting_summary: MeetingSummaryDetail }> {
+  return request("POST", `/admin/meeting-summaries/${id}/approve`);
+}
+
+export function getMeetingSummary(id: string): Promise<PublicMeetingSummary> {
+  return request("GET", `/meeting-summary/${id}`);
+}
+
 // --- Admin: hub settings ---
 
 export interface AnnouncementAuthor {

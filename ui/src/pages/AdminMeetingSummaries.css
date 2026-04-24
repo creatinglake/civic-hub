@@ -1,0 +1,119 @@
+.admin-meeting-summaries-page {
+  padding: 0;
+}
+
+.admin-meeting-summaries-body {
+  padding: var(--space-md) var(--space-lg) var(--space-xl);
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.admin-meeting-summaries-body h1 {
+  margin: 0 0 var(--space-xs);
+}
+
+/* Prominent AI-generated disclaimer banner shown above the review form.
+   Theme-accent color so it can't be mistaken for body copy. */
+.meeting-ai-banner {
+  margin: var(--space-md) 0 var(--space-lg);
+  padding: var(--space-md);
+  background: var(--color-surface-muted);
+  border-left: 3px solid var(--color-primary);
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-base);
+}
+
+.meeting-ai-banner strong {
+  color: var(--color-primary);
+}
+
+.meeting-source-list {
+  margin: 0;
+  padding-left: 1.1rem;
+  line-height: var(--line-height-base);
+  color: var(--color-text);
+  font-size: var(--font-size-sm);
+  word-break: break-word;
+}
+
+.meeting-source-list li {
+  margin-bottom: var(--space-xs);
+}
+
+.meeting-source-list ul {
+  margin: var(--space-xs) 0 0;
+  padding-left: 1.1rem;
+}
+
+/* Topic-block editor rows. Each block renders as a card-ish panel with
+   inline reorder + delete controls. */
+.meeting-block-list {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 var(--space-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.meeting-block-row {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-md);
+  background: var(--color-surface);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  position: relative;
+}
+
+.meeting-block-actions {
+  position: absolute;
+  top: var(--space-sm);
+  right: var(--space-sm);
+  display: flex;
+  gap: var(--space-xs);
+}
+
+.meeting-block-actions button {
+  background: var(--color-surface-muted);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 2px 8px;
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  color: var(--color-text-muted);
+}
+
+.meeting-block-actions button:hover:not(:disabled) {
+  color: var(--color-text);
+  border-color: var(--color-border-hover);
+}
+
+.meeting-block-actions button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.meeting-block-delete {
+  color: #b91c1c !important;
+}
+
+.meeting-block-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+.meeting-block-field span {
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.meeting-block-field-inline {
+  max-width: 240px;
+}

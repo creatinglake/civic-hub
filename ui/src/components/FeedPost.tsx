@@ -25,7 +25,11 @@ interface Props {
  * The filter map is open for extension: new process-type plugins can be
  * surfaced by adding entries here without restructuring the Feed.
  */
-type FeedProcessKind = "civic.vote" | "civic.brief" | "civic.announcement";
+type FeedProcessKind =
+  | "civic.vote"
+  | "civic.brief"
+  | "civic.announcement"
+  | "civic.meeting_summary";
 
 export function eventToPost(
   event: CivicEvent,
@@ -63,6 +67,16 @@ export function eventToPost(
           title?: string;
           author_role?: string;
         };
+        meeting_summary?: {
+          id?: string;
+          meeting_title?: string;
+          meeting_date?: string;
+          block_count?: number;
+        };
+        summary_id?: string;
+        meeting_date?: string;
+        meeting_title?: string;
+        block_count?: number;
       };
 
       const cachedType = getProcessType(event.process_id);
@@ -90,6 +104,44 @@ export function eventToPost(
           summary: summaryFromDescription(
             getProcessDescription(event.process_id),
           ),
+          timestamp: event.timestamp,
+          href: event.action_url,
+        };
+      }
+
+      // Meeting summary result_published
+      const isMeetingSummary =
+        data.meeting_summary !== undefined ||
+        typeof data.summary_id === "string" ||
+        cachedType === "civic.meeting_summary";
+
+      if (isMeetingSummary) {
+        const meetingDate =
+          data.meeting_summary?.meeting_date ?? data.meeting_date ?? "";
+        const blockCount =
+          typeof data.meeting_summary?.block_count === "number"
+            ? data.meeting_summary.block_count
+            : typeof data.block_count === "number"
+            ? data.block_count
+            : null;
+        const title = `Meeting summary: ${formatMeetingDate(meetingDate)}`;
+        const meetingTitle =
+          data.meeting_summary?.meeting_title ??
+          data.meeting_title ??
+          getProcessTitle(event.process_id);
+        const noun = blockCount === 1 ? "topic" : "topics";
+        const summary =
+          meetingTitle && blockCount !== null
+            ? `${meetingTitle} — ${blockCount} ${noun} covered.`
+            : meetingTitle
+            ? meetingTitle
+            : blockCount !== null
+            ? `${blockCount} ${noun} covered.`
+            : "";
+        return {
+          id: event.id,
+          title,
+          summary,
           timestamp: event.timestamp,
           href: event.action_url,
         };
@@ -138,6 +190,24 @@ function summaryFromDescription(description: string | undefined): string {
   if (!description) return "";
   const firstLine = description.split(/\r?\n/).find((l) => l.trim().length > 0);
   return firstLine?.trim() ?? "";
+}
+
+/**
+ * Format a YYYY-MM-DD (or full ISO) date for feed post titles. Falls back
+ * to the raw string if parsing fails, so truncated or malformed dates
+ * don't render as "Invalid Date".
+ */
+function formatMeetingDate(iso: string): string {
+  if (!iso) return "(date unknown)";
+  const d = iso.includes("T")
+    ? new Date(iso)
+    : new Date(`${iso}T12:00:00`);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
 }
 
 function relativeTime(iso: string, now: Date = new Date()): string {
@@ -198,6 +268,9 @@ function classifyHref(href: string): { kind: "internal"; to: string } | { kind: 
       return { kind: "internal", to: url.pathname };
     }
     if (/^\/announcement\/[^/]+\/?$/.test(url.pathname)) {
+      return { kind: "internal", to: url.pathname };
+    }
+    if (/^\/meeting-summary\/[^/]+\/?$/.test(url.pathname)) {
       return { kind: "internal", to: url.pathname };
     }
     if (url.origin === window.location.origin) {

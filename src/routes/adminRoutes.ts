@@ -16,6 +16,12 @@ import {
   handleApproveBrief,
 } from "../controllers/adminBriefController.js";
 import {
+  handleAdminGetMeetingSummary,
+  handleAdminListMeetingSummaries,
+  handleApproveMeetingSummary,
+  handlePatchMeetingSummary,
+} from "../controllers/meetingSummaryController.js";
+import {
   handleGetSettings,
   handlePatchSettings,
 } from "../controllers/adminSettingsController.js";
@@ -36,6 +42,12 @@ router.get("/briefs", handleAdminListBriefs);
 router.get("/briefs/:id", handleAdminGetBrief);
 router.patch("/briefs/:id", handlePatchBrief);
 router.post("/briefs/:id/approve", handleApproveBrief);
+
+// Meeting Summaries
+router.get("/meeting-summaries", handleAdminListMeetingSummaries);
+router.get("/meeting-summaries/:id", handleAdminGetMeetingSummary);
+router.patch("/meeting-summaries/:id", handlePatchMeetingSummary);
+router.post("/meeting-summaries/:id/approve", handleApproveMeetingSummary);
 
 // Hub settings (admin-configurable; overrides env var fallbacks)
 router.get("/settings", handleGetSettings);

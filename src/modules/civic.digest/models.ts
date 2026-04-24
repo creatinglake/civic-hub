@@ -54,7 +54,8 @@ export type DigestItemKind =
   | "vote_opened"
   | "vote_result_published"
   | "brief_published"
-  | "announcement";
+  | "announcement"
+  | "meeting_summary_published";
 
 /** A single row in the digest — one renderable civic event. */
 export interface DigestItem {

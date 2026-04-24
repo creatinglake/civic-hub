@@ -16,6 +16,9 @@ import authRoutes from "./routes/authRoutes.js";
 import voteLogRoutes from "./routes/voteLogRoutes.js";
 import briefRoutes from "./routes/briefRoutes.js";
 import announcementRoutes from "./routes/announcementRoutes.js";
+import meetingSummaryRoutes, {
+  meetingSummaryCronRouter,
+} from "./routes/meetingSummaryRoutes.js";
 import {
   digestCronRouter,
   digestUnsubscribeRouter,
@@ -93,11 +96,16 @@ app.use("/announcement", announcementRoutes);
 // Public list — separate path so it doesn't collide with /announcement/:id
 app.get("/announcements", handleListAnnouncements);
 
-// Digest (Slice 5):
-//   /internal/digest/run    — Vercel Cron → POSTs with CRON_SECRET bearer
-//   /unsubscribe/digest     — public GET, token-as-credential
-//   /user/settings/digest   — authed PATCH from the Settings page
+// Meeting summaries (Slice 6):
+//   /meeting-summary/:id    — public read of published summaries
+app.use("/meeting-summary", meetingSummaryRoutes);
+
+// Digest (Slice 5) + Meeting summary (Slice 6) crons both mount here.
+// Vercel Cron POSTs with the CRON_SECRET bearer, auto-injected.
+//   /internal/digest/run
+//   /internal/meeting-summary/run
 app.use("/internal", digestCronRouter);
+app.use("/internal", meetingSummaryCronRouter);
 app.use("/unsubscribe", digestUnsubscribeRouter);
 app.use("/user/settings", userSettingsRouter);
 
@@ -153,6 +161,12 @@ app.get("/", (_req, res) => {
       "POST /internal/digest/run": "Cron-triggered daily email digest (CRON_SECRET bearer)",
       "GET /unsubscribe/digest?token=X": "Unsubscribe from the daily digest",
       "PATCH /user/settings/digest": "Toggle digest subscription (authed)",
+      "POST /internal/meeting-summary/run": "Cron-triggered meeting discovery + summarization (CRON_SECRET bearer)",
+      "GET /admin/meeting-summaries": "List meeting summaries for admin review (optional ?status=)",
+      "GET /admin/meeting-summaries/:id": "Get full meeting summary detail for admin",
+      "PATCH /admin/meeting-summaries/:id": "Edit meeting summary blocks/notes (pending only)",
+      "POST /admin/meeting-summaries/:id/approve": "Approve and publish a meeting summary",
+      "GET /meeting-summary/:id": "Public read of a published meeting summary",
       "GET /events": "List all events (primary public interface)",
       "GET /events?process_id=X": "Filter events by process",
       "GET /events?type=X": "Filter events by type (e.g., civic.process.vote_submitted)",

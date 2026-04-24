@@ -102,12 +102,18 @@ export async function handleListProcesses(
 ): Promise<void> {
   try {
     const all = await listProcessSummaries();
-    // Public list: hide civic.brief processes that aren't yet published.
-    // Pending / approved briefs are an admin-facing concern and must not be
-    // visible to the public before the admin approval step completes.
+    // Public list: hide civic.brief and civic.meeting_summary processes
+    // that aren't yet published. Pending / approved records are admin-
+    // facing and must not be visible to the public before approval.
     const filtered = all.filter((p) => {
-      if ((p as { type?: string }).type !== "civic.brief") return true;
-      return (p as { publication_status?: string }).publication_status === "published";
+      const type = (p as { type?: string }).type;
+      if (type === "civic.brief") {
+        return (p as { publication_status?: string }).publication_status === "published";
+      }
+      if (type === "civic.meeting_summary") {
+        return (p as { approval_status?: string }).approval_status === "published";
+      }
+      return true;
     });
     res.json(filtered);
   } catch (err) {

@@ -7,7 +7,7 @@
 // silently — a user's digest should not contain posts they'd never see
 // on the feed, and vice versa.
 //
-// Rules:
+// Rules (4 kinds as of Slice 6):
 //   INCLUDE civic.process.started          from civic.vote
 //     → the "new vote open for voting" signal. The Feed uses `started`
 //       (not `created`) as the new-vote-open event; we match it so the
@@ -18,6 +18,8 @@
 //     → civic brief published after admin approval.
 //   INCLUDE civic.process.result_published from civic.announcement
 //     → board / admin / authorized-author announcements.
+//   INCLUDE civic.process.result_published from civic.meeting_summary
+//     → AI-generated meeting summaries published after admin approval.
 //
 //   EXCLUDE civic.process.created          (all process types)
 //     → factory-generated, silent to the Feed.
@@ -73,8 +75,13 @@ export function classifyItemKind(event: DigestEvent): DigestItemKind | null {
       brief_id?: unknown;
       announcement?: unknown;
       result?: unknown;
+      meeting_summary?: unknown;
+      summary_id?: unknown;
     };
     if (d?.announcement !== undefined) return "announcement";
+    if (d?.meeting_summary !== undefined || typeof d?.summary_id === "string") {
+      return "meeting_summary_published";
+    }
     if (typeof d?.brief_id === "string") return "brief_published";
     if (d?.result !== undefined) return "vote_result_published";
   }
@@ -90,7 +97,8 @@ const KIND_ORDER: Record<DigestItemKind, number> = {
   vote_opened: 0,
   vote_result_published: 1,
   brief_published: 2,
-  announcement: 3,
+  meeting_summary_published: 3,
+  announcement: 4,
 };
 
 export function sortDigestItems(items: DigestItem[]): DigestItem[] {

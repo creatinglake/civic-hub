@@ -4,6 +4,7 @@ import {
   type VoteState,
   getAnnouncement,
   getEvents,
+  getMeetingSummary,
   getProcessState,
   getPublicBrief,
 } from "../services/api";
@@ -21,7 +22,11 @@ interface Props {
   filter?: (event: CivicEvent) => boolean;
 }
 
-type ProcessKind = "civic.vote" | "civic.brief" | "civic.announcement";
+type ProcessKind =
+  | "civic.vote"
+  | "civic.brief"
+  | "civic.announcement"
+  | "civic.meeting_summary";
 
 interface ProcessMeta {
   type?: ProcessKind;
@@ -42,8 +47,13 @@ function kindFromEvent(event: CivicEvent): ProcessKind | null {
       brief_id?: unknown;
       result?: unknown;
       announcement?: unknown;
+      meeting_summary?: unknown;
+      summary_id?: unknown;
     };
     if (data?.announcement !== undefined) return "civic.announcement";
+    if (data?.meeting_summary !== undefined || typeof data?.summary_id === "string") {
+      return "civic.meeting_summary";
+    }
     if (typeof data?.brief_id === "string") return "civic.brief";
     if (data?.result !== undefined) return "civic.vote";
   }
@@ -121,6 +131,12 @@ export default function Feed({ filter }: Props) {
         lookup = getPublicBrief(id).then((brief) => ({
           type: "civic.brief" as const,
           title: brief.title,
+          description: undefined,
+        }));
+      } else if (kind === "civic.meeting_summary") {
+        lookup = getMeetingSummary(id).then((s) => ({
+          type: "civic.meeting_summary" as const,
+          title: s.meeting_title,
           description: undefined,
         }));
       } else {

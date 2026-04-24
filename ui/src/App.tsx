@@ -11,8 +11,10 @@ import Propose from "./pages/Propose";
 import ProposalDetail from "./pages/ProposalDetail";
 import AdminProposals from "./pages/AdminProposals";
 import AdminBriefs from "./pages/AdminBriefs";
+import AdminMeetingSummaries from "./pages/AdminMeetingSummaries";
 import AdminSettings from "./pages/AdminSettings";
 import Brief from "./pages/Brief";
+import MeetingSummary from "./pages/MeetingSummary";
 import VoteLog from "./pages/VoteLog";
 import PostAnnouncement from "./pages/PostAnnouncement";
 import AnnouncementPage from "./pages/Announcement";
@@ -52,8 +54,17 @@ function AppContent() {
           <Route path="/admin/proposals" element={<AdminProposals />} />
           <Route path="/admin/briefs" element={<AdminBriefs />} />
           <Route path="/admin/briefs/:id" element={<AdminBriefs />} />
+          <Route
+            path="/admin/meeting-summaries"
+            element={<AdminMeetingSummaries />}
+          />
+          <Route
+            path="/admin/meeting-summaries/:id"
+            element={<AdminMeetingSummaries />}
+          />
           <Route path="/admin/settings" element={<AdminSettings />} />
           <Route path="/brief/:id" element={<Brief />} />
+          <Route path="/meeting-summary/:id" element={<MeetingSummary />} />
           <Route path="/announcement/new" element={<PostAnnouncement />} />
           <Route path="/announcement/:id/edit" element={<PostAnnouncement />} />
           <Route path="/announcement/:id" element={<AnnouncementPage />} />

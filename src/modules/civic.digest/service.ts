@@ -71,6 +71,14 @@ function eventToItem(
     headline_result?: unknown;
     participation_count?: unknown;
     result?: { total_votes?: unknown };
+    meeting_summary?: {
+      meeting_title?: unknown;
+      meeting_date?: unknown;
+      block_count?: unknown;
+    };
+    meeting_title?: unknown;
+    meeting_date?: unknown;
+    block_count?: unknown;
   };
 
   // Prefer the event payload (authoritative at emit-time); fall back to
@@ -123,6 +131,30 @@ function eventToItem(
       summary = truncate(preview, 160);
       break;
     }
+    case "meeting_summary_published": {
+      const meetingDate =
+        (typeof d?.meeting_summary?.meeting_date === "string" &&
+          d.meeting_summary.meeting_date) ||
+        (typeof d?.meeting_date === "string" && d.meeting_date) ||
+        "";
+      const meetingTitle =
+        (typeof d?.meeting_summary?.meeting_title === "string" &&
+          d.meeting_summary.meeting_title) ||
+        (typeof d?.meeting_title === "string" && d.meeting_title) ||
+        rawTitle ||
+        "Board meeting";
+      const blockCount =
+        typeof d?.meeting_summary?.block_count === "number"
+          ? d.meeting_summary.block_count
+          : typeof d?.block_count === "number"
+          ? d.block_count
+          : 0;
+      const dateLabel = formatMeetingDate(meetingDate);
+      const topicsNoun = blockCount === 1 ? "topic" : "topics";
+      title = `Meeting summary: ${dateLabel}`;
+      summary = `${meetingTitle} — ${blockCount} ${topicsNoun} covered.`;
+      break;
+    }
   }
 
   return {
@@ -156,6 +188,7 @@ const GROUP_LABELS: Record<DigestItemKind, string> = {
   vote_opened: "New votes open",
   vote_result_published: "New results published",
   brief_published: "New Civic Briefs",
+  meeting_summary_published: "New meeting summaries",
   announcement: "Announcements",
 };
 
@@ -290,4 +323,21 @@ function escapeAttr(s: string): string {
 function truncate(s: string, max: number): string {
   if (s.length <= max) return s;
   return s.slice(0, max - 1).trimEnd() + "…";
+}
+
+/**
+ * Format a YYYY-MM-DD meeting date for digest subjects/items. Falls back
+ * to the raw string if parsing fails.
+ */
+function formatMeetingDate(iso: string): string {
+  if (!iso) return "(date unknown)";
+  const d = iso.includes("T")
+    ? new Date(iso)
+    : new Date(`${iso}T12:00:00`);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
 }
