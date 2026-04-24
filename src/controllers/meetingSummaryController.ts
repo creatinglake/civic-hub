@@ -53,6 +53,15 @@ import { fetchYouTubeTranscript } from "../utils/youtube.js";
 
 const DEFAULT_CONNECTOR_ID = "floyd-minutes-page";
 const CRON_ACTOR = "system:meeting-summary-cron";
+const DEFAULT_MAX_PER_RUN = 3;
+
+function maxPerRun(): number {
+  const raw = process.env.MEETING_SUMMARY_MAX_PER_RUN?.trim();
+  if (!raw) return DEFAULT_MAX_PER_RUN;
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n < 1) return DEFAULT_MAX_PER_RUN;
+  return Math.floor(n);
+}
 
 // Connector registry — MVP ships one; extending is a new entry here.
 const CONNECTORS: Record<string, MeetingSourceConnector> = {
@@ -153,11 +162,15 @@ export async function handleRunMeetingSummary(
       `[meeting-summary] run started connector=${connector.id} source=${cfg.source_url}`,
     );
 
+    const discoveryStart = Date.now();
     const entries = await discoverMeetings(connector, cfg, {
       fetchHtml,
       callClaude,
     });
     discovered = entries.length;
+    console.log(
+      `[meeting-summary] discovery done entries=${discovered} duration_ms=${Date.now() - discoveryStart}`,
+    );
 
     // Build the set of existing source_ids once so the inner loop is O(1).
     const allProcesses = await getAllProcesses();
@@ -168,7 +181,21 @@ export async function handleRunMeetingSummary(
       if (typeof s?.source_id === "string") existingSourceIds.add(s.source_id);
     }
 
+    const perRunCap = maxPerRun();
+    console.log(
+      `[meeting-summary] processing with per_run_cap=${perRunCap}`,
+    );
+
     for (const entry of entries) {
+      if (created >= perRunCap) {
+        // Cap reached — remaining new meetings will be picked up on the
+        // next run. Prevents a backfill batch from exceeding the
+        // function's maxDuration.
+        console.log(
+          `[meeting-summary] cap reached (${perRunCap}); remaining new meetings deferred to next run`,
+        );
+        break;
+      }
       if (existingSourceIds.has(entry.source_id)) {
         console.log(
           `[meeting-summary] skip existing source_id=${entry.source_id}`,
@@ -177,6 +204,7 @@ export async function handleRunMeetingSummary(
         continue;
       }
 
+      const meetingStart = Date.now();
       try {
         const summary = await summarizeMeeting(entry, cfg, {
           fetchPdf,
@@ -206,13 +234,13 @@ export async function handleRunMeetingSummary(
         await emitCreationEvents(ctx, CRON_ACTOR, state);
 
         console.log(
-          `[meeting-summary] created process=${newProcess.id} source_id=${entry.source_id} blocks=${summary.blocks.length}`,
+          `[meeting-summary] created process=${newProcess.id} source_id=${entry.source_id} blocks=${summary.blocks.length} duration_ms=${Date.now() - meetingStart}`,
         );
         created += 1;
       } catch (err) {
         const msg = err instanceof Error ? err.message : "unknown error";
         console.warn(
-          `[meeting-summary] failed source_id=${entry.source_id} error=${msg}`,
+          `[meeting-summary] failed source_id=${entry.source_id} error=${msg} duration_ms=${Date.now() - meetingStart}`,
         );
         failed += 1;
       }
