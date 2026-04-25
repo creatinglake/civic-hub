@@ -184,10 +184,11 @@ export default function AdminMeetingSummaries() {
           >
             &larr; Back to Meeting summaries
           </button>
-          <h1>Review: {selected.meeting_title}</h1>
+          <h1>
+            Review: {selected.meeting_title} — {formatDate(selected.meeting_date)}
+          </h1>
           <p className="admin-subtitle">
-            Status: <StatusChip status={selected.approval_status} /> ·
-            Meeting date {formatDate(selected.meeting_date)} · Generated{" "}
+            Status: <StatusChip status={selected.approval_status} /> · Generated{" "}
             {formatDateTime(selected.generated_at)}
           </p>
 

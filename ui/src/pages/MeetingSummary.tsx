@@ -64,12 +64,15 @@ export default function MeetingSummaryPage() {
       </Link>
       <header className="meeting-header">
         <p className="meeting-eyebrow">Meeting summary</p>
-        <h1>{summary.meeting_title}</h1>
-        <p className="meeting-meta">
+        <h1>
+          {summary.meeting_title}
+          {" — "}
           <time dateTime={summary.meeting_date}>
             {formatDate(summary.meeting_date)}
-          </time>{" "}
-          · Published{" "}
+          </time>
+        </h1>
+        <p className="meeting-meta">
+          Published{" "}
           <time dateTime={summary.published_at}>
             {formatDate(summary.published_at)}
           </time>
