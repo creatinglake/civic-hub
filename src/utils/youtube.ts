@@ -1,31 +1,28 @@
 // YouTube helpers — transcript fetch + video-id extraction.
 //
-// Uses the unofficial `youtube-transcript` library (no API key required)
-// which consumes YouTube's public `timedtext` endpoint. This endpoint is
-// not part of the official YouTube Data API v3 — the official path
-// (`captions.download`) requires OAuth2 and is unworkable for a server-
-// side cron.
+// Two transcript paths, picked at call time based on env vars:
 //
-// Fragility notice: the public `timedtext` endpoint can change without
-// notice. If it breaks, the per-meeting pipeline logs the failure and
-// falls back to PDF-only summarization rather than crashing the whole
-// cron run. Flagged in HANDOFF.md.
+// 1) SearchAPI.io (preferred when SEARCHAPI_API_KEY is set).
+//    Wraps "give me transcripts for this YouTube URL" into one HTTPS
+//    call. The service runs from residential IPs so YouTube's anti-
+//    scraping defenses don't challenge it. This is the production
+//    path on Vercel — Vercel's cloud IPs get captcha-challenged when
+//    they hit YouTube directly.
 //
-// YOUTUBE_API_KEY env var is reserved for a future slice that wants to
-// validate video existence or pull metadata via the official API; it's
-// unused in MVP.
+// 2) `youtube-transcript` library (fallback when no SearchAPI key).
+//    Consumes YouTube's public `timedtext` endpoint directly — works
+//    from residential IPs (local dev) but typically fails on cloud
+//    hosts. Kept around so dev / non-Vercel hosts still work.
+//
+// Either way the pipeline catches transcript failures and falls back to
+// PDF-only summarization (with a warning log) — a transcript outage
+// degrades quality, never breaks the run.
 
 // The `youtube-transcript` package declares "type": "module" but its
 // "main" entry is a CJS-style bundle with `exports.X = ...` assignments,
 // which Node cannot expose as named ESM imports. Pointing at the ESM
 // build directly is the robust workaround and survives package updates
 // so long as the ESM file name stays stable.
-//
-// The package's type definitions only cover the root entry, not the
-// deep ESM path — declare it as `any` so tsc accepts the import.
-// `YoutubeTranscript.fetchTranscript` is still shaped well enough for
-// our one use site; we map it through the `TranscriptSegment` type
-// below.
 // @ts-expect-error — deep import has no declaration file; see above
 import { YoutubeTranscript } from "youtube-transcript/dist/youtube-transcript.esm.js";
 import type { TranscriptSegment } from "../modules/civic.meeting_summary/index.js";
@@ -51,10 +48,17 @@ export function extractVideoId(watchUrl: string): string | null {
   }
 }
 
+const SEARCHAPI_TIMEOUT_MS = 60_000;
+
 /**
  * Fetch the auto-transcript for a YouTube watch URL. Throws on any
  * error (no transcript available, video private, endpoint changed
  * upstream). Callers catch and treat as "no transcript."
+ *
+ * Routes through SearchAPI.io when SEARCHAPI_API_KEY is set; falls back
+ * to the unofficial youtube-transcript library otherwise. The fallback
+ * works in local dev but typically fails on cloud hosts (Vercel etc.)
+ * because YouTube blocks programmatic access from data-center IPs.
  */
 export async function fetchYouTubeTranscript(
   watchUrl: string,
@@ -63,9 +67,97 @@ export async function fetchYouTubeTranscript(
   if (!id) {
     throw new Error(`Invalid YouTube watch URL: ${watchUrl}`);
   }
-  // library's response type: { text, duration, offset } where offset
-  // is in milliseconds.
-  const raw = await YoutubeTranscript.fetchTranscript(id, { lang: "en" });
+
+  const key = process.env.SEARCHAPI_API_KEY?.trim();
+  if (key) {
+    return fetchViaSearchApi(id, key);
+  }
+  return fetchViaLibrary(id);
+}
+
+/**
+ * Hit SearchAPI's youtube_transcripts engine. Documented response shape
+ * (as of 2026-04):
+ *
+ *   {
+ *     "transcripts": [
+ *       { "text": "...", "start": 0.5, "duration": 2.3 },
+ *       ...
+ *     ]
+ *   }
+ *
+ * The endpoint can return additional metadata fields we ignore. Time
+ * values are in seconds (floats); we round `start` to integer seconds
+ * to match the rest of our pipeline.
+ */
+async function fetchViaSearchApi(
+  videoId: string,
+  apiKey: string,
+): Promise<TranscriptSegment[]> {
+  const url = new URL("https://www.searchapi.io/api/v1/search");
+  url.searchParams.set("engine", "youtube_transcripts");
+  url.searchParams.set("video_id", videoId);
+  url.searchParams.set("lang", "en");
+
+  const controller = new AbortController();
+  const t = setTimeout(() => controller.abort(), SEARCHAPI_TIMEOUT_MS);
+  let res: Response;
+  try {
+    res = await fetch(url.toString(), {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        Accept: "application/json",
+      },
+      signal: controller.signal,
+    });
+  } catch (err) {
+    if (err instanceof Error && err.name === "AbortError") {
+      throw new Error(
+        `SearchAPI transcript fetch exceeded ${SEARCHAPI_TIMEOUT_MS}ms — aborted`,
+      );
+    }
+    throw err;
+  } finally {
+    clearTimeout(t);
+  }
+
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(
+      `SearchAPI ${res.status}: ${body.slice(0, 300)}`,
+    );
+  }
+
+  const data = (await res.json()) as {
+    transcripts?: Array<{ text?: unknown; start?: unknown }>;
+    error?: string;
+  };
+
+  if (data.error) {
+    throw new Error(`SearchAPI error: ${data.error}`);
+  }
+
+  const raw = Array.isArray(data.transcripts) ? data.transcripts : [];
+  const out: TranscriptSegment[] = [];
+  for (const seg of raw) {
+    const text = typeof seg.text === "string" ? seg.text : "";
+    if (text.trim().length === 0) continue;
+    const start =
+      typeof seg.start === "number" && Number.isFinite(seg.start) && seg.start >= 0
+        ? Math.max(0, Math.round(seg.start))
+        : 0;
+    out.push({ start, text });
+  }
+  return out;
+}
+
+/**
+ * Fallback path — uses the unofficial library. Works locally; usually
+ * fails on Vercel (YouTube anti-bot challenges cloud IPs).
+ */
+async function fetchViaLibrary(videoId: string): Promise<TranscriptSegment[]> {
+  const raw = await YoutubeTranscript.fetchTranscript(videoId, { lang: "en" });
   const out: TranscriptSegment[] = [];
   for (const seg of raw) {
     const text = typeof seg.text === "string" ? seg.text : "";
