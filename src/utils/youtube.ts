@@ -152,12 +152,31 @@ async function fetchViaSearchApi(
   return out;
 }
 
+const LIBRARY_TIMEOUT_MS = 30_000;
+
 /**
  * Fallback path — uses the unofficial library. Works locally; usually
- * fails on Vercel (YouTube anti-bot challenges cloud IPs).
+ * fails on Vercel (YouTube anti-bot challenges cloud IPs). The library
+ * can hang silently when YouTube returns a captcha challenge instead of
+ * a real error, so we wrap it in a hard 30-second timeout — better to
+ * report "no transcript" and move on than to burn the whole Vercel
+ * function budget on a single hung fetch.
  */
 async function fetchViaLibrary(videoId: string): Promise<TranscriptSegment[]> {
-  const raw = await YoutubeTranscript.fetchTranscript(videoId, { lang: "en" });
+  const raw = await Promise.race([
+    YoutubeTranscript.fetchTranscript(videoId, { lang: "en" }),
+    new Promise<never>((_, reject) =>
+      setTimeout(
+        () =>
+          reject(
+            new Error(
+              `youtube-transcript library exceeded ${LIBRARY_TIMEOUT_MS}ms — likely cloud-IP block; set SEARCHAPI_API_KEY to use the SearchAPI path instead`,
+            ),
+          ),
+        LIBRARY_TIMEOUT_MS,
+      ),
+    ),
+  ]);
   const out: TranscriptSegment[] = [];
   for (const seg of raw) {
     const text = typeof seg.text === "string" ? seg.text : "";
