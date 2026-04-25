@@ -335,27 +335,43 @@ export default function AdminMeetingSummaries() {
                       disabled={!isPending}
                     />
                   </label>
-                  <label className="meeting-block-field meeting-block-field-inline">
-                    <span>Timestamp (HH:MM:SS)</span>
-                    <input
-                      type="text"
-                      className="form-input"
-                      value={
-                        block.start_time_seconds === null
-                          ? ""
-                          : formatSeconds(block.start_time_seconds)
-                      }
-                      onChange={(e) =>
-                        updateBlock(i, {
-                          start_time_seconds: parseTimeInput(e.target.value),
-                        })
-                      }
-                      disabled={!isPending || !selected.source_video_url}
-                      placeholder={
-                        selected.source_video_url ? "00:00:00" : "n/a"
-                      }
-                    />
-                  </label>
+                  <div className="meeting-block-field meeting-block-field-inline">
+                    <label className="meeting-block-field">
+                      <span>Timestamp (HH:MM:SS)</span>
+                      <input
+                        type="text"
+                        className="form-input"
+                        value={
+                          block.start_time_seconds === null
+                            ? ""
+                            : formatSeconds(block.start_time_seconds)
+                        }
+                        onChange={(e) =>
+                          updateBlock(i, {
+                            start_time_seconds: parseTimeInput(e.target.value),
+                          })
+                        }
+                        disabled={!isPending || !selected.source_video_url}
+                        placeholder={
+                          selected.source_video_url ? "00:00:00" : "n/a"
+                        }
+                      />
+                    </label>
+                    {block.start_time_seconds !== null &&
+                      selected.source_video_url && (
+                        <a
+                          className="meeting-block-watch-link"
+                          href={youTubeAtTime(
+                            selected.source_video_url,
+                            block.start_time_seconds,
+                          )}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          Open at this moment ↗
+                        </a>
+                      )}
+                  </div>
                   <label className="meeting-block-field">
                     <span>Action taken (optional)</span>
                     <input
@@ -567,6 +583,16 @@ function formatSeconds(total: number): string {
   const s = total % 60;
   const pad = (n: number) => String(n).padStart(2, "0");
   return `${pad(h)}:${pad(m)}:${pad(s)}`;
+}
+
+function youTubeAtTime(watchUrl: string, seconds: number): string {
+  try {
+    const u = new URL(watchUrl);
+    u.searchParams.set("t", `${Math.max(0, Math.floor(seconds))}s`);
+    return u.toString();
+  } catch {
+    return watchUrl;
+  }
 }
 
 /** Parse HH:MM:SS, MM:SS, or plain seconds. Returns null on empty. */

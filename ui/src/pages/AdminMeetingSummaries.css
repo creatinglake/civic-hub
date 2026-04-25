@@ -115,5 +115,19 @@
 }
 
 .meeting-block-field-inline {
-  max-width: 240px;
+  max-width: 320px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.meeting-block-watch-link {
+  font-size: var(--font-size-sm);
+  color: var(--color-primary);
+  text-decoration: none;
+  align-self: flex-start;
+}
+
+.meeting-block-watch-link:hover {
+  text-decoration: underline;
 }
