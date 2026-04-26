@@ -43,7 +43,7 @@ function AppContent() {
       <BannerSlot />
       <Nav />
 
-      <main>
+      <main className="page-shell">
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/votes" element={<Votes />} />

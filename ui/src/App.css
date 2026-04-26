@@ -1,17 +1,25 @@
 /* Civic Hub — UI styles with CSS variable theming */
 
 .app {
-  max-width: 800px;
   margin: 0 auto;
-  background: var(--background-color);
+  background: var(--color-bg);
   min-height: 100vh;
+}
+
+/* Page shell — caps content width on wide viewports while letting
+   sticky/full-bleed surfaces (nav, banner, footer) stretch edge-to-edge.
+   Inner pages provide their own horizontal padding (e.g. .feed,
+   .hub-info, .section) so the shell stays a pure width cap. */
+.page-shell {
+  max-width: var(--max-width-shell);
+  margin: 0 auto;
 }
 
 /* --- Hub banner + info --- */
 
 .hub-banner {
   width: 100%;
-  height: 200px;
+  height: 240px;
   overflow: hidden;
 }
 
@@ -24,39 +32,47 @@
 }
 
 .hub-info {
-  padding: 1.5rem 1.5rem 2rem;
+  padding: var(--space-lg) var(--space-md) var(--space-xl);
 }
 
 .hub-name {
   margin: 0;
-  font-size: 1.6rem;
-  color: var(--text-color);
-  line-height: 1.2;
+  font-family: var(--font-heading);
+  font-size: var(--font-size-3xl);
+  color: var(--color-text);
+  line-height: var(--line-height-tight);
+  font-weight: 600;
+  letter-spacing: -0.01em;
 }
 
 .hub-label {
   display: block;
-  font-size: 1.2rem;
+  font-family: var(--font-body);
+  font-size: var(--font-size-base);
   color: var(--color-brand);
   font-weight: 600;
-  margin-top: 0.2rem;
-  letter-spacing: 0.01em;
+  margin-top: var(--space-xs);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
 .hub-tagline {
-  margin: 0.75rem 0 0.25rem;
-  color: var(--light-text);
-  font-size: 0.95rem;
-  line-height: 1.4;
+  margin: var(--space-md) 0 0;
+  max-width: 720px;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-base);
+  line-height: var(--line-height-relaxed);
 }
 
 /* --- Footer --- */
 
 .app-footer {
   text-align: center;
-  padding: 2rem 1.5rem 1.5rem;
-  font-size: 0.8rem;
-  color: var(--light-text);
+  padding: var(--space-xl) var(--space-md) var(--space-lg);
+  max-width: var(--max-width-shell);
+  margin: 0 auto;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-subtle);
 }
 
 .app-footer a {

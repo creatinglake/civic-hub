@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { getAnnouncement, type Announcement } from "../services/api";
 import { useAuth } from "../context/AuthContext";
+import { relativeTime, absoluteTime } from "../components/FeedPost";
 import "./Announcement.css";
 
 export default function AnnouncementPage() {
@@ -75,15 +76,21 @@ export default function AnnouncementPage() {
         </p>
         <h1>{announcement.title}</h1>
         <p className="announcement-meta">
-          Posted by {roleLabel} on{" "}
-          <time dateTime={announcement.created_at}>
-            {formatDate(announcement.created_at)}
+          Posted by {roleLabel}{" "}
+          <time
+            dateTime={announcement.created_at}
+            title={absoluteTime(announcement.created_at)}
+          >
+            {relativeTime(announcement.created_at)}
           </time>
           {wasEdited && announcement.last_edited_at && (
             <>
               {" · Last edited "}
-              <time dateTime={announcement.last_edited_at}>
-                {formatDate(announcement.last_edited_at)}
+              <time
+                dateTime={announcement.last_edited_at}
+                title={absoluteTime(announcement.last_edited_at)}
+              >
+                {relativeTime(announcement.last_edited_at)}
               </time>
             </>
           )}
@@ -132,10 +139,3 @@ export default function AnnouncementPage() {
   );
 }
 
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString(undefined, {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
-}

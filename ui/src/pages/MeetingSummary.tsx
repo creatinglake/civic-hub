@@ -4,6 +4,7 @@ import {
   getMeetingSummary,
   type PublicMeetingSummary,
 } from "../services/api";
+import { relativeTime, absoluteTime } from "../components/FeedPost";
 import "./MeetingSummary.css";
 
 export default function MeetingSummaryPage() {
@@ -73,8 +74,11 @@ export default function MeetingSummaryPage() {
         </h1>
         <p className="meeting-meta">
           Published{" "}
-          <time dateTime={summary.published_at}>
-            {formatDate(summary.published_at)}
+          <time
+            dateTime={summary.published_at}
+            title={absoluteTime(summary.published_at)}
+          >
+            {relativeTime(summary.published_at)}
           </time>
         </p>
       </header>

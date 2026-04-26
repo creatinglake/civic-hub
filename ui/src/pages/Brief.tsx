@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { getPublicBrief, type PublicBrief } from "../services/api";
+import { relativeTime, absoluteTime } from "../components/FeedPost";
 import "./Brief.css";
 
 export default function BriefPage() {
@@ -62,8 +63,11 @@ export default function BriefPage() {
         <h1>{brief.title}</h1>
         <p className="brief-meta">
           Published{" "}
-          <time dateTime={brief.published_at}>
-            {formatDate(brief.published_at)}
+          <time
+            dateTime={brief.published_at}
+            title={absoluteTime(brief.published_at)}
+          >
+            {relativeTime(brief.published_at)}
           </time>{" "}
           · {brief.participation_count} resident
           {brief.participation_count === 1 ? "" : "s"} participated ·{" "}
@@ -116,10 +120,3 @@ export default function BriefPage() {
   );
 }
 
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString(undefined, {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
-}

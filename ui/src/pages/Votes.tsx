@@ -96,7 +96,11 @@ export default function Votes() {
           <section className="section">
             <h2 className="section-title">Active Votes</h2>
             {activeVotes.length === 0 ? (
-              <p className="empty-state-inline">No active votes.</p>
+              <p className="empty-state-inline">
+                {completedVotes.length === 0
+                  ? "Nothing here yet. Come back soon — the first issues will launch shortly."
+                  : "No active votes right now. When the Board asks for resident input, it'll show up here."}
+              </p>
             ) : (
               <ul className="process-list">
                 {activeVotes.map((v) => (

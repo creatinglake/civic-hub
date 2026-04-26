@@ -1,6 +1,6 @@
 .feed {
-  padding: var(--space-lg);
-  max-width: 640px;
+  padding: var(--space-lg) var(--space-md);
+  max-width: var(--max-width-feed);
   margin: 0 auto;
 }
 
@@ -10,10 +10,15 @@
   font-size: var(--font-size-base);
   text-align: center;
   padding: var(--space-xl) var(--space-md);
+  line-height: var(--line-height-relaxed);
 }
 
 .feed-status-error {
   color: var(--color-text);
+}
+
+.feed-status a {
+  color: var(--color-primary);
 }
 
 .feed-list {
@@ -34,11 +39,12 @@
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-card);
-  transition: border-color 0.15s;
+  transition: border-color 0.15s, box-shadow 0.15s;
 }
 
 .feed-post:hover {
-  border-color: var(--color-border-hover);
+  border-color: var(--color-border-strong);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
 }
 
 .feed-post-link {
@@ -55,26 +61,80 @@
   border-radius: var(--radius-md);
 }
 
+/* --- Title row with side pill ---
+ *
+ * Title and pill share a flex row with `align-items: flex-start`.
+ * The pill keeps its intrinsic width and never pushes the title into
+ * ellipsis. On narrow viewports the row wraps and the pill drops below
+ * the title, right-aligned via the `margin-left: auto` on the pill.
+ */
+.feed-post-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+  margin: 0 0 var(--space-sm);
+}
+
 .feed-post-title {
-  margin: 0 0 var(--space-xs);
+  margin: 0;
   font-family: var(--font-heading);
-  font-size: var(--font-size-lg);
+  font-size: var(--font-size-2xl);
+  font-weight: 600;
   line-height: var(--line-height-tight);
   color: var(--color-text);
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 .feed-post-summary {
   margin: 0 0 var(--space-sm);
+  font-family: var(--font-body);
   font-size: var(--font-size-base);
-  line-height: var(--line-height-base);
+  line-height: var(--line-height-normal);
   color: var(--color-text-muted);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .feed-post-time {
   display: block;
-  font-size: var(--font-size-sm);
+  font-family: var(--font-body);
+  font-size: var(--font-size-xs);
   color: var(--color-text-subtle);
 }
+
+/* --- Pill ---
+ *
+ * Color-coded by post kind. Each modifier is paired with a token pair
+ * in theme.css (--pill-<kind>-bg / --pill-<kind>-fg) so the palette can
+ * be re-skinned without touching this file.
+ */
+.feed-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 10px;
+  margin-left: auto;
+  border-radius: var(--radius-pill);
+  font-family: var(--font-body);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.feed-pill--vote-open    { background: var(--pill-vote-bg);         color: var(--pill-vote-fg); }
+.feed-pill--vote-results { background: var(--pill-results-bg);      color: var(--pill-results-fg); }
+.feed-pill--brief        { background: var(--pill-brief-bg);        color: var(--pill-brief-fg); }
+.feed-pill--announcement { background: var(--pill-announcement-bg); color: var(--pill-announcement-fg); }
+.feed-pill--meeting      { background: var(--pill-meeting-bg);      color: var(--pill-meeting-fg); }
+
+/* --- Load more --- */
 
 .feed-load-more-row {
   display: flex;
@@ -83,6 +143,7 @@
 }
 
 .feed-load-more {
+  min-height: 44px;
   padding: var(--space-sm) var(--space-lg);
   background: var(--color-surface);
   color: var(--color-text);
@@ -95,7 +156,7 @@
 }
 
 .feed-load-more:hover {
-  border-color: var(--color-border-hover);
+  border-color: var(--color-border-strong);
 }
 
 .feed-load-more:focus-visible {

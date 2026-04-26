@@ -1,70 +1,288 @@
-import { NavLink } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
+import { Link, NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import AuthModal from "./AuthModal";
+import hub from "../config/hub";
 import "./Nav.css";
+
+const PRIMARY_LINKS: ReadonlyArray<{ to: string; label: string; end?: boolean }> = [
+  { to: "/", label: "Feed", end: true },
+  { to: "/votes", label: "Votes" },
+  { to: "/about", label: "About" },
+];
+
+// Six muted, accessible-on-white background colors for the avatar circle.
+// Foreground (initial letter) is always white; backgrounds are saturated
+// enough to give white text >= 4.5:1 contrast.
+const AVATAR_COLORS = [
+  "#1e3a5f", // brand navy
+  "#0f5a55", // teal
+  "#8c3210", // terracotta
+  "#0f4a26", // forest
+  "#5b21b6", // violet
+  "#a16207", // ochre
+] as const;
+
+function avatarColor(seed: string): string {
+  let hash = 0;
+  for (let i = 0; i < seed.length; i++) {
+    hash = (hash * 31 + seed.charCodeAt(i)) >>> 0;
+  }
+  return AVATAR_COLORS[hash % AVATAR_COLORS.length];
+}
 
 export default function Nav() {
   const { user, logout, isAdmin, canPostAnnouncements } = useAuth();
+  const navigate = useNavigate();
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [showAuth, setShowAuth] = useState(false);
+
+  const avatarRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const drawerRef = useRef<HTMLDivElement>(null);
+  const hamburgerRef = useRef<HTMLButtonElement>(null);
+
+  // Close menu / drawer on click-outside or Escape.
+  useEffect(() => {
+    if (!menuOpen && !drawerOpen) return;
+    function handlePointer(e: MouseEvent) {
+      const target = e.target as Node;
+      if (menuOpen) {
+        if (
+          !menuRef.current?.contains(target) &&
+          !avatarRef.current?.contains(target)
+        ) {
+          setMenuOpen(false);
+        }
+      }
+      if (drawerOpen) {
+        if (
+          !drawerRef.current?.contains(target) &&
+          !hamburgerRef.current?.contains(target)
+        ) {
+          setDrawerOpen(false);
+        }
+      }
+    }
+    function handleKey(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        if (menuOpen) {
+          setMenuOpen(false);
+          avatarRef.current?.focus();
+        }
+        if (drawerOpen) {
+          setDrawerOpen(false);
+          hamburgerRef.current?.focus();
+        }
+      }
+    }
+    document.addEventListener("mousedown", handlePointer);
+    document.addEventListener("keydown", handleKey);
+    return () => {
+      document.removeEventListener("mousedown", handlePointer);
+      document.removeEventListener("keydown", handleKey);
+    };
+  }, [menuOpen, drawerOpen]);
+
+  // Arrow-key navigation inside the menu.
+  function handleMenuKey(e: React.KeyboardEvent<HTMLDivElement>) {
+    const items = Array.from(
+      menuRef.current?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? [],
+    );
+    if (items.length === 0) return;
+    const currentIndex = items.indexOf(document.activeElement as HTMLElement);
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      const next = items[(currentIndex + 1 + items.length) % items.length];
+      next?.focus();
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      const prev = items[(currentIndex - 1 + items.length) % items.length];
+      prev?.focus();
+    } else if (e.key === "Home") {
+      e.preventDefault();
+      items[0]?.focus();
+    } else if (e.key === "End") {
+      e.preventDefault();
+      items[items.length - 1]?.focus();
+    } else if (e.key === "Tab") {
+      setMenuOpen(false);
+    }
+  }
+
+  function selectMenuItem(action: () => void) {
+    setMenuOpen(false);
+    action();
+  }
+
+  function handleLogout() {
+    logout();
+    navigate("/");
+  }
+
+  const initial = user?.email?.[0]?.toUpperCase() ?? "?";
+  const bg = user ? avatarColor(user.email) : AVATAR_COLORS[0];
 
   return (
-    <nav className="civic-nav" aria-label="Primary">
-      <ul className="civic-nav-links">
-        <li>
-          <NavLink to="/" end className={navLinkClass}>
-            Feed
-          </NavLink>
-        </li>
-        <li>
-          <NavLink to="/votes" className={navLinkClass}>
-            Votes
-          </NavLink>
-        </li>
-        <li>
-          <NavLink to="/about" className={navLinkClass}>
-            About
-          </NavLink>
-        </li>
-      </ul>
-      <div className="civic-nav-right">
-        {canPostAnnouncements && (
-          <NavLink
-            to="/announcement/new"
-            className={({ isActive }) =>
-              `civic-nav-link civic-nav-link-post${isActive ? " is-active" : ""}`
-            }
-          >
-            Post Announcement
-          </NavLink>
-        )}
-        {isAdmin && (
-          <NavLink
-            to="/admin/proposals"
-            className={({ isActive }) =>
-              `civic-nav-link civic-nav-link-admin${isActive ? " is-active" : ""}`
-            }
-          >
-            Admin
-          </NavLink>
-        )}
-        {user && (
-          <NavLink
-            to="/settings"
-            className={({ isActive }) =>
-              `civic-nav-link civic-nav-link-settings${isActive ? " is-active" : ""}`
-            }
-          >
-            Settings
-          </NavLink>
-        )}
-        {user && (
-          <div className="civic-nav-user">
-            <span className="civic-nav-user-email">{user.email}</span>
-            <button className="civic-nav-logout" onClick={logout}>
-              Log out
+    <>
+      <nav className="civic-nav" aria-label="Primary">
+        <div className="civic-nav-inner">
+          <div className="civic-nav-left">
+            <button
+              ref={hamburgerRef}
+              type="button"
+              className="civic-nav-hamburger"
+              aria-label="Open menu"
+              aria-expanded={drawerOpen}
+              aria-controls="civic-nav-drawer"
+              onClick={() => setDrawerOpen((v) => !v)}
+            >
+              <span aria-hidden="true">
+                <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+                  <line x1="3" y1="6" x2="19" y2="6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                  <line x1="3" y1="11" x2="19" y2="11" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                  <line x1="3" y1="16" x2="19" y2="16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                </svg>
+              </span>
             </button>
+
+            <Link to="/" className="civic-nav-wordmark" aria-label={`${hub.jurisdiction} home`}>
+              Floyd Civic Hub
+            </Link>
+
+            <ul className="civic-nav-links" role="list">
+              {PRIMARY_LINKS.map((l) => (
+                <li key={l.to}>
+                  <NavLink to={l.to} end={l.end} className={navLinkClass}>
+                    {l.label}
+                  </NavLink>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          <div className="civic-nav-right">
+            {user ? (
+              <>
+                <button
+                  ref={avatarRef}
+                  type="button"
+                  className="civic-nav-avatar"
+                  style={{ background: bg }}
+                  aria-label={`Account menu for ${user.email}`}
+                  aria-haspopup="menu"
+                  aria-expanded={menuOpen}
+                  aria-controls="civic-nav-menu"
+                  onClick={() => setMenuOpen((v) => !v)}
+                >
+                  <span aria-hidden="true">{initial}</span>
+                </button>
+                {menuOpen && (
+                  <div
+                    ref={menuRef}
+                    id="civic-nav-menu"
+                    className="civic-nav-menu"
+                    role="menu"
+                    aria-label="Account menu"
+                    onKeyDown={handleMenuKey}
+                  >
+                    <div className="civic-nav-menu-header" role="presentation">
+                      Signed in as
+                      <div className="civic-nav-menu-email">{user.email}</div>
+                    </div>
+                    <div className="civic-nav-menu-divider" role="separator" />
+                    <button
+                      type="button"
+                      role="menuitem"
+                      className="civic-nav-menu-item"
+                      onClick={() => selectMenuItem(() => navigate("/settings"))}
+                    >
+                      Settings
+                    </button>
+                    {canPostAnnouncements && (
+                      <button
+                        type="button"
+                        role="menuitem"
+                        className="civic-nav-menu-item"
+                        onClick={() =>
+                          selectMenuItem(() => navigate("/announcement/new"))
+                        }
+                      >
+                        Post announcement
+                      </button>
+                    )}
+                    {isAdmin && (
+                      <button
+                        type="button"
+                        role="menuitem"
+                        className="civic-nav-menu-item"
+                        onClick={() =>
+                          selectMenuItem(() => navigate("/admin/proposals"))
+                        }
+                      >
+                        Admin panel
+                      </button>
+                    )}
+                    <div className="civic-nav-menu-divider" role="separator" />
+                    <button
+                      type="button"
+                      role="menuitem"
+                      className="civic-nav-menu-item civic-nav-menu-item-danger"
+                      onClick={() => selectMenuItem(handleLogout)}
+                    >
+                      Log out
+                    </button>
+                  </div>
+                )}
+              </>
+            ) : (
+              <button
+                type="button"
+                className="civic-nav-signin"
+                onClick={() => setShowAuth(true)}
+              >
+                Sign in
+              </button>
+            )}
+          </div>
+        </div>
+
+        {drawerOpen && (
+          <div
+            ref={drawerRef}
+            id="civic-nav-drawer"
+            className="civic-nav-drawer"
+            role="dialog"
+            aria-label="Site navigation"
+          >
+            <ul className="civic-nav-drawer-links" role="list">
+              {PRIMARY_LINKS.map((l) => (
+                <li key={l.to}>
+                  <NavLink
+                    to={l.to}
+                    end={l.end}
+                    className={({ isActive }) =>
+                      `civic-nav-drawer-link${isActive ? " is-active" : ""}`
+                    }
+                    onClick={() => setDrawerOpen(false)}
+                  >
+                    {l.label}
+                  </NavLink>
+                </li>
+              ))}
+            </ul>
           </div>
         )}
-      </div>
-    </nav>
+      </nav>
+
+      {showAuth && (
+        <AuthModal
+          onComplete={() => setShowAuth(false)}
+          onDismiss={() => setShowAuth(false)}
+        />
+      )}
+    </>
   );
 }
 

@@ -193,7 +193,10 @@ export default function AdminProposals() {
         {loading && <p>Loading...</p>}
 
         {!loading && proposals.length === 0 && (
-          <p className="empty-state-inline">No proposals to review.</p>
+          <p className="empty-state-inline">
+            No proposals yet. Resident-submitted issues land here for admin
+            review before becoming votes.
+          </p>
         )}
 
         {!loading && proposals.length > 0 && (

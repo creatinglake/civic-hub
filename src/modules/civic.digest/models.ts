@@ -61,6 +61,13 @@ export type DigestItemKind =
 export interface DigestItem {
   kind: DigestItemKind;
   title: string;
+  /**
+   * Short uppercase label rendered as a colored pill to the right of the
+   * title in the HTML email — mirrors the web feed's per-post pill.
+   * For announcements this carries the role-aware label
+   * ("Admin announcement", "Board member announcement", etc.).
+   */
+  pill_label: string;
   /** 1–2 line plain-text summary shown under the title. May be empty. */
   summary: string;
   /** Absolute URL the "Read more" link points to (event.action_url). */

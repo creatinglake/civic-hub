@@ -4,6 +4,12 @@
 // list of already-filtered events, and hub context. The service returns
 // a fully-formed DigestEmail ready to hand to the mailer, or null when
 // the user has no new activity to report.
+//
+// Email rendering mirrors the web feed (Slice 8): title-first per item,
+// a colored pill on the right indicating the post type, and a 1-line
+// summary below. Pill colors are inlined as hex literals — email clients
+// don't read CSS variables — and intentionally match the --pill-*
+// tokens defined in the UI's theme.css.
 
 import {
   classifyItemKind,
@@ -66,7 +72,7 @@ function eventToItem(
 ): DigestItem {
   const d = event.data as {
     process?: { title?: unknown };
-    announcement?: { title?: unknown; body_preview?: unknown };
+    announcement?: { title?: unknown; body_preview?: unknown; author_role?: unknown };
     brief_id?: unknown;
     headline_result?: unknown;
     participation_count?: unknown;
@@ -93,11 +99,13 @@ function eventToItem(
 
   let title: string;
   let summary: string;
+  let pill_label: string;
 
   switch (kind) {
     case "vote_opened": {
       title = rawTitle ?? "New vote open";
       summary = "New vote now open — cast your ballot.";
+      pill_label = "Vote open";
       break;
     }
     case "vote_result_published": {
@@ -106,6 +114,7 @@ function eventToItem(
       const noun = total === 1 ? "participant" : "participants";
       title = rawTitle ?? "Vote results published";
       summary = `Results published · ${total} ${noun}.`;
+      pill_label = "Vote results";
       break;
     }
     case "brief_published": {
@@ -120,6 +129,7 @@ function eventToItem(
       summary = headline
         ? `Civic Brief delivered · ${count} ${noun} — ${headline}`
         : `Civic Brief delivered · ${count} ${noun} participated.`;
+      pill_label = "Civic Brief";
       break;
     }
     case "announcement": {
@@ -129,6 +139,26 @@ function eventToItem(
           : "";
       title = rawTitle ?? "New announcement";
       summary = truncate(preview, 160);
+      // Match the feed's role-aware pill: legacy "board" normalizes to
+      // "Board member"; admin always reads "Admin announcement"; any
+      // other free-form label suffixes "announcement".
+      const rawRole =
+        typeof d?.announcement?.author_role === "string"
+          ? d.announcement.author_role
+          : null;
+      // Match the feed's normalization: legacy lowercase "admin" and
+      // missing role both become "Admin"; "board" becomes "Board
+      // member"; anything else is rendered verbatim.
+      const normalized =
+        rawRole === "board"
+          ? "Board member"
+          : rawRole === "admin" || !rawRole
+          ? "Admin"
+          : rawRole;
+      pill_label =
+        normalized === "Admin"
+          ? "Admin announcement"
+          : `${normalized} announcement`;
       break;
     }
     case "meeting_summary_published": {
@@ -151,8 +181,9 @@ function eventToItem(
           : 0;
       const dateLabel = formatMeetingDate(meetingDate);
       const topicsNoun = blockCount === 1 ? "topic" : "topics";
-      title = `Meeting summary: ${dateLabel}`;
-      summary = `${meetingTitle} — ${blockCount} ${topicsNoun} covered.`;
+      title = meetingTitle;
+      summary = `${dateLabel} · ${blockCount} ${topicsNoun} covered.`;
+      pill_label = "Meeting summary";
       break;
     }
   }
@@ -160,6 +191,7 @@ function eventToItem(
   return {
     kind,
     title,
+    pill_label,
     summary,
     action_url: event.action_url,
     timestamp: event.timestamp,
@@ -192,6 +224,24 @@ const GROUP_LABELS: Record<DigestItemKind, string> = {
   announcement: "Announcements",
 };
 
+/**
+ * Per-kind pill background/foreground hex pairs. Mirrors the
+ * --pill-<kind>-bg / --pill-<kind>-fg tokens in the UI's theme.css.
+ * Inlined as literals because email clients don't honor CSS vars.
+ */
+const PILL_COLORS: Record<DigestItemKind, { bg: string; fg: string }> = {
+  vote_opened:                { bg: "#e0ecfc", fg: "#1e3a5f" },
+  vote_result_published:      { bg: "#d6e4f7", fg: "#15325a" },
+  brief_published:            { bg: "#d4ede8", fg: "#0f5a55" },
+  meeting_summary_published:  { bg: "#d9ecd9", fg: "#0f4a26" },
+  announcement:               { bg: "#fbe5d3", fg: "#8c3210" },
+};
+
+const FONT_BODY =
+  "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+const FONT_HEADING =
+  "Fraunces, Georgia, 'Times New Roman', serif";
+
 export function formatDigestHtml(
   items: DigestItem[],
   hub: DigestHubContext,
@@ -202,42 +252,56 @@ export function formatDigestHtml(
   for (const kind of Object.keys(GROUP_LABELS) as DigestItemKind[]) {
     const group = grouped.get(kind);
     if (!group || group.length === 0) continue;
-    sections.push(renderGroupHtml(GROUP_LABELS[kind], group));
+    sections.push(renderGroupHtml(GROUP_LABELS[kind], group, kind));
   }
 
   return `<!DOCTYPE html>
 <html>
-<body style="margin:0;padding:0;background:#f5f5f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#1a1a1a;">
-  <div style="max-width:560px;margin:0 auto;padding:32px 24px;background:#ffffff;">
-    <h1 style="font-size:20px;font-weight:600;margin:0 0 8px;color:#1e3a5f;">${escapeHtml(hub.hub_name)}</h1>
-    <p style="font-size:13px;color:#888;margin:0 0 24px;">${escapeHtml(subject)}</p>
+<body style="margin:0;padding:0;background:#fafaf7;font-family:${FONT_BODY};color:#1a1a1a;">
+  <div style="max-width:600px;margin:0 auto;padding:32px 24px;background:#ffffff;">
+    <h1 style="font-family:${FONT_HEADING};font-size:24px;font-weight:600;margin:0 0 8px;color:#1e3a5f;letter-spacing:-0.005em;">${escapeHtml(hub.hub_name)}</h1>
+    <p style="font-size:13px;color:#8a8a8a;margin:0 0 24px;">${escapeHtml(subject)}</p>
     <p style="font-size:15px;line-height:1.5;margin:0 0 16px;">Hello from ${escapeHtml(hub.hub_name)},</p>
     <p style="font-size:15px;line-height:1.5;margin:0 0 24px;">Here's what's new since your last update.</p>
     ${sections.join("\n")}
-    <hr style="border:none;border-top:1px solid #e5e5e5;margin:32px 0 16px;" />
-    <p style="font-size:12px;color:#888;line-height:1.6;margin:0;">
+    <hr style="border:none;border-top:1px solid #e5e5e0;margin:32px 0 16px;" />
+    <p style="font-size:12px;color:#8a8a8a;line-height:1.6;margin:0;">
       <a href="${escapeAttr(hub.unsubscribe_url)}" style="color:#2c7be5;">Unsubscribe from this digest</a>
       &nbsp;·&nbsp;
       <a href="${escapeAttr(hub.manage_subscriptions_url)}" style="color:#2c7be5;">Manage subscriptions</a>
     </p>
-    <p style="font-size:12px;color:#888;margin:12px 0 0;">${escapeHtml(hub.postal_address)}</p>
+    <p style="font-size:12px;color:#8a8a8a;margin:12px 0 0;">${escapeHtml(hub.postal_address)}</p>
   </div>
 </body>
 </html>`;
 }
 
-function renderGroupHtml(label: string, items: DigestItem[]): string {
-  // The title itself is the click target — no separate "Read more" link.
-  // Keeping a single anchor per item makes the email skimmable and cuts
-  // visual clutter when there are several rows.
+function renderGroupHtml(
+  label: string,
+  items: DigestItem[],
+  kind: DigestItemKind,
+): string {
+  const { bg, fg } = PILL_COLORS[kind];
+  // Each row uses a 2-cell table so the pill aligns against the right
+  // edge across email clients. Inline styles only — Outlook and Gmail
+  // strip <style> blocks. Title is the click target.
   const rows = items
     .map(
       (item) => `
-        <li style="margin:0 0 14px;padding:0;list-style:none;">
-          <a href="${escapeAttr(item.action_url)}" style="color:#1e3a5f;text-decoration:none;font-weight:600;font-size:15px;line-height:1.35;display:inline-block;">${escapeHtml(item.title)}</a>
+        <li style="margin:0 0 18px;padding:0;list-style:none;">
+          <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;">
+            <tr>
+              <td valign="top" style="padding:0 12px 0 0;">
+                <a href="${escapeAttr(item.action_url)}" style="font-family:${FONT_HEADING};color:#1a1a1a;text-decoration:none;font-weight:600;font-size:18px;line-height:1.25;display:inline-block;">${escapeHtml(item.title)}</a>
+              </td>
+              <td valign="top" align="right" style="white-space:nowrap;">
+                <span style="display:inline-block;background:${bg};color:${fg};font-family:${FONT_BODY};font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;padding:3px 10px;border-radius:9999px;">${escapeHtml(item.pill_label)}</span>
+              </td>
+            </tr>
+          </table>
           ${
             item.summary
-              ? `<div style="font-size:13px;color:#555;line-height:1.45;margin:3px 0 0;">${escapeHtml(item.summary)}</div>`
+              ? `<div style="font-family:${FONT_BODY};font-size:14px;color:#595959;line-height:1.5;margin:6px 0 0;">${escapeHtml(item.summary)}</div>`
               : ""
           }
         </li>
@@ -246,8 +310,8 @@ function renderGroupHtml(label: string, items: DigestItem[]): string {
     .join("");
 
   return `
-    <section style="margin:0 0 24px;">
-      <h2 style="font-size:14px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:#555;margin:0 0 12px;">${escapeHtml(label)}</h2>
+    <section style="margin:0 0 28px;">
+      <h2 style="font-family:${FONT_BODY};font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:#595959;margin:0 0 14px;">${escapeHtml(label)}</h2>
       <ul style="margin:0;padding:0;">${rows}</ul>
     </section>
   `;
@@ -268,11 +332,10 @@ export function formatDigestText(
     const label = GROUP_LABELS[kind].toUpperCase();
     const rows = group
       .map((item) => {
-        // Plain-text counterpart of the single-link HTML: title on one
-        // line, then the URL on the next line so email clients
-        // auto-linkify it. Summary sits between them when present.
+        // Plain-text counterpart: pill label trails the title in
+        // brackets so the type signal still travels.
         const body = item.summary ? `\n  ${item.summary}` : "";
-        return `• ${item.title}${body}\n  ${item.action_url}`;
+        return `• ${item.title} [${item.pill_label}]${body}\n  ${item.action_url}`;
       })
       .join("\n\n");
     sections.push(`${label}\n${"-".repeat(label.length)}\n${rows}`);
