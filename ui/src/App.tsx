@@ -7,6 +7,7 @@ import Home from "./pages/Home";
 import Votes from "./pages/Votes";
 import Process from "./pages/Process";
 import About from "./pages/About";
+import SearchPage from "./pages/Search";
 import Propose from "./pages/Propose";
 import ProposalDetail from "./pages/ProposalDetail";
 import AdminProposals from "./pages/AdminProposals";
@@ -83,6 +84,7 @@ function AppContent() {
           <Route path="/announcement/:id" element={<AnnouncementPage />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="/about" element={<About />} />
+          <Route path="/search" element={<SearchPage />} />
         </Routes>
       </main>
 

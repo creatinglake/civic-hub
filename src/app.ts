@@ -18,6 +18,7 @@ import voteResultsRoutes from "./routes/voteResultsRoutes.js";
 import announcementRoutes from "./routes/announcementRoutes.js";
 import uploadRoutes from "./routes/uploadRoutes.js";
 import linkPreviewRoutes from "./routes/linkPreviewRoutes.js";
+import searchRoutes from "./routes/searchRoutes.js";
 import meetingSummaryRoutes, {
   meetingSummaryCronRouter,
 } from "./routes/meetingSummaryRoutes.js";
@@ -115,6 +116,11 @@ app.get("/announcements", handleListAnnouncements);
 app.use("/upload", uploadRoutes);
 app.use("/link-preview", linkPreviewRoutes);
 
+// Slice 10.5 — public full-text search across all process types.
+// Backed by Postgres FTS via the search_processes RPC (see
+// supabase/migrations/20260427200000_add_search_doc.sql).
+app.use("/search", searchRoutes);
+
 // Meeting summaries (Slice 6):
 //   /meeting-summary/:id    — public read of published summaries
 app.use("/meeting-summary", meetingSummaryRoutes);
@@ -180,6 +186,7 @@ app.get("/", (_req, res) => {
       "GET /announcements": "List announcements, newest first (optional ?limit=N)",
       "POST /upload/post-image": "Upload a featured image (multipart, authed)",
       "GET /link-preview?url=X": "Fetch (cached) OpenGraph preview for a URL",
+      "GET /search?q=X": "Full-text search across all process types (public)",
       "POST /internal/digest/run": "Cron-triggered daily email digest (CRON_SECRET bearer)",
       "GET /unsubscribe/digest?token=X": "Unsubscribe from the daily digest",
       "PATCH /user/settings/digest": "Toggle digest subscription (authed)",

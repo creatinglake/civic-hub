@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link, NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import AuthModal from "./AuthModal";
+import SearchBar from "./SearchBar";
 import hub from "../config/hub";
 import "./Nav.css";
 
@@ -163,6 +164,14 @@ export default function Nav() {
           </div>
 
           <div className="civic-nav-right">
+            {/* Slice 10.5 — desktop search bar between the primary
+             * links and the avatar / sign-in cluster. Collapsed to an
+             * icon by default; expands on click. Hidden on the mobile
+             * drawer breakpoint via CSS (.civic-nav-search). */}
+            <div className="civic-nav-search">
+              <SearchBar />
+            </div>
+
             {user ? (
               <>
                 <button
@@ -256,6 +265,15 @@ export default function Nav() {
             role="dialog"
             aria-label="Site navigation"
           >
+            {/* Slice 10.5 — search lives at the top of the mobile drawer
+             * so a tap on the hamburger surfaces both navigation and
+             * search. Submitting closes the drawer (onSubmitted). */}
+            <div className="civic-nav-drawer-search">
+              <SearchBar
+                inDrawer
+                onSubmitted={() => setDrawerOpen(false)}
+              />
+            </div>
             <ul className="civic-nav-drawer-links" role="list">
               {PRIMARY_LINKS.map((l) => (
                 <li key={l.to}>

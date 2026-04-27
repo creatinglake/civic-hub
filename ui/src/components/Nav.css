@@ -31,6 +31,25 @@
   position: relative;
 }
 
+/* Slice 10.5 — desktop search affordance lives in the right cluster.
+ * Hidden on the mobile breakpoint where the drawer surfaces it
+ * instead. The .civic-nav-search wrapper exists so the breakpoint
+ * rule lives on Nav rather than SearchBar. */
+.civic-nav-search {
+  display: flex;
+  align-items: center;
+}
+@media (max-width: 767px) {
+  .civic-nav-search {
+    display: none;
+  }
+}
+
+.civic-nav-drawer-search {
+  padding: var(--space-md);
+  border-bottom: 1px solid var(--color-border);
+}
+
 /* --- Wordmark --- */
 
 .civic-nav-wordmark {
