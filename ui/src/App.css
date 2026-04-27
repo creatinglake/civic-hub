@@ -35,6 +35,23 @@
   padding: var(--space-lg) var(--space-md) var(--space-xl);
 }
 
+/* Mobile: shorter banner so `object-fit: cover` actually crops the
+   image vertically (otherwise the photo's pale sky shows at the top
+   and reads as whitespace). Combined with object-position: center
+   bottom, the visible portion becomes the storefront, not the sky.
+   Also tighten the gap below the banner before the hero. */
+@media (max-width: 600px) {
+  .hub-banner {
+    height: 160px;
+  }
+  .hub-banner-img {
+    object-position: center bottom;
+  }
+  .hub-info {
+    padding-top: var(--space-md);
+  }
+}
+
 .hub-name {
   margin: 0;
   font-family: var(--font-heading);
