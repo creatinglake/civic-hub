@@ -13,6 +13,25 @@
       content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"
     />
     <meta name="theme-color" content="#fafaf7" />
+    <!-- Slice 11 follow-up: pre-CSS reset that loads before any
+         component stylesheet. Belt-and-braces against user-agent
+         default margins on iOS Safari and against any rogue padding
+         that creeps in via Vite's HMR ordering. The repeated
+         `!important` is intentional — these rules MUST win. -->
+    <style>
+      html, body, #root {
+        margin: 0 !important;
+        padding: 0 !important;
+      }
+      /* Use the dynamic viewport height so the page sizes correctly
+         when iOS Safari's URL bar shows / hides. `100vh` on iOS
+         measures the *largest* possible viewport and bleeds content
+         under the URL bar at scrollY=0; `100dvh` follows the actual
+         visible viewport. */
+      .app {
+        min-height: 100dvh;
+      }
+    </style>
     <title>Floyd County, VA — Civic Hub</title>
     <meta name="description" content="Vote on local issues and see where our community stands. Floyd County, Virginia Civic Hub." />
     <meta property="og:title" content="Floyd County, VA — Civic Hub" />
