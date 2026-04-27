@@ -63,7 +63,19 @@ export interface VoteResultsContent {
    * it. Render a fallback on the public page when missing.
    */
   vote_context?: VoteContextSnapshot;
+  /**
+   * Optional featured image (Slice 9). Public Supabase Storage URL.
+   * Set during admin review (PATCH /admin/vote-results/:id). When set,
+   * image_alt MUST be a non-empty string ≤ IMAGE_ALT_MAX. Validation
+   * mirrors civic.announcement.
+   */
+  image_url?: string | null;
+  image_alt?: string | null;
 }
+
+/** Cap on image alt-text — kept in sync with civic.announcement. */
+export const IMAGE_ALT_MAX = 200;
+export const IMAGE_URL_MAX = 1000;
 
 /**
  * Shape of Process.state for a civic.vote_results process.
@@ -170,4 +182,11 @@ export interface CreateVoteResultsFromVoteInput {
 export interface VoteResultsContentPatch {
   comments?: string[];
   admin_notes?: string;
+  /**
+   * Set to a string to attach/replace the image, null to remove,
+   * undefined to leave as-is. Same semantics for image_alt. Alt-text
+   * is required when image_url is non-null (validated server-side).
+   */
+  image_url?: string | null;
+  image_alt?: string | null;
 }

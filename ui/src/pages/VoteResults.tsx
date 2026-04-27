@@ -2,7 +2,11 @@ import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { getPublicVoteResults, type PublicVoteResults } from "../services/api";
 import { relativeTime, absoluteTime } from "../components/FeedPost";
+import PostFeaturedImage from "../components/PostFeaturedImage";
+import LinkPreviewCard from "../components/LinkPreviewCard";
 import "./VoteResults.css";
+
+const URL_RE = /\bhttps?:\/\/\S+/gi;
 
 /**
  * Public Vote Results page. Renamed from Brief.tsx in Slice 8.5 and
@@ -118,6 +122,13 @@ export default function VoteResultsPage() {
         {deliveryLine}
       </aside>
 
+      {results.image_url && (
+        <PostFeaturedImage
+          src={results.image_url}
+          alt={results.image_alt ?? ""}
+        />
+      )}
+
       <section className="vote-results-section">
         <h2>About this vote</h2>
         {ctx ? (
@@ -193,6 +204,27 @@ export default function VoteResultsPage() {
         <section className="vote-results-section">
           <h2>Notes from the Civic Hub</h2>
           <p className="brief-admin-notes">{results.admin_notes}</p>
+          {(() => {
+            // Surface link previews for URLs in admin_notes — same
+            // contract as Announcement.tsx. Plain links inside the
+            // notes paragraph are still clickable; the preview cards
+            // are an additive layer.
+            const urls = Array.from(
+              new Set(
+                (results.admin_notes.match(URL_RE) ?? [])
+                  .map((u) => u.replace(/[)\].,;!?]+$/, ""))
+                  .filter((u) => u.length > 0),
+              ),
+            );
+            if (urls.length === 0) return null;
+            return (
+              <div className="vote-results-link-previews">
+                {urls.map((u) => (
+                  <LinkPreviewCard key={u} url={u} />
+                ))}
+              </div>
+            );
+          })()}
         </section>
       )}
 

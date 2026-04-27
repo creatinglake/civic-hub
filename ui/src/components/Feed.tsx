@@ -33,6 +33,13 @@ interface ProcessMeta {
   type?: ProcessKind;
   title?: string;
   description?: string;
+  /**
+   * Slice 9 — the post's attached image (if any). When set, the feed
+   * card uses it as a leading visual; when unset, the card renders
+   * plain (no gradient cover, no OG fallback).
+   */
+  imageUrl?: string | null;
+  imageAlt?: string | null;
 }
 
 /**
@@ -147,7 +154,9 @@ export default function Feed({ filter }: Props) {
         lookup = getPublicVoteResults(id).then((vr) => ({
           type: "civic.vote_results" as const,
           title: vr.title,
-          description: undefined,
+          description: vr.admin_notes ?? undefined,
+          imageUrl: vr.image_url ?? null,
+          imageAlt: vr.image_alt ?? null,
         }));
       } else if (kind === "civic.meeting_summary") {
         lookup = getMeetingSummary(id).then((s) => ({
@@ -161,6 +170,8 @@ export default function Feed({ filter }: Props) {
           type: "civic.announcement" as const,
           title: a.title,
           description: a.body,
+          imageUrl: a.image_url ?? null,
+          imageAlt: a.image_alt ?? null,
         }));
       }
 
@@ -174,8 +185,8 @@ export default function Feed({ filter }: Props) {
           }
         })
         .catch(() => {
-          // Most commonly: brief not yet published (404). Cache as empty so
-          // the post either skips rendering or shows a fallback title.
+          // Most commonly: vote-results not yet published (404). Cache as
+          // empty so the post either skips rendering or shows a fallback.
           setProcessMeta((prev) => ({ ...prev, [id]: {} }));
         })
         .finally(() => {
@@ -191,7 +202,13 @@ export default function Feed({ filter }: Props) {
     const out: FeedPostView[] = [];
     for (const ev of visibleEvents) {
       const post = eventToPost(ev, getDescription, getTitle, getType);
-      if (post) out.push(post);
+      if (!post) continue;
+      const meta = processMeta[ev.process_id];
+      out.push({
+        ...post,
+        imageUrl: meta?.imageUrl ?? null,
+        imageAlt: meta?.imageAlt ?? null,
+      });
     }
     return out;
   }, [visibleEvents, processMeta]);

@@ -15,6 +15,8 @@ export type {
 export {
   BODY_MAX,
   BODY_PREVIEW_LEN,
+  IMAGE_ALT_MAX,
+  IMAGE_URL_MAX,
   LINK_LABEL_MAX,
   LINK_URL_MAX,
   LINKS_MAX,

@@ -14,6 +14,8 @@ import type {
 } from "./models.js";
 import {
   BODY_MAX,
+  IMAGE_ALT_MAX,
+  IMAGE_URL_MAX,
   LINK_LABEL_MAX,
   LINK_URL_MAX,
   LINKS_MAX,
@@ -33,6 +35,8 @@ export function createAnnouncementState(
     title: input.title,
     body: input.body,
     links: input.links ?? [],
+    image_url: input.image_url ?? null,
+    image_alt: input.image_alt ?? null,
   });
   return {
     type: "civic.announcement",
@@ -72,7 +76,7 @@ export async function updateAnnouncement(
     throw new Error("Not authorized to edit this announcement.");
   }
 
-  const editedFields: Array<"title" | "body" | "links"> = [];
+  const editedFields: Array<"title" | "body" | "links" | "image"> = [];
   const nextContent: AnnouncementContent = { ...state.content };
 
   if (patch.title !== undefined && patch.title !== state.content.title) {
@@ -88,6 +92,24 @@ export async function updateAnnouncement(
     // Compare stringified to detect actual change; keeps the event honest.
     if (JSON.stringify(patch.links) !== JSON.stringify(state.content.links)) {
       editedFields.push("links");
+    }
+  }
+  // Image fields: only an image_url change (or alt-text change) counts
+  // as a content edit. Either image_url or image_alt being present in
+  // the patch is enough to enter the branch — they're validated together
+  // by sanitizeContent.
+  const imagePatched =
+    patch.image_url !== undefined || patch.image_alt !== undefined;
+  if (imagePatched) {
+    if (patch.image_url !== undefined) nextContent.image_url = patch.image_url;
+    if (patch.image_alt !== undefined) nextContent.image_alt = patch.image_alt;
+    if (
+      (patch.image_url !== undefined &&
+        patch.image_url !== (state.content.image_url ?? null)) ||
+      (patch.image_alt !== undefined &&
+        patch.image_alt !== (state.content.image_alt ?? null))
+    ) {
+      editedFields.push("image");
     }
   }
 
@@ -153,7 +175,39 @@ function sanitizeContent(c: AnnouncementContent): AnnouncementContent {
     links.push({ label, url });
   }
 
-  return { title, body, links };
+  // Image attachment validation. image_url is optional; when present,
+  // image_alt is REQUIRED (non-empty, ≤ IMAGE_ALT_MAX). The accessibility
+  // contract is that no screen-reader user encounters an unlabeled
+  // featured image.
+  let image_url: string | null = null;
+  let image_alt: string | null = null;
+  const rawUrl = typeof c.image_url === "string" ? c.image_url.trim() : "";
+  const rawAlt = typeof c.image_alt === "string" ? c.image_alt.trim() : "";
+  if (rawUrl.length > 0) {
+    if (rawUrl.length > IMAGE_URL_MAX) {
+      throw new Error(`Image URL must be <= ${IMAGE_URL_MAX} characters.`);
+    }
+    if (!/^https?:\/\//i.test(rawUrl)) {
+      throw new Error("Image URL must start with http:// or https://.");
+    }
+    if (rawAlt.length === 0) {
+      throw new Error(
+        "Alt text is required when an image is attached. Describe the image briefly for screen readers.",
+      );
+    }
+    if (rawAlt.length > IMAGE_ALT_MAX) {
+      throw new Error(`Alt text must be <= ${IMAGE_ALT_MAX} characters.`);
+    }
+    image_url = rawUrl;
+    image_alt = rawAlt;
+  } else if (rawAlt.length > 0) {
+    // Alt without an image is meaningless — treat as no image rather
+    // than rejecting outright (the composer can race the two fields).
+    image_url = null;
+    image_alt = null;
+  }
+
+  return { title, body, links, image_url, image_alt };
 }
 
 /** Public read model — what GET /announcement/:id returns. */
@@ -167,6 +221,8 @@ export function getPublicReadModel(
     title: state.content.title,
     body: state.content.body,
     links: state.content.links,
+    image_url: state.content.image_url ?? null,
+    image_alt: state.content.image_alt ?? null,
     author_id: state.author_id,
     author_role: state.author_role,
     created_at: state.created_at,
@@ -184,6 +240,8 @@ export function getPublicSummary(
     id: processMeta.id,
     type: "civic.announcement",
     title: state.content.title,
+    image_url: state.content.image_url ?? null,
+    image_alt: state.content.image_alt ?? null,
     author_role: state.author_role,
     created_at: state.created_at,
     last_edited_at: state.last_edited_at,

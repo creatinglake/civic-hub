@@ -25,6 +25,8 @@ import {
   saveProcessState,
 } from "../services/processService.js";
 import { getAuthUser } from "../middleware/auth.js";
+import { extractUrls } from "../modules/civic.link_preview/index.js";
+import { warmPreviewsInBackground } from "../services/linkPreviewCache.js";
 
 function getState(record: { state: Record<string, unknown> }): AnnouncementProcessState {
   return record.state as unknown as AnnouncementProcessState;
@@ -72,7 +74,12 @@ export async function handleCreateAnnouncement(
         "authorLabel missing on res.locals — requireAnnouncementPoster must run before this handler.",
       );
     }
-    const body = (req.body ?? {}) as { title?: unknown; body?: unknown };
+    const body = (req.body ?? {}) as {
+      title?: unknown;
+      body?: unknown;
+      image_url?: unknown;
+      image_alt?: unknown;
+    };
 
     if (typeof body.title !== "string" || typeof body.body !== "string") {
       res.status(400).json({ error: "title and body are required (string)." });
@@ -80,10 +87,19 @@ export async function handleCreateAnnouncement(
     }
 
     const links = readLinks(req.body);
+    const image_url =
+      typeof body.image_url === "string" && body.image_url.trim().length > 0
+        ? body.image_url.trim()
+        : null;
+    const image_alt =
+      typeof body.image_alt === "string" && body.image_alt.trim().length > 0
+        ? body.image_alt.trim()
+        : null;
 
-    // Spawn the process via the generic factory so the created event is
-    // emitted consistently. The announcement module's publication events
-    // fire separately below.
+    // Spawn the process via the generic factory. The announcementProcess
+    // handler's initializeState normalizes this flat input into the
+    // module's nested AnnouncementProcessState shape (and runs the
+    // image alt-text-required validation).
     const record = await createProcess({
       definition: { type: "civic.announcement", version: "0.1" },
       title: body.title,
@@ -95,6 +111,8 @@ export async function handleCreateAnnouncement(
         author_id: user.id,
         author_role: authorLabel,
         links: links ?? [],
+        image_url,
+        image_alt,
       },
     });
 
@@ -118,6 +136,18 @@ export async function handleCreateAnnouncement(
     // Auto-finalize the process status — announcements are instant-publish.
     record.status = "finalized";
     await saveProcessState(record);
+
+    // Fire-and-forget: warm the link-preview cache for any URLs in the
+    // body so the public page renders previews on first view. Linked
+    // URLs in the structured `links` array are warmed too — they're
+    // less likely to need previews (the label is curated already), but
+    // it costs us nothing and keeps the feed card image fallback chain
+    // honest.
+    const linkUrls = (links ?? []).map((l) => l.url);
+    const allUrls = Array.from(
+      new Set([...extractUrls(body.body), ...linkUrls]),
+    );
+    if (allUrls.length > 0) warmPreviewsInBackground(allUrls);
 
     res.status(201).json(
       getPublicReadModel(state, { id: record.id, createdAt: record.createdAt }),
@@ -148,6 +178,8 @@ export async function handleUpdateAnnouncement(
       title?: unknown;
       body?: unknown;
       links?: unknown;
+      image_url?: unknown;
+      image_alt?: unknown;
     };
     const patch: AnnouncementContentPatch = {};
     if (typeof body.title === "string") patch.title = body.title;
@@ -155,6 +187,16 @@ export async function handleUpdateAnnouncement(
     if (body.links !== undefined) {
       const links = readLinks(req.body);
       if (links !== undefined) patch.links = links;
+    }
+    // image_url / image_alt patch semantics: explicit `null` removes,
+    // a string sets/replaces, undefined leaves the field alone. The
+    // module's updateAnnouncement runs sanitizeContent which enforces
+    // the alt-required-when-image-set rule.
+    if (body.image_url === null || typeof body.image_url === "string") {
+      patch.image_url = body.image_url as string | null;
+    }
+    if (body.image_alt === null || typeof body.image_alt === "string") {
+      patch.image_alt = body.image_alt as string | null;
     }
 
     const state = getState(record);
@@ -166,6 +208,17 @@ export async function handleUpdateAnnouncement(
         ctxFor(record),
       );
       await saveProcessState(record);
+
+      // Warm previews for whatever URLs are in the post-edit body. We
+      // do this on every edit (not just body edits) because admins
+      // sometimes update the linked URL list and the body's URLs change
+      // implicitly with rephrasing.
+      const linkUrls = (outcome.state.content.links ?? []).map((l) => l.url);
+      const allUrls = Array.from(
+        new Set([...extractUrls(outcome.state.content.body), ...linkUrls]),
+      );
+      if (allUrls.length > 0) warmPreviewsInBackground(allUrls);
+
       res.json({
         ...getPublicReadModel(outcome.state, {
           id: record.id,

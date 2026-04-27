@@ -3,7 +3,11 @@ import { Link, useParams } from "react-router-dom";
 import { getAnnouncement, type Announcement } from "../services/api";
 import { useAuth } from "../context/AuthContext";
 import { relativeTime, absoluteTime } from "../components/FeedPost";
+import PostFeaturedImage from "../components/PostFeaturedImage";
+import LinkPreviewCard from "../components/LinkPreviewCard";
 import "./Announcement.css";
+
+const URL_RE = /\bhttps?:\/\/\S+/gi;
 
 export default function AnnouncementPage() {
   const { id } = useParams<{ id: string }>();
@@ -108,6 +112,13 @@ export default function AnnouncementPage() {
         </p>
       </header>
 
+      {announcement.image_url && (
+        <PostFeaturedImage
+          src={announcement.image_url}
+          alt={announcement.image_alt ?? ""}
+        />
+      )}
+
       <div className="announcement-body">
         {announcement.body.split(/\n\n+/).map((para, i) => (
           <p key={i} className="announcement-paragraph">
@@ -120,6 +131,29 @@ export default function AnnouncementPage() {
           </p>
         ))}
       </div>
+
+      {(() => {
+        // Render preview cards for any unique URL found in the body.
+        // Slice 9 contract: previews fall back to plain links inside
+        // <LinkPreviewCard> when the upstream OG fetch fails. We dedupe
+        // here so a body that mentions the same URL twice produces one
+        // card.
+        const urls = Array.from(
+          new Set(
+            (announcement.body.match(URL_RE) ?? [])
+              .map((u) => u.replace(/[)\].,;!?]+$/, ""))
+              .filter((u) => u.length > 0),
+          ),
+        );
+        if (urls.length === 0) return null;
+        return (
+          <section className="announcement-link-previews" aria-label="Linked previews">
+            {urls.map((u) => (
+              <LinkPreviewCard key={u} url={u} />
+            ))}
+          </section>
+        );
+      })()}
 
       {announcement.links.length > 0 && (
         <section className="announcement-links">

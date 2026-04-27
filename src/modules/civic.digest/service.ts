@@ -40,12 +40,13 @@ export function assembleDigestForUser(
   input: DigestAssemblyInput,
 ): DigestEmail | null {
   const titles = input.process_titles ?? {};
+  const thumbnails = input.process_thumbnails ?? {};
   const items: DigestItem[] = [];
   for (const event of input.events) {
     if (!isDigestRenderable(event)) continue;
     const kind = classifyItemKind(event);
     if (!kind) continue;
-    items.push(eventToItem(event, kind, titles));
+    items.push(eventToItem(event, kind, titles, thumbnails));
   }
 
   if (items.length === 0) return null;
@@ -69,6 +70,7 @@ function eventToItem(
   event: DigestEvent,
   kind: DigestItemKind,
   titles: Record<string, string>,
+  thumbnails: Record<string, string>,
 ): DigestItem {
   const d = event.data as {
     process?: { title?: unknown };
@@ -190,6 +192,9 @@ function eventToItem(
     summary,
     action_url: event.action_url,
     timestamp: event.timestamp,
+    thumbnail_url: event.process_id
+      ? thumbnails[event.process_id] ?? null
+      : null,
   };
 }
 
@@ -282,31 +287,40 @@ function renderGroupHtml(
   kind: DigestItemKind,
 ): string {
   const { bg, fg } = PILL_COLORS[kind];
-  // Each row uses a 2-cell table so the pill aligns against the right
-  // edge across email clients. Inline styles only — Outlook and Gmail
-  // strip <style> blocks. Title is the click target.
+  // Each row uses a table so the pill aligns against the right edge and
+  // (Slice 9) any thumbnail aligns against the left edge across email
+  // clients. Inline styles only — Outlook and Gmail strip <style>
+  // blocks. Title is the click target.
   const rows = items
-    .map(
-      (item) => `
+    .map((item) => {
+      const thumbCell = item.thumbnail_url
+        ? `
+              <td valign="top" width="60" style="padding:0 12px 0 0;">
+                <a href="${escapeAttr(item.action_url)}" style="display:block;line-height:0;">
+                  <img src="${escapeAttr(item.thumbnail_url)}" alt="" width="60" height="60" style="display:block;width:60px;height:60px;border-radius:8px;object-fit:cover;border:0;" />
+                </a>
+              </td>`
+        : "";
+      const summaryBlock = item.summary
+        ? `<div style="font-family:${FONT_BODY};font-size:14px;color:#595959;line-height:1.5;margin:6px 0 0;">${escapeHtml(item.summary)}</div>`
+        : "";
+      return `
         <li style="margin:0 0 18px;padding:0;list-style:none;">
           <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;">
             <tr>
+              ${thumbCell}
               <td valign="top" style="padding:0 12px 0 0;">
                 <a href="${escapeAttr(item.action_url)}" style="font-family:${FONT_HEADING};color:#1a1a1a;text-decoration:none;font-weight:600;font-size:18px;line-height:1.25;display:inline-block;">${escapeHtml(item.title)}</a>
+                ${summaryBlock}
               </td>
               <td valign="top" align="right" style="white-space:nowrap;">
                 <span style="display:inline-block;background:${bg};color:${fg};font-family:${FONT_BODY};font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;padding:3px 10px;border-radius:9999px;">${escapeHtml(item.pill_label)}</span>
               </td>
             </tr>
           </table>
-          ${
-            item.summary
-              ? `<div style="font-family:${FONT_BODY};font-size:14px;color:#595959;line-height:1.5;margin:6px 0 0;">${escapeHtml(item.summary)}</div>`
-              : ""
-          }
         </li>
-      `,
-    )
+      `;
+    })
     .join("");
 
   return `

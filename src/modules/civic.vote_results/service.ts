@@ -15,6 +15,7 @@ import type {
   VoteResultsProcessContext,
   VoteResultsProcessState,
 } from "./models.js";
+import { IMAGE_ALT_MAX, IMAGE_URL_MAX } from "./models.js";
 import { assertPublicationTransition, canApprove, canEdit } from "./lifecycle.js";
 import {
   emitVoteResultsAggregationCompleted,
@@ -112,11 +113,63 @@ export async function editVoteResults(
   if (patch.admin_notes !== undefined) {
     content.admin_notes = patch.admin_notes;
   }
+  // Image fields — patch can set, replace, or clear. Validates the
+  // alt-text-required-when-image-set rule the same way civic.announcement
+  // does, so the two modules stay behaviorally consistent. Patches that
+  // touch only one of the two are merged with the existing state before
+  // validating, so PATCH-ing a new image_url + image_alt together works
+  // and PATCH-ing image_alt alone (e.g. fixing a typo) does too.
+  const willTouchImage =
+    patch.image_url !== undefined || patch.image_alt !== undefined;
+  if (willTouchImage) {
+    const nextUrl =
+      patch.image_url !== undefined
+        ? patch.image_url
+        : content.image_url ?? null;
+    const nextAlt =
+      patch.image_alt !== undefined
+        ? patch.image_alt
+        : content.image_alt ?? null;
+    const sanitized = sanitizeImage(nextUrl, nextAlt);
+    content.image_url = sanitized.image_url;
+    content.image_alt = sanitized.image_alt;
+  }
   state.content = content;
 
   await emitVoteResultsUpdated(ctx, actor, state);
 
   return { state, result: { content } };
+}
+
+/**
+ * Validate and normalize the image_url / image_alt pair. Same contract
+ * as civic.announcement: image_url is optional but, when set, requires
+ * a non-empty alt of <= IMAGE_ALT_MAX. URL must be http(s).
+ */
+function sanitizeImage(
+  rawUrl: string | null | undefined,
+  rawAlt: string | null | undefined,
+): { image_url: string | null; image_alt: string | null } {
+  const url = typeof rawUrl === "string" ? rawUrl.trim() : "";
+  const alt = typeof rawAlt === "string" ? rawAlt.trim() : "";
+  if (url.length === 0) {
+    return { image_url: null, image_alt: null };
+  }
+  if (url.length > IMAGE_URL_MAX) {
+    throw new Error(`Image URL must be <= ${IMAGE_URL_MAX} characters.`);
+  }
+  if (!/^https?:\/\//i.test(url)) {
+    throw new Error("Image URL must start with http:// or https://.");
+  }
+  if (alt.length === 0) {
+    throw new Error(
+      "Alt text is required when an image is attached. Describe the image briefly for screen readers.",
+    );
+  }
+  if (alt.length > IMAGE_ALT_MAX) {
+    throw new Error(`Alt text must be <= ${IMAGE_ALT_MAX} characters.`);
+  }
+  return { image_url: url, image_alt: alt };
 }
 
 function sanitizeList(items: string[]): string[] {
@@ -265,6 +318,8 @@ export function getPublicReadModel(
     comments: state.content.comments,
     admin_notes: state.content.admin_notes,
     vote_context: state.content.vote_context,
+    image_url: state.content.image_url ?? null,
+    image_alt: state.content.image_alt ?? null,
     delivered_recipient_count: state.delivered_to.length,
     approved_at: state.approved_at,
     generated_at: state.generated_at,

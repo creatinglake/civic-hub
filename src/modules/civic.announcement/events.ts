@@ -72,7 +72,7 @@ export async function emitAnnouncementUpdated(
   ctx: AnnouncementProcessContext,
   actor: string,
   state: AnnouncementProcessState,
-  editedFields: Array<"title" | "body" | "links">,
+  editedFields: Array<"title" | "body" | "links" | "image">,
 ): Promise<void> {
   await ctx.emit({
     event_type: "civic.process.updated",

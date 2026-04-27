@@ -7,6 +7,7 @@ import {
   type AnnouncementLink,
 } from "../services/api";
 import { useAuth } from "../context/AuthContext";
+import PostImagePicker from "../components/PostImagePicker";
 import "./PostAnnouncement.css";
 
 const TITLE_MAX = 200;
@@ -23,6 +24,8 @@ export default function PostAnnouncement() {
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [links, setLinks] = useState<AnnouncementLink[]>([]);
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [imageAlt, setImageAlt] = useState<string | null>(null);
   const [loadingExisting, setLoadingExisting] = useState(isEditMode);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -37,6 +40,8 @@ export default function PostAnnouncement() {
         setTitle(a.title);
         setBody(a.body);
         setLinks(a.links);
+        setImageUrl(a.image_url);
+        setImageAlt(a.image_alt);
         setAuthorId(a.author_id);
       })
       .catch((err: Error) => setError(err.message))
@@ -103,6 +108,18 @@ export default function PostAnnouncement() {
       .map((l) => ({ label: l.label.trim(), url: l.url.trim() }))
       .filter((l) => l.label.length > 0 || l.url.length > 0);
 
+    // Image fields: send `null` (not undefined) to clear an existing
+    // image on edit, or a string to set/replace. Alt text is required
+    // when image_url is set; the backend rejects with a clear error
+    // otherwise — we mirror the check here so the user gets feedback
+    // without a round-trip.
+    if (imageUrl && (!imageAlt || imageAlt.trim().length === 0)) {
+      setError(
+        "Alt text is required when an image is attached. Please describe the image briefly for screen readers.",
+      );
+      return;
+    }
+
     setSubmitting(true);
     try {
       if (isEditMode && editId) {
@@ -110,6 +127,8 @@ export default function PostAnnouncement() {
           title: title.trim(),
           body: body.trim(),
           links: cleanedLinks,
+          image_url: imageUrl,
+          image_alt: imageUrl ? (imageAlt ?? "").trim() : null,
         });
         navigate(`/announcement/${editId}`);
       } else {
@@ -117,6 +136,8 @@ export default function PostAnnouncement() {
           title: title.trim(),
           body: body.trim(),
           links: cleanedLinks,
+          image_url: imageUrl,
+          image_alt: imageUrl ? (imageAlt ?? "").trim() : null,
         });
         navigate(`/announcement/${created.id}`);
       }
@@ -167,6 +188,21 @@ export default function PostAnnouncement() {
       </p>
 
       <form onSubmit={handleSubmit} className="post-announcement-form">
+        <div className="form-field">
+          <label className="form-label">
+            Featured image <span className="optional">(optional)</span>
+          </label>
+          <PostImagePicker
+            imageUrl={imageUrl}
+            imageAlt={imageAlt}
+            onChange={({ image_url, image_alt }) => {
+              setImageUrl(image_url);
+              setImageAlt(image_alt);
+            }}
+            disabled={submitting}
+          />
+        </div>
+
         <div className="form-field">
           <label className="form-label" htmlFor="announcement-title">
             Title <span className="required">*</span>

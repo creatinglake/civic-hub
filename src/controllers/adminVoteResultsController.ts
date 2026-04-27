@@ -46,6 +46,8 @@ import { getAuthUser } from "../middleware/auth.js";
 import { sendEmail } from "../services/mailer.js";
 import { getVoteResultsRecipients } from "../services/hubSettings.js";
 import { uiBaseUrl } from "../utils/baseUrl.js";
+import { extractUrls } from "../modules/civic.link_preview/index.js";
+import { warmPreviewsInBackground } from "../services/linkPreviewCache.js";
 
 const HUB_LABEL = "Floyd Civic Hub";
 
@@ -186,6 +188,15 @@ export async function handlePatchVoteResults(
     const patch: VoteResultsContentPatch = {};
     if (Array.isArray(body.comments)) patch.comments = body.comments;
     if (typeof body.admin_notes === "string") patch.admin_notes = body.admin_notes;
+    // Image patch semantics match civic.announcement: null clears,
+    // string sets, undefined leaves alone. The module enforces the
+    // alt-text-required-when-image-set rule.
+    if (body.image_url === null || typeof body.image_url === "string") {
+      patch.image_url = body.image_url as string | null;
+    }
+    if (body.image_alt === null || typeof body.image_alt === "string") {
+      patch.image_alt = body.image_alt as string | null;
+    }
 
     const actor = getAuthUser(res).id;
     const ctx = {
@@ -197,6 +208,14 @@ export async function handlePatchVoteResults(
 
     await editVoteResults(state, actor, patch, ctx);
     await saveProcessState(record);
+
+    // Pre-warm the link-preview cache for any URLs the admin embedded
+    // in admin_notes. Vote-results admin_notes is the canonical "free
+    // text" surface for this module — comments[] is sanitized to short
+    // statements that rarely contain URLs. Fire-and-forget; failures
+    // logged but never bubble up to the admin save.
+    const noteUrls = extractUrls(state.content.admin_notes);
+    if (noteUrls.length > 0) warmPreviewsInBackground(noteUrls);
 
     const model = getAdminReadModel(state, {
       id: record.id,

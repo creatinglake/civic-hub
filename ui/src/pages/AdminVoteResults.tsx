@@ -10,6 +10,7 @@ import {
   type VoteResultsSummary,
 } from "../services/api";
 import AdminTabs from "../components/AdminTabs";
+import PostImagePicker from "../components/PostImagePicker";
 import "./AdminVoteResults.css";
 
 const STATUS_FILTERS: Array<{
@@ -39,6 +40,8 @@ export default function AdminVoteResults() {
   // Review form state
   const [commentsText, setCommentsText] = useState("");
   const [adminNotes, setAdminNotes] = useState("");
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [imageAlt, setImageAlt] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [approving, setApproving] = useState(false);
   const [confirmingApprove, setConfirmingApprove] = useState(false);
@@ -87,21 +90,37 @@ export default function AdminVoteResults() {
         setSelected(record);
         setCommentsText(record.content.comments.join("\n"));
         setAdminNotes(record.content.admin_notes);
+        setImageUrl(record.content.image_url ?? null);
+        setImageAlt(record.content.image_alt ?? null);
         setConfirmingApprove(false);
       })
       .catch((err: Error) => setError(err.message));
   }, [routeId]);
 
+  function buildPatch() {
+    return {
+      comments: parseCommentsText(commentsText),
+      admin_notes: adminNotes,
+      image_url: imageUrl,
+      image_alt: imageUrl ? (imageAlt ?? "").trim() : null,
+    };
+  }
+
   async function saveDraft() {
     if (!selected) return;
+    if (imageUrl && (!imageAlt || imageAlt.trim().length === 0)) {
+      setError(
+        "Alt text is required when an image is attached. Please describe the image briefly for screen readers.",
+      );
+      return;
+    }
     setSaving(true);
     setError(null);
     try {
-      const updated = await adminPatchVoteResults(selected.id, {
-        comments: parseCommentsText(commentsText),
-        admin_notes: adminNotes,
-      });
+      const updated = await adminPatchVoteResults(selected.id, buildPatch());
       setSelected(updated);
+      setImageUrl(updated.content.image_url ?? null);
+      setImageAlt(updated.content.image_alt ?? null);
       setActionMessage("Draft saved.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save");
@@ -112,15 +131,18 @@ export default function AdminVoteResults() {
 
   async function approve() {
     if (!selected) return;
+    if (imageUrl && (!imageAlt || imageAlt.trim().length === 0)) {
+      setError(
+        "Alt text is required when an image is attached. Please describe the image briefly for screen readers.",
+      );
+      return;
+    }
     setApproving(true);
     setError(null);
     try {
       // Save any unsaved edits first so the published record matches
       // what the admin is looking at.
-      await adminPatchVoteResults(selected.id, {
-        comments: parseCommentsText(commentsText),
-        admin_notes: adminNotes,
-      });
+      await adminPatchVoteResults(selected.id, buildPatch());
       const { vote_results } = await adminApproveVoteResults(selected.id);
       setSelected(vote_results);
       setActionMessage(
@@ -241,6 +263,23 @@ export default function AdminVoteResults() {
               onChange={(e) => setAdminNotes(e.target.value)}
               disabled={!isPending}
               placeholder="(none)"
+            />
+          </section>
+
+          <section className="admin-detail-section">
+            <h3>Featured image</h3>
+            <p className="form-hint">
+              Optional. Renders as the lead image on the published vote-results
+              page and as the feed card visual. JPEG, PNG, WebP, or GIF.
+            </p>
+            <PostImagePicker
+              imageUrl={imageUrl}
+              imageAlt={imageAlt}
+              onChange={({ image_url, image_alt }) => {
+                setImageUrl(image_url);
+                setImageAlt(image_alt);
+              }}
+              disabled={!isPending || saving || approving}
             />
           </section>
 

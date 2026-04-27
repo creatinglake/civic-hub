@@ -32,6 +32,14 @@ export interface AnnouncementContent {
   title: string;           // required, <= TITLE_MAX
   body: string;            // required, plain text, <= BODY_MAX
   links: AnnouncementLink[]; // optional, <= LINKS_MAX
+  /**
+   * Optional featured image (Slice 9). Public Supabase Storage URL
+   * pointing at the `post-images` bucket. When set, image_alt MUST be
+   * a non-empty string — alt text is required for accessibility, not
+   * optional. The validator rejects image_url without image_alt.
+   */
+  image_url?: string | null;
+  image_alt?: string | null;
 }
 
 export interface AnnouncementProcessState {
@@ -52,6 +60,10 @@ export const LINK_LABEL_MAX = 100;
 export const LINK_URL_MAX = 500;
 /** First N chars of the body included in event data as a preview. */
 export const BODY_PREVIEW_LEN = 200;
+/** Cap on image alt-text. Long alts hurt screen readers more than help. */
+export const IMAGE_ALT_MAX = 200;
+/** Cap on the image_url itself; defensively rejects pathological values. */
+export const IMAGE_URL_MAX = 1000;
 
 /**
  * Event emission callback — injected by the host hub.
@@ -87,6 +99,8 @@ export interface CreateAnnouncementInput {
   links?: AnnouncementLink[];
   author_id: string;
   author_role: AnnouncementAuthorRole;
+  image_url?: string | null;
+  image_alt?: string | null;
 }
 
 /** Partial update used by PATCH /announcement/:id. */
@@ -94,4 +108,11 @@ export interface AnnouncementContentPatch {
   title?: string;
   body?: string;
   links?: AnnouncementLink[];
+  /**
+   * Set to a string to attach/replace the image. Set to null to
+   * explicitly remove an existing image. Undefined means "leave as-is".
+   * The same null/string semantics apply to image_alt.
+   */
+  image_url?: string | null;
+  image_alt?: string | null;
 }

@@ -468,6 +468,8 @@ export interface VoteResultsContent {
   comments: string[];
   admin_notes: string;
   vote_context?: VoteContextSnapshot;
+  image_url?: string | null;
+  image_alt?: string | null;
 }
 
 /** Admin list summary */
@@ -503,6 +505,8 @@ export interface PublicVoteResults {
   comments: string[];
   admin_notes: string;
   vote_context?: VoteContextSnapshot;
+  image_url?: string | null;
+  image_alt?: string | null;
   delivered_recipient_count: number;
   approved_at: string | null;
   generated_at: string;
@@ -512,6 +516,8 @@ export interface PublicVoteResults {
 export interface VoteResultsContentPatch {
   comments?: string[];
   admin_notes?: string;
+  image_url?: string | null;
+  image_alt?: string | null;
 }
 
 export function adminListVoteResults(
@@ -566,6 +572,8 @@ export interface Announcement {
   title: string;
   body: string;
   links: AnnouncementLink[];
+  image_url: string | null;
+  image_alt: string | null;
   author_id: string;
   author_role: AnnouncementAuthorRole;
   created_at: string;
@@ -578,6 +586,8 @@ export interface AnnouncementSummary {
   id: string;
   type: "civic.announcement";
   title: string;
+  image_url: string | null;
+  image_alt: string | null;
   author_role: AnnouncementAuthorRole;
   created_at: string;
   last_edited_at: string | null;
@@ -588,12 +598,20 @@ export interface CreateAnnouncementInput {
   title: string;
   body: string;
   links?: AnnouncementLink[];
+  image_url?: string | null;
+  image_alt?: string | null;
 }
 
 export interface UpdateAnnouncementInput {
   title?: string;
   body?: string;
   links?: AnnouncementLink[];
+  /**
+   * Set to a string to attach/replace, null to remove, undefined to
+   * leave unchanged. Same semantics for image_alt.
+   */
+  image_url?: string | null;
+  image_alt?: string | null;
 }
 
 export function createAnnouncement(
@@ -748,4 +766,57 @@ export function setDigestSubscription(
   subscribed: boolean,
 ): Promise<{ digest_subscribed: boolean }> {
   return request("PATCH", "/user/settings/digest", { subscribed });
+}
+
+// --- Slice 9: image upload + link previews ---
+
+export interface UploadedImage {
+  url: string;
+  width: number;
+  height: number;
+  mime: string;
+}
+
+/**
+ * Upload a single image file to the post-images bucket. The caller is
+ * responsible for client-side resize / re-encode (see uploadImage in
+ * components/PostImagePicker) — this helper only sends the bytes. Auth
+ * Bearer token is forwarded automatically.
+ */
+export async function uploadPostImage(file: Blob): Promise<UploadedImage> {
+  const headers: Record<string, string> = {};
+  const token = getStoredToken();
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+  const form = new FormData();
+  form.append("file", file);
+  const res = await fetch(`${API_BASE}/upload/post-image`, {
+    method: "POST",
+    headers,
+    body: form,
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(err.error ?? `Upload failed: ${res.status}`);
+  }
+  return res.json();
+}
+
+export interface LinkPreviewData {
+  url: string;
+  canonical_url: string | null;
+  title: string | null;
+  description: string | null;
+  image_url: string | null;
+  site_name: string | null;
+  fetched_at: string;
+  error: string | null;
+}
+
+/**
+ * Fetch a cached or fresh OpenGraph preview for an external URL. Always
+ * resolves with a LinkPreviewData object — when `error` is set, the
+ * frontend renders a plain link instead of a rich card.
+ */
+export function getLinkPreview(url: string): Promise<LinkPreviewData> {
+  return request("GET", `/link-preview?url=${encodeURIComponent(url)}`);
 }

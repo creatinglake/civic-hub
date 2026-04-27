@@ -84,6 +84,13 @@ export interface DigestItem {
   action_url: string;
   /** ISO 8601 — used only for stable sort within a group. */
   timestamp: string;
+  /**
+   * Slice 9 — optional small thumbnail rendered to the left of the
+   * title in the HTML digest only. Plain-text digest ignores it.
+   * Populated by the host hub via `process_thumbnails` lookup; the
+   * module never fetches it.
+   */
+  thumbnail_url?: string | null;
 }
 
 /** Assembled digest payload for one user; null means "nothing to send." */
@@ -115,4 +122,12 @@ export interface DigestAssemblyInput {
    * whole batch to avoid per-user DB round-trips.
    */
   process_titles?: Record<string, string>;
+  /**
+   * Slice 9 — optional process_id → image_url lookup. When present, the
+   * matching DigestItem.thumbnail_url is filled and the HTML email
+   * shows a small (~60 px) rounded thumbnail to the left of the title.
+   * Plain-text digest ignores this. The host hub builds the map by
+   * walking processes once per cron run.
+   */
+  process_thumbnails?: Record<string, string>;
 }

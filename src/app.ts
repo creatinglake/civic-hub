@@ -16,6 +16,8 @@ import authRoutes from "./routes/authRoutes.js";
 import voteLogRoutes from "./routes/voteLogRoutes.js";
 import voteResultsRoutes from "./routes/voteResultsRoutes.js";
 import announcementRoutes from "./routes/announcementRoutes.js";
+import uploadRoutes from "./routes/uploadRoutes.js";
+import linkPreviewRoutes from "./routes/linkPreviewRoutes.js";
 import meetingSummaryRoutes, {
   meetingSummaryCronRouter,
 } from "./routes/meetingSummaryRoutes.js";
@@ -107,6 +109,12 @@ app.use("/announcement", announcementRoutes);
 // Public list — separate path so it doesn't collide with /announcement/:id
 app.get("/announcements", handleListAnnouncements);
 
+// Slice 9 — image upload + link previews. The upload endpoint is
+// authenticated (requireAnnouncementPoster) and accepts multipart bodies;
+// the link-preview endpoint is public and lightly rate-limited.
+app.use("/upload", uploadRoutes);
+app.use("/link-preview", linkPreviewRoutes);
+
 // Meeting summaries (Slice 6):
 //   /meeting-summary/:id    — public read of published summaries
 app.use("/meeting-summary", meetingSummaryRoutes);
@@ -170,6 +178,8 @@ app.get("/", (_req, res) => {
       "PATCH /announcement/:id": "Edit an announcement (author only, or any admin)",
       "GET /announcement/:id": "Public read of an announcement",
       "GET /announcements": "List announcements, newest first (optional ?limit=N)",
+      "POST /upload/post-image": "Upload a featured image (multipart, authed)",
+      "GET /link-preview?url=X": "Fetch (cached) OpenGraph preview for a URL",
       "POST /internal/digest/run": "Cron-triggered daily email digest (CRON_SECRET bearer)",
       "GET /unsubscribe/digest?token=X": "Unsubscribe from the daily digest",
       "PATCH /user/settings/digest": "Toggle digest subscription (authed)",

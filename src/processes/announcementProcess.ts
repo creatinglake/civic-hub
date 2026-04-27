@@ -44,6 +44,14 @@ const announcementProcess: ProcessHandler = {
       links: Array.isArray(input.links)
         ? (input.links as AnnouncementLink[])
         : undefined,
+      image_url:
+        typeof input.image_url === "string" || input.image_url === null
+          ? (input.image_url as string | null)
+          : undefined,
+      image_alt:
+        typeof input.image_alt === "string" || input.image_alt === null
+          ? (input.image_alt as string | null)
+          : undefined,
     };
     return createAnnouncementState(createInput) as unknown as Record<string, unknown>;
   },

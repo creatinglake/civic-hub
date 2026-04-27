@@ -180,12 +180,23 @@ export async function handleRunDigest(
     // fallback when its own payload doesn't have one. We fetch every
     // process once per cron run (cheap for MVP scale) instead of per
     // user or per event.
+    //
+    // Slice 9: same loop also builds process_id → image_url so the
+    // digest can render small thumbnails next to titles. We pull the
+    // image from `state.content.image_url` (the canonical Slice-9
+    // location for both civic.announcement and civic.vote_results).
     const processTitles: Record<string, string> = {};
+    const processThumbnails: Record<string, string> = {};
     if (users.length > 0) {
       try {
         const allProcesses = await getAllProcesses();
         for (const p of allProcesses) {
           processTitles[p.id] = p.title;
+          const content = (p.state as { content?: { image_url?: unknown } } | null | undefined)?.content;
+          const imageUrl = content?.image_url;
+          if (typeof imageUrl === "string" && imageUrl.length > 0) {
+            processThumbnails[p.id] = imageUrl;
+          }
         }
       } catch (err) {
         // Non-fatal: fall back to generic labels in the digest. The
@@ -227,6 +238,7 @@ export async function handleRunDigest(
           hub,
           since,
           process_titles: processTitles,
+          process_thumbnails: processThumbnails,
         });
 
         if (!digest) {

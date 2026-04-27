@@ -24,6 +24,11 @@ export type FeedPillKind =
  * cheap to render. Title and pill are intentionally separate fields: the
  * pill renders as its own element beside the title rather than being baked
  * into the title string.
+ *
+ * Slice 9 — leading visual: only renders an attached image when the
+ * post has one. Cards without an image render plain (no gradient cover,
+ * no OG fallback) — the per-card colored top border + pill carry the
+ * type signal cheaply, and the feed stays scannable.
  */
 export interface FeedPostView {
   id: string;
@@ -33,6 +38,8 @@ export interface FeedPostView {
   summary: string;
   timestamp: string; // ISO 8601
   href: string;
+  imageUrl?: string | null;
+  imageAlt?: string | null;
 }
 
 interface Props {
@@ -338,9 +345,20 @@ function classifyHref(href: string): { kind: "internal"; to: string } | { kind: 
 export default function FeedPost({ post }: Props) {
   const classified = classifyHref(post.href);
   const pillClass = `feed-pill feed-pill--${post.pillKind}`;
+  const articleClass = `feed-post feed-post--${post.pillKind}`;
 
   const inner = (
     <>
+      {post.imageUrl && (
+        <span className="feed-post-image">
+          <img
+            src={post.imageUrl}
+            alt={post.imageAlt ?? ""}
+            loading="lazy"
+            decoding="async"
+          />
+        </span>
+      )}
       <div className="feed-post-head">
         <h2 className="feed-post-title">{post.title}</h2>
         <span className={pillClass}>{post.pillLabel}</span>
@@ -357,7 +375,7 @@ export default function FeedPost({ post }: Props) {
   );
 
   return (
-    <article className="feed-post">
+    <article className={articleClass}>
       {classified.kind === "internal" ? (
         <Link to={classified.to} className="feed-post-link">
           {inner}
