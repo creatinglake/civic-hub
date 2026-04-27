@@ -234,10 +234,13 @@ const PILL_COLORS: Record<DigestItemKind, { bg: string; fg: string }> = {
   announcement:               { bg: "#fbe5d3", fg: "#8c3210" },
 };
 
+// Both stacks fall back through the OS sans family so email clients
+// without Inter/Manrope (Outlook on Windows, older webmail) still get a
+// clean modern sans rather than reverting to a serif default.
 const FONT_BODY =
   "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
 const FONT_HEADING =
-  "Fraunces, Georgia, 'Times New Roman', serif";
+  "Manrope, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
 
 export function formatDigestHtml(
   items: DigestItem[],
