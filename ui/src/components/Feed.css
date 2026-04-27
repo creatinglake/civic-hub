@@ -134,6 +134,16 @@
   overflow: hidden;
 }
 
+/* Slice 10 — engagement line sits between the summary and the
+ * timestamp. Slightly larger than time but smaller than summary so it
+ * reads as secondary metadata, not body copy. */
+.feed-post-engagement {
+  margin: 0 0 var(--space-xs);
+  font-family: var(--font-body);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
 .feed-post-time {
   display: block;
   font-family: var(--font-body);

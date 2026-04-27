@@ -9,18 +9,31 @@ import {
   getProcessState,
   getPublicVoteResults,
 } from "../services/api";
-import FeedPost, { eventToPost, type FeedPostView } from "./FeedPost";
+import FeedPost, {
+  eventToPost,
+  relativeTime,
+  type FeedPillKind,
+  type FeedPostView,
+} from "./FeedPost";
 import "./Feed.css";
 
 const PAGE_SIZE = 50;
 
 interface Props {
   /**
-   * Optional filter predicate applied before pagination. Reserved for future
-   * filter/search UI — kept as a prop now so that adding it later is a
-   * parent-level concern, not a Feed rewrite.
+   * Optional filter predicate applied before pagination. The Slice 10
+   * <FeedFilter> component composes one of these from the URL `?type=`
+   * param. When undefined, all events are shown.
    */
   filter?: (event: CivicEvent) => boolean;
+  /**
+   * Slice 10 — when a filter is active and yields zero matches, render
+   * a scoped empty state with this action (typically "Show all
+   * activity" → reset). Pass `null` to suppress the action button
+   * entirely (used when the active filter is "all" — caller never
+   * passes the action in that case).
+   */
+  emptyFilteredAction?: { label: string; onClick: () => void } | null;
 }
 
 type ProcessKind =
@@ -40,6 +53,23 @@ interface ProcessMeta {
    */
   imageUrl?: string | null;
   imageAlt?: string | null;
+  /**
+   * Slice 10 — engagement counts surfaced as a metadata line on the
+   * card. Each post type fills a different subset:
+   *
+   *   civic.vote            → totalVotes
+   *   civic.vote_results    → totalVotes (= participation_count) + commentsCount
+   *   civic.announcement    → editCount + lastEditedAt (ISO)
+   *   civic.meeting_summary → blockCount + maxStartSeconds (for duration)
+   *
+   * eventToPost reads from these and builds the engagement string.
+   */
+  totalVotes?: number;
+  commentsCount?: number;
+  editCount?: number;
+  lastEditedAt?: string | null;
+  blockCount?: number;
+  maxStartSeconds?: number | null;
 }
 
 /**
@@ -83,7 +113,7 @@ function kindFromEvent(event: CivicEvent): ProcessKind | null {
   return null;
 }
 
-export default function Feed({ filter }: Props) {
+export default function Feed({ filter, emptyFilteredAction }: Props) {
   const [events, setEvents] = useState<CivicEvent[]>([]);
   const [processMeta, setProcessMeta] = useState<Record<string, ProcessMeta>>({});
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
@@ -148,6 +178,7 @@ export default function Feed({ filter }: Props) {
             type: "civic.vote" as const,
             title: vote.title,
             description: vote.description,
+            totalVotes: vote.total_votes ?? 0,
           };
         });
       } else if (kind === "civic.vote_results") {
@@ -157,13 +188,27 @@ export default function Feed({ filter }: Props) {
           description: vr.admin_notes ?? undefined,
           imageUrl: vr.image_url ?? null,
           imageAlt: vr.image_alt ?? null,
+          totalVotes: vr.participation_count,
+          commentsCount: vr.comments?.length ?? 0,
         }));
       } else if (kind === "civic.meeting_summary") {
-        lookup = getMeetingSummary(id).then((s) => ({
-          type: "civic.meeting_summary" as const,
-          title: s.meeting_title,
-          description: undefined,
-        }));
+        lookup = getMeetingSummary(id).then((s) => {
+          // The longest start_time_seconds across all blocks gives a
+          // reasonable lower bound for meeting duration; videos still
+          // run past the last marked topic, so this is "at least this
+          // long" rather than exact. Acceptable for the engagement line.
+          const starts = (s.blocks ?? [])
+            .map((b) => b.start_time_seconds)
+            .filter((n): n is number => typeof n === "number");
+          const maxStart = starts.length > 0 ? Math.max(...starts) : null;
+          return {
+            type: "civic.meeting_summary" as const,
+            title: s.meeting_title,
+            description: undefined,
+            blockCount: s.blocks?.length ?? 0,
+            maxStartSeconds: maxStart,
+          };
+        });
       } else {
         // civic.announcement — body serves as the feed summary.
         lookup = getAnnouncement(id).then((a) => ({
@@ -172,6 +217,8 @@ export default function Feed({ filter }: Props) {
           description: a.body,
           imageUrl: a.image_url ?? null,
           imageAlt: a.image_alt ?? null,
+          editCount: a.edit_count ?? 0,
+          lastEditedAt: a.last_edited_at ?? null,
         }));
       }
 
@@ -208,6 +255,7 @@ export default function Feed({ filter }: Props) {
         ...post,
         imageUrl: meta?.imageUrl ?? null,
         imageAlt: meta?.imageAlt ?? null,
+        engagement: meta ? buildEngagement(post.pillKind, meta) : null,
       });
     }
     return out;
@@ -234,6 +282,28 @@ export default function Feed({ filter }: Props) {
   }
 
   if (posts.length === 0) {
+    // Distinguish "feed is empty" from "filter matched nothing". The
+    // first is the bootstrap state for a fresh hub; the second is a
+    // resident's filter selection finding zero posts. The reset action
+    // is provided by the parent (Home.tsx) when a filter is active.
+    if (emptyFilteredAction && events.length > 0) {
+      return (
+        <section className="feed">
+          <p className="feed-status">
+            No posts match this filter yet.{" "}
+          </p>
+          <div className="feed-load-more-row">
+            <button
+              type="button"
+              className="feed-load-more"
+              onClick={emptyFilteredAction.onClick}
+            >
+              {emptyFilteredAction.label}
+            </button>
+          </div>
+        </section>
+      );
+    }
     return (
       <section className="feed">
         <p className="feed-status">
@@ -266,4 +336,83 @@ export default function Feed({ filter }: Props) {
       )}
     </section>
   );
+}
+
+/**
+ * Slice 10 — compose the per-card engagement / metadata line from the
+ * fields the Feed container fetched lazily for this process. Returns
+ * null whenever no real signal exists for the post type, so the line
+ * is suppressed entirely (no "0 residents voted" cards).
+ *
+ * Plural/singular handling lives here to keep FeedPost rendering dumb.
+ */
+function buildEngagement(
+  kind: FeedPillKind,
+  meta: ProcessMeta,
+): string | null {
+  switch (kind) {
+    case "vote-open": {
+      const n = meta.totalVotes ?? 0;
+      if (n === 0) return "Open for input — be the first to vote";
+      const noun = n === 1 ? "resident has" : "residents have";
+      return `${formatCount(n)} ${noun} voted so far`;
+    }
+    case "vote-results": {
+      const n = meta.totalVotes ?? 0;
+      const m = meta.commentsCount ?? 0;
+      if (n === 0 && m === 0) return null;
+      const parts: string[] = [];
+      if (n > 0) {
+        const noun = n === 1 ? "resident" : "residents";
+        parts.push(`${formatCount(n)} ${noun} voted`);
+      }
+      if (m > 0) {
+        const noun = m === 1 ? "comment" : "comments";
+        parts.push(`${formatCount(m)} ${noun}`);
+      }
+      return parts.join(" · ");
+    }
+    case "announcement":
+    case "announcement-author": {
+      const c = meta.editCount ?? 0;
+      if (c > 0 && meta.lastEditedAt) {
+        return `Edited ${relativeTime(meta.lastEditedAt)}`;
+      }
+      return null;
+    }
+    case "meeting": {
+      const b = meta.blockCount ?? 0;
+      if (b === 0) return null;
+      const noun = b === 1 ? "topic" : "topics";
+      const parts = [`${formatCount(b)} ${noun} covered`];
+      const dur = formatDuration(meta.maxStartSeconds ?? null);
+      if (dur) parts.push(dur);
+      return parts.join(" · ");
+    }
+  }
+}
+
+/** "1234" → "1.2k". Below 1000 returns the integer untouched. */
+function formatCount(n: number): string {
+  if (n < 1000) return String(n);
+  const k = n / 1000;
+  // 1.2k, 1.5k, 12k — one decimal under 10k, rounded otherwise.
+  if (k < 10) return `${k.toFixed(1).replace(/\.0$/, "")}k`;
+  return `${Math.round(k)}k`;
+}
+
+/**
+ * Convert a max-block-start in seconds to a coarse duration label
+ * ("12 min", "1h 5m"). Returns null when input is null / invalid.
+ * "At least this long" — actual videos run past the last marked topic.
+ */
+function formatDuration(startSeconds: number | null): string | null {
+  if (startSeconds == null || !Number.isFinite(startSeconds) || startSeconds <= 0) {
+    return null;
+  }
+  const minutes = Math.max(1, Math.ceil(startSeconds / 60));
+  if (minutes < 60) return `${minutes} min`;
+  const h = Math.floor(minutes / 60);
+  const m = minutes - h * 60;
+  return m === 0 ? `${h}h` : `${h}h ${m}m`;
 }

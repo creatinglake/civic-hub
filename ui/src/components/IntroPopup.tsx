@@ -1,4 +1,6 @@
 import { useEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
+import "./IntroPopup.css";
 
 const STORAGE_KEY = "seen_intro_popup";
 
@@ -22,24 +24,36 @@ export function markIntroSeen(): void {
   }
 }
 
+/**
+ * Slice 10 — clear the "seen" flag so the popup reappears on the next
+ * visit. Used by the About page's "Show me the welcome again" link.
+ * Doesn't force-reopen the popup right then; that would be jarring
+ * after an explicit click.
+ */
+export function clearIntroSeen(): void {
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+  } catch {
+    // No-op — same fallback as markIntroSeen.
+  }
+}
+
+/**
+ * Slice 10 — first-visit welcome popup. Native <dialog> element gives
+ * us focus trapping, escape-key handling, and backdrop click for free.
+ *
+ * Copy is intentionally short (3 sentences max) and Floyd-specific.
+ * No sign-in ask — that happens when a resident tries to participate.
+ */
 export default function IntroPopup({ onDismiss }: Props) {
-  const overlayRef = useRef<HTMLDivElement>(null);
-  const closeRef = useRef<HTMLButtonElement>(null);
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const navigate = useNavigate();
 
-  // Focus trap: focus the close button on mount
+  // Open the dialog imperatively on mount via showModal() so we get
+  // the native modal behavior (focus trap, backdrop, ESC handling).
   useEffect(() => {
-    closeRef.current?.focus();
-  }, []);
-
-  // Dismiss on Escape key
-  useEffect(() => {
-    function handleKey(e: KeyboardEvent) {
-      if (e.key === "Escape") {
-        handleDismiss();
-      }
-    }
-    document.addEventListener("keydown", handleKey);
-    return () => document.removeEventListener("keydown", handleKey);
+    const d = dialogRef.current;
+    if (d && !d.open) d.showModal();
   }, []);
 
   function handleDismiss() {
@@ -47,58 +61,54 @@ export default function IntroPopup({ onDismiss }: Props) {
     onDismiss();
   }
 
-  // Click on overlay backdrop dismisses
-  function handleOverlayClick(e: React.MouseEvent) {
-    if (e.target === overlayRef.current) {
-      handleDismiss();
-    }
+  function handleLearnMore() {
+    handleDismiss();
+    navigate("/about");
+  }
+
+  // Backdrop click dismisses. Native <dialog> reports the click target
+  // as the dialog itself when the user clicks the backdrop area.
+  function handleClick(e: React.MouseEvent<HTMLDialogElement>) {
+    if (e.target === e.currentTarget) handleDismiss();
   }
 
   return (
-    <div
-      className="intro-overlay"
-      ref={overlayRef}
-      onClick={handleOverlayClick}
-      role="dialog"
-      aria-modal="true"
-      aria-label="Welcome to the Floyd County Civic Hub"
+    <dialog
+      ref={dialogRef}
+      className="intro-popup"
+      aria-labelledby="intro-popup-title"
+      onClick={handleClick}
+      onClose={handleDismiss}
     >
-      <div className="intro-modal">
-        <button
-          className="intro-close"
-          onClick={handleDismiss}
-          ref={closeRef}
-          aria-label="Close"
-        >
-          &times;
-        </button>
+      <div className="intro-popup-body">
+        <h2 id="intro-popup-title" className="intro-popup-title">
+          Welcome to the Floyd Civic Hub.
+        </h2>
 
-        <h2 className="intro-title">Welcome to the Floyd County Civic Hub</h2>
-
-        <div className="intro-body">
-          <p>
-            This is a simple, nonpartisan tool to understand what people in
-            Floyd County think about local issues.
-          </p>
-          <ul>
-            <li>Vote on clearly framed questions</li>
-            <li>One vote per verified account</li>
-            <li>Results are advisory and shared with local officials</li>
-          </ul>
-          <p>
-            The goal is to provide a clearer signal of community sentiment
-            between elections.
-          </p>
-        </div>
-
-        <p className="intro-closing">
-          This is an early pilot. Feedback is welcome.
+        <p className="intro-popup-text">
+          This is where Floyd County residents weigh in on local issues, read
+          Board of Supervisors meeting summaries, and stay in the loop between
+          elections.
         </p>
 
-        <button className="intro-continue" onClick={handleDismiss}>
-          Continue
-        </button>
+        <div className="intro-popup-actions">
+          <button
+            type="button"
+            className="intro-popup-primary"
+            onClick={handleDismiss}
+            autoFocus
+          >
+            Got it
+          </button>
+          <button
+            type="button"
+            className="intro-popup-secondary"
+            onClick={handleLearnMore}
+          >
+            Learn more
+          </button>
+        </div>
       </div>
-    </div>
+    </dialog>
   );
 }

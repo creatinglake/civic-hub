@@ -121,6 +121,107 @@ code. Ideas for process plugins worth exploring:
   decisions — feedback loop for "did this vote actually change anything?"
 - Public audit log of official responses tied to specific votes.
 
+## Multi-tenancy / per-hub customization
+
+The Civic.Social vision is federated independent hubs (Floyd, Arlington,
+a school board in Ohio, a state-level body in Vermont). Each new operator
+needs to customize the surface — banner image, hub name, intro copy,
+About content, theme accent, jurisdiction string, email subject prefix,
+"Floyd County residents" wording, and so on. Today some of this lives in
+env vars (`HUB_NAME`, `HUB_POSTAL_ADDRESS`, `MEETING_SOURCE_URL`,
+`CIVIC_ADMIN_EMAILS`, etc.), some in the `hub_settings` table (brief
+recipients, announcement-author lists), and some is hardcoded in the
+codebase (banner image path, intro popup copy, About markdown,
+"Floyd"-flavored strings throughout the UI, theme palette).
+
+### Customization surface inventory
+
+What a new operator would need to change:
+
+- **Identity** — hub name, wordmark / logo, banner image, footer "operated
+  by" tagline, color theme accent.
+- **Copy** — intro popup text, About page content, jurisdiction-specific
+  wording across the UI ("Floyd County residents" → whatever), email
+  subject prefixes.
+- **Configuration** — admin / Board emails, postal address, time zone,
+  default jurisdiction string used in events (`us-va-floyd`), Resend /
+  SMTP credentials.
+- **Process-specific** — for meeting summaries (Slice 6): source URL,
+  extraction instructions, connector id. Already env vars.
+- **Legal** — Privacy / TOS / Code of Conduct. Already markdown files in
+  `ui/src/content/legal/` from Slice 11; placeholders need filling in.
+
+### Five approaches, low to high complexity
+
+1. **Fork-and-edit.** Each operator clones the repo, edits hardcoded
+   strings + env vars, deploys their own Vercel + Supabase. Federation
+   across forks works fine because hubs talk via the Civic Event spec.
+   De-facto path today. Cost: low (just push hardcoded stuff into env
+   vars and content files). Downside: every operator needs developer
+   competence.
+
+2. **Centralized hub config object.** A single `hub.config.ts` (or
+   `hub.json`) at repo root holds every customization point. New
+   operators only edit that one file. Banner image still in `/public`,
+   markdown content still in `ui/src/content/`. "Approach 1, made tidier."
+   Cost: one focused refactor pass. Onboarding becomes much shorter.
+
+3. **Admin-editable runtime settings.** Most non-developer-friendly
+   things (hub name, banner upload, intro copy, About content, theme
+   accent color) move into `hub_settings` rows in the DB. An admin
+   settings UI exposes them to operators. The codebase has already
+   started down this road — brief recipients and announcement-author
+   lists already work this way. Cost: moderate slice. Benefit: every
+   future operator's setup becomes non-developer-friendly.
+
+4. **First-run setup wizard.** When a fresh deployment boots and
+   `hub_settings` is empty, a wizard walks the operator through hub
+   name, banner upload (using Supabase Storage from Slice 9), admin
+   email, jurisdiction string, and an initial fill of About / intro
+   content. Saves to the DB. Cost: medium slice. Onboarding for a
+   non-developer becomes ~20 minutes once they have Vercel + Supabase
+   accounts.
+
+5. **True multi-tenant single deployment.** One deployment, hubs keyed
+   by hostname (`floyd.civic.social`, `arlington.civic.social`, …),
+   each tenant a row in a `hubs` table. Full architectural pivot.
+   Months of work. Real data isolation, admin permissions across hubs,
+   legal complexity (one operator vs many). Probably not — this is a
+   different kind of project. Better as a separately-positioned
+   "Civic.Social hosted" offering for operators who want to outsource
+   infra, kept distinct from the open-source self-host story.
+
+### Recommended ordering
+
+- **Near term (post-launch):** Approach 2. Pull every hardcoded "Floyd"
+  / "Floyd County" / banner path / intro text reference into one config
+  object. Incrementally useful even before any second hub exists.
+- **Medium term:** Approach 3. Build an admin settings UI for the
+  most-edited items, on top of the existing `hub_settings` table.
+- **Longer term, post-pilot:** Approach 4. Setup wizard. Only worth
+  building once there's evidence of multiple operators wanting to spin
+  up.
+- **Probably not, or only as a separate offering:** Approach 5.
+
+### Signals to watch
+
+- Approach 1's friction starts hurting → time for Approach 2 (when
+  forking and editing 12 files for each new hub becomes the bottleneck).
+- Hand-walking every new operator through a Vercel deploy → time for
+  Approach 4.
+- Until those signals show up, the work is speculative. **In the
+  meantime, anytime a hardcoded "Floyd" string is encountered while
+  building a slice, push it into an env var or a content file.** By the
+  time hub #2 arrives, half the refactor will already be done.
+
+### Adjacent ideas already in this file
+
+- "Theme uploader" (UI / UX section) — overlapping with Approach 3.
+- "User-record roles" (Governance section) — overlapping with
+  Approach 3 for admin/Board role management.
+- These should be consolidated under whatever multi-tenancy slice
+  eventually graduates from this section.
+
 ---
 
 ## Log of ideas that graduated

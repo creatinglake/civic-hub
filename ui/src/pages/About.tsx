@@ -1,6 +1,15 @@
+import { useState } from "react";
 import { Link } from "react-router-dom";
+import { clearIntroSeen } from "../components/IntroPopup";
 
 export default function About() {
+  const [introCleared, setIntroCleared] = useState(false);
+
+  function handleShowWelcomeAgain() {
+    clearIntroSeen();
+    setIntroCleared(true);
+  }
+
   return (
     <div className="page about-page">
       <Link to="/" className="back-link">&larr; Home</Link>
@@ -103,6 +112,21 @@ export default function About() {
         <p>
           For questions or feedback:{" "}
           <a href="mailto:contact@civic.social">contact@civic.social</a>
+        </p>
+        <p className="about-welcome-reset">
+          {introCleared ? (
+            <span>
+              Welcome will reappear next time you visit the home page.
+            </span>
+          ) : (
+            <button
+              type="button"
+              className="about-welcome-reset-button"
+              onClick={handleShowWelcomeAgain}
+            >
+              Show me the welcome again
+            </button>
+          )}
         </p>
       </section>
     </div>

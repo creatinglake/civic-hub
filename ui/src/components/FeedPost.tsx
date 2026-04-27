@@ -41,6 +41,14 @@ export interface FeedPostView {
   href: string;
   imageUrl?: string | null;
   imageAlt?: string | null;
+  /**
+   * Slice 10 — compact engagement / metadata line rendered between the
+   * summary and the timestamp. Empty / missing → suppressed entirely
+   * so cards with no real engagement don't show a "0 residents voted"
+   * line. The Feed container builds this from the per-process
+   * metadata it already fetches lazily — see Feed.tsx::buildEngagement.
+   */
+  engagement?: string | null;
 }
 
 interface Props {
@@ -176,15 +184,12 @@ export function eventToPost(
         const title = meetingTitle
           ? meetingTitle
           : `Meeting summary — ${formatMeetingDate(meetingDate)}`;
-        const noun = blockCount === 1 ? "topic" : "topics";
-        const summary =
-          blockCount !== null
-            ? meetingDate
-              ? `${formatMeetingDate(meetingDate)} · ${blockCount} ${noun} covered.`
-              : `${blockCount} ${noun} covered.`
-            : meetingDate
-            ? formatMeetingDate(meetingDate)
-            : "";
+        // Slice 10: summary now carries the meeting date as context;
+        // the engagement line below this carries the topic count +
+        // duration. Splitting them avoids "12 topics covered" appearing
+        // on both lines.
+        void blockCount;
+        const summary = meetingDate ? formatMeetingDate(meetingDate) : "";
         return {
           id: event.id,
           title,
@@ -207,11 +212,14 @@ export function eventToPost(
 
       if (isVoteResults) {
         const title = getProcessTitle(event.process_id) ?? "Vote results";
-        const count = data.participation_count ?? 0;
-        const noun = count === 1 ? "resident" : "residents";
+        // Slice 10: the summary now carries context (the headline
+        // result or a "delivered to the Board" indicator), and the
+        // engagement line below carries the participation count +
+        // comment count. Splitting them avoids the duplication that
+        // showed up when both lines said "N residents voted".
         const summary = data.headline_result
-          ? `${count} ${noun} voted — ${data.headline_result}`
-          : `${count} ${noun} voted — delivered to the Board.`;
+          ? String(data.headline_result)
+          : "Delivered to the Board of Supervisors.";
         return {
           id: event.id,
           title,
@@ -369,6 +377,9 @@ export default function FeedPost({ post }: Props) {
         <span className={pillClass}>{post.pillLabel}</span>
       </div>
       {post.summary && <p className="feed-post-summary">{post.summary}</p>}
+      {post.engagement && (
+        <p className="feed-post-engagement">{post.engagement}</p>
+      )}
       <time
         className="feed-post-time"
         dateTime={post.timestamp}
