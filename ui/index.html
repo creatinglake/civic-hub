@@ -31,6 +31,14 @@
       .app {
         min-height: 100dvh;
       }
+      /* TEMPORARY diagnostic: bright outlines on the top elements so we
+         can see exactly where each one ends on iOS Chrome. Remove once
+         the gap question is settled. `outline` doesn't affect layout
+         the way `border` would. */
+      .civic-nav { outline: 3px solid red !important; }
+      .hub-banner { outline: 3px solid blue !important; }
+      .page-shell { outline: 3px solid green !important; }
+      .hub-banner img { outline: 3px solid magenta !important; }
     </style>
     <title>Floyd County, VA — Civic Hub</title>
     <meta name="description" content="Vote on local issues and see where our community stands. Floyd County, Virginia Civic Hub." />
