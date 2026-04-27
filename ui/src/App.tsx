@@ -46,8 +46,14 @@ function AppContent() {
     <div className="app">
       {showIntro && <IntroPopup onDismiss={() => setShowIntro(false)} />}
 
-      <BannerSlot />
+      {/* Slice 11 follow-up: Nav above the banner. On mobile this fills
+          what would otherwise be a gap between iOS Chrome's URL bar
+          and the banner image; on desktop the banner still leads on
+          banner-eligible routes, but the nav is now the first thing
+          painted everywhere. The Nav is `position: sticky; top: 0`
+          so it stays pinned regardless of scroll position. */}
       <Nav />
+      <BannerSlot />
 
       <main className="page-shell">
         <Routes>
