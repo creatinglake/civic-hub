@@ -175,10 +175,12 @@ function sanitizeContent(c: AnnouncementContent): AnnouncementContent {
     links.push({ label, url });
   }
 
-  // Image attachment validation. image_url is optional; when present,
-  // image_alt is REQUIRED (non-empty, ≤ IMAGE_ALT_MAX). The accessibility
-  // contract is that no screen-reader user encounters an unlabeled
-  // featured image.
+  // Image attachment validation. image_url is optional; image_alt is
+  // optional but strongly encouraged for accessibility. The composer
+  // surfaces a hint about screen-reader users; we don't reject empty
+  // alt because (a) some images are decorative — WCAG actually wants
+  // empty alt in that case — and (b) requiring alt tends to produce
+  // low-quality "image" / "photo" alt strings that are worse than empty.
   let image_url: string | null = null;
   let image_alt: string | null = null;
   const rawUrl = typeof c.image_url === "string" ? c.image_url.trim() : "";
@@ -190,16 +192,11 @@ function sanitizeContent(c: AnnouncementContent): AnnouncementContent {
     if (!/^https?:\/\//i.test(rawUrl)) {
       throw new Error("Image URL must start with http:// or https://.");
     }
-    if (rawAlt.length === 0) {
-      throw new Error(
-        "Alt text is required when an image is attached. Describe the image briefly for screen readers.",
-      );
-    }
     if (rawAlt.length > IMAGE_ALT_MAX) {
       throw new Error(`Alt text must be <= ${IMAGE_ALT_MAX} characters.`);
     }
     image_url = rawUrl;
-    image_alt = rawAlt;
+    image_alt = rawAlt.length > 0 ? rawAlt : null;
   } else if (rawAlt.length > 0) {
     // Alt without an image is meaningless — treat as no image rather
     // than rejecting outright (the composer can race the two fields).

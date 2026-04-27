@@ -15,7 +15,8 @@ import type { CivicEvent } from "../services/api";
 export type FeedPillKind =
   | "vote-open"
   | "vote-results"
-  | "announcement"
+  | "announcement"          // admin-authored announcements (default)
+  | "announcement-author"   // non-admin author (Board, committees, etc.)
   | "meeting";
 
 /**
@@ -130,15 +131,19 @@ export function eventToPost(
             : rawLabel === "admin" || !rawLabel
             ? "Admin"
             : rawLabel;
-        const pillLabel =
-          normalized === "Admin"
-            ? "Admin announcement"
-            : `${normalized} announcement`;
+        const isAdmin = normalized === "Admin";
+        const pillLabel = isAdmin
+          ? "Admin announcement"
+          : `${normalized} announcement`;
         return {
           id: event.id,
           title,
           pillLabel,
-          pillKind: "announcement",
+          // Non-admin authors (Board members, committees, etc.) get a
+          // distinct pill + card border color so residents can tell
+          // which announcements come from elected officials vs the
+          // hub administrator.
+          pillKind: isAdmin ? "announcement" : "announcement-author",
           summary: summaryFromDescription(
             getProcessDescription(event.process_id),
           ),

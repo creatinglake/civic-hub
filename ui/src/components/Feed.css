@@ -83,10 +83,11 @@
 .feed-post {
   border-top: 4px solid var(--color-border);
 }
-.feed-post--vote-open    { border-top-color: var(--pill-vote-bg); }
-.feed-post--vote-results { border-top-color: var(--pill-vote-results-bg); }
-.feed-post--announcement { border-top-color: var(--pill-announcement-bg); }
-.feed-post--meeting      { border-top-color: var(--pill-meeting-bg); }
+.feed-post--vote-open           { border-top-color: var(--pill-vote-bg); }
+.feed-post--vote-results        { border-top-color: var(--pill-vote-results-bg); }
+.feed-post--announcement        { border-top-color: var(--pill-announcement-bg); }
+.feed-post--announcement-author { border-top-color: var(--pill-announcement-author-bg); }
+.feed-post--meeting             { border-top-color: var(--pill-meeting-bg); }
 
 .feed-post-link:focus-visible {
   outline: 2px solid var(--color-focus);
@@ -171,10 +172,11 @@
  * review" pill, but no FeedPost code path emits the `--vote-results`
  * blue class today.
  */
-.feed-pill--vote-open    { background: var(--pill-vote-bg);         color: var(--pill-vote-fg); }
-.feed-pill--vote-results { background: var(--pill-vote-results-bg); color: var(--pill-vote-results-fg); }
-.feed-pill--announcement { background: var(--pill-announcement-bg); color: var(--pill-announcement-fg); }
-.feed-pill--meeting      { background: var(--pill-meeting-bg);      color: var(--pill-meeting-fg); }
+.feed-pill--vote-open           { background: var(--pill-vote-bg);                color: var(--pill-vote-fg); }
+.feed-pill--vote-results        { background: var(--pill-vote-results-bg);        color: var(--pill-vote-results-fg); }
+.feed-pill--announcement        { background: var(--pill-announcement-bg);        color: var(--pill-announcement-fg); }
+.feed-pill--announcement-author { background: var(--pill-announcement-author-bg); color: var(--pill-announcement-author-fg); }
+.feed-pill--meeting             { background: var(--pill-meeting-bg);             color: var(--pill-meeting-fg); }
 
 /* --- Load more --- */
 

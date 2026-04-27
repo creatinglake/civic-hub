@@ -124,10 +124,10 @@ export default function PostImagePicker({
           </div>
 
           <label className="post-image-picker-alt-label" htmlFor="post-image-alt">
-            Describe this image for people using screen readers <span className="required">*</span>
+            Describe this image for people using screen readers <span className="optional">(optional but recommended)</span>
           </label>
           <p className="form-hint">
-            E.g. "Main Street with autumn leaves" — not "photo of Main Street". Required when an image is attached.
+            E.g. "Main Street with autumn leaves" — not "photo of Main Street". Helps residents using screen readers understand what's in the photo.
           </p>
           <textarea
             id="post-image-alt"

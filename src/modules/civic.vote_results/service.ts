@@ -142,9 +142,11 @@ export async function editVoteResults(
 }
 
 /**
- * Validate and normalize the image_url / image_alt pair. Same contract
- * as civic.announcement: image_url is optional but, when set, requires
- * a non-empty alt of <= IMAGE_ALT_MAX. URL must be http(s).
+ * Validate and normalize the image_url / image_alt pair. Mirrors
+ * civic.announcement: image_url is optional; image_alt is also
+ * optional but encouraged (the composer's hint asks the admin to add
+ * one). We don't reject empty alt — see civic.announcement/service.ts
+ * sanitizeContent for the rationale.
  */
 function sanitizeImage(
   rawUrl: string | null | undefined,
@@ -161,15 +163,10 @@ function sanitizeImage(
   if (!/^https?:\/\//i.test(url)) {
     throw new Error("Image URL must start with http:// or https://.");
   }
-  if (alt.length === 0) {
-    throw new Error(
-      "Alt text is required when an image is attached. Describe the image briefly for screen readers.",
-    );
-  }
   if (alt.length > IMAGE_ALT_MAX) {
     throw new Error(`Alt text must be <= ${IMAGE_ALT_MAX} characters.`);
   }
-  return { image_url: url, image_alt: alt };
+  return { image_url: url, image_alt: alt.length > 0 ? alt : null };
 }
 
 function sanitizeList(items: string[]): string[] {

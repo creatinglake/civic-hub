@@ -109,26 +109,21 @@ export default function PostAnnouncement() {
       .filter((l) => l.label.length > 0 || l.url.length > 0);
 
     // Image fields: send `null` (not undefined) to clear an existing
-    // image on edit, or a string to set/replace. Alt text is required
-    // when image_url is set; the backend rejects with a clear error
-    // otherwise — we mirror the check here so the user gets feedback
-    // without a round-trip.
-    if (imageUrl && (!imageAlt || imageAlt.trim().length === 0)) {
-      setError(
-        "Alt text is required when an image is attached. Please describe the image briefly for screen readers.",
-      );
-      return;
-    }
-
+    // image on edit, or a string to set/replace. Alt text is optional;
+    // the picker hints toward adding it for accessibility but doesn't
+    // block submission when empty.
     setSubmitting(true);
     try {
+      const altToSend = imageUrl
+        ? ((imageAlt ?? "").trim().length > 0 ? imageAlt!.trim() : null)
+        : null;
       if (isEditMode && editId) {
         await updateAnnouncement(editId, {
           title: title.trim(),
           body: body.trim(),
           links: cleanedLinks,
           image_url: imageUrl,
-          image_alt: imageUrl ? (imageAlt ?? "").trim() : null,
+          image_alt: altToSend,
         });
         navigate(`/announcement/${editId}`);
       } else {
@@ -137,7 +132,7 @@ export default function PostAnnouncement() {
           body: body.trim(),
           links: cleanedLinks,
           image_url: imageUrl,
-          image_alt: imageUrl ? (imageAlt ?? "").trim() : null,
+          image_alt: altToSend,
         });
         navigate(`/announcement/${created.id}`);
       }

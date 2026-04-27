@@ -98,22 +98,19 @@ export default function AdminVoteResults() {
   }, [routeId]);
 
   function buildPatch() {
+    const altTrimmed = (imageAlt ?? "").trim();
     return {
       comments: parseCommentsText(commentsText),
       admin_notes: adminNotes,
       image_url: imageUrl,
-      image_alt: imageUrl ? (imageAlt ?? "").trim() : null,
+      // Alt is optional. Only send a non-empty string; otherwise null
+      // so the field clears on save.
+      image_alt: imageUrl && altTrimmed.length > 0 ? altTrimmed : null,
     };
   }
 
   async function saveDraft() {
     if (!selected) return;
-    if (imageUrl && (!imageAlt || imageAlt.trim().length === 0)) {
-      setError(
-        "Alt text is required when an image is attached. Please describe the image briefly for screen readers.",
-      );
-      return;
-    }
     setSaving(true);
     setError(null);
     try {
@@ -131,12 +128,6 @@ export default function AdminVoteResults() {
 
   async function approve() {
     if (!selected) return;
-    if (imageUrl && (!imageAlt || imageAlt.trim().length === 0)) {
-      setError(
-        "Alt text is required when an image is attached. Please describe the image briefly for screen readers.",
-      );
-      return;
-    }
     setApproving(true);
     setError(null);
     try {
