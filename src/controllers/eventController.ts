@@ -5,6 +5,30 @@
 
 import { Request, Response } from "express";
 import { getAllEvents, getEventsByProcessId } from "../events/eventStore.js";
+import { getUserFromToken } from "../modules/civic.auth/index.js";
+import { isAdminEmail } from "../middleware/auth.js";
+
+/**
+ * Slice 11 — events with `meta.visibility === "restricted"` are
+ * moderation audit events. They MUST NOT appear on the public event
+ * feed. Admins, however, do see them so they can audit moderation
+ * actions externally if needed. We do a best-effort token check; any
+ * failure short of an admin-positive identification falls back to the
+ * public view.
+ */
+async function callerIsAdmin(req: Request): Promise<boolean> {
+  const auth = req.headers.authorization;
+  if (!auth || !auth.startsWith("Bearer ")) return false;
+  const token = auth.slice(7);
+  if (!token) return false;
+  try {
+    const user = await getUserFromToken(token);
+    if (!user) return false;
+    return isAdminEmail(user.email);
+  } catch {
+    return false;
+  }
+}
 
 export async function handleGetEvents(
   req: Request,
@@ -18,6 +42,13 @@ export async function handleGetEvents(
     let events = processId
       ? await getEventsByProcessId(processId)
       : await getAllEvents();
+
+    // Restricted events are admin-only. Default to public view; only
+    // include restricted events when the caller authenticates as admin.
+    const isAdmin = await callerIsAdmin(req);
+    if (!isAdmin) {
+      events = events.filter((e) => e.meta?.visibility !== "restricted");
+    }
 
     // Optional: further filter by event type (combinable with process_id)
     if (eventType) {

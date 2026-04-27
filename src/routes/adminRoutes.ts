@@ -25,6 +25,13 @@ import {
   handleGetSettings,
   handlePatchSettings,
 } from "../controllers/adminSettingsController.js";
+import {
+  handleGetModerationLog,
+  handleHideComment,
+  handleRemoveAnnouncement,
+  handleRestoreAnnouncement,
+  handleRestoreComment,
+} from "../controllers/moderationController.js";
 import { requireAdmin } from "../middleware/auth.js";
 
 const router = Router();
@@ -53,5 +60,21 @@ router.post("/meeting-summaries/:id/approve", handleApproveMeetingSummary);
 // Hub settings (admin-configurable; overrides env var fallbacks)
 router.get("/settings", handleGetSettings);
 router.patch("/settings", handlePatchSettings);
+
+// Moderation (Slice 11). Every action emits a restricted-visibility
+// civic.process.updated event for the audit trail; the moderation log
+// reads those events back. Routes deliberately mirror the resource
+// they act on so admins can navigate between them in muscle memory.
+router.post("/moderation/comments/:commentId/hide", handleHideComment);
+router.post("/moderation/comments/:commentId/restore", handleRestoreComment);
+router.post(
+  "/moderation/announcements/:id/remove",
+  handleRemoveAnnouncement,
+);
+router.post(
+  "/moderation/announcements/:id/restore",
+  handleRestoreAnnouncement,
+);
+router.get("/moderation/log", handleGetModerationLog);
 
 export default router;

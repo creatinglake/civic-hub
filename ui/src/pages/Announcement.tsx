@@ -1,6 +1,11 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { getAnnouncement, type Announcement } from "../services/api";
+import {
+  adminRemoveAnnouncement,
+  adminRestoreAnnouncement,
+  getAnnouncement,
+  type Announcement,
+} from "../services/api";
 import { useAuth } from "../context/AuthContext";
 import { relativeTime, absoluteTime } from "../components/FeedPost";
 import PostFeaturedImage from "../components/PostFeaturedImage";
@@ -9,6 +14,14 @@ import "./Announcement.css";
 
 const URL_RE = /\bhttps?:\/\/\S+/gi;
 
+const REASON_CHIPS = [
+  "Personal attack",
+  "Harassment",
+  "Doxxing",
+  "Spam",
+  "Other",
+] as const;
+
 export default function AnnouncementPage() {
   const { id } = useParams<{ id: string }>();
   const { user, isAdmin } = useAuth();
@@ -16,6 +29,14 @@ export default function AnnouncementPage() {
   const [announcement, setAnnouncement] = useState<Announcement | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Slice 11 — admin moderation controls. The remove modal opens when
+  // the admin clicks "Remove announcement" and stays mounted until the
+  // request resolves (or the admin cancels).
+  const [showRemoveModal, setShowRemoveModal] = useState(false);
+  const [removeReason, setRemoveReason] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [moderationError, setModerationError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!id) return;
@@ -68,6 +89,43 @@ export default function AnnouncementPage() {
   const canEdit =
     isAdmin || (!!user?.id && user.id === announcement.author_id);
   const wasEdited = announcement.edit_count > 0;
+  const isRemoved = !!announcement.moderation?.removed;
+
+  async function handleRemoveSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!id) return;
+    if (removeReason.trim().length === 0) {
+      setModerationError("Please choose or enter a reason.");
+      return;
+    }
+    setModerationError(null);
+    setSubmitting(true);
+    try {
+      const updated = await adminRemoveAnnouncement(id, removeReason.trim());
+      setAnnouncement(updated);
+      setShowRemoveModal(false);
+      setRemoveReason("");
+    } catch (err) {
+      setModerationError(
+        err instanceof Error ? err.message : "Could not remove announcement",
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function handleRestore() {
+    if (!id) return;
+    setModerationError(null);
+    try {
+      const updated = await adminRestoreAnnouncement(id);
+      setAnnouncement(updated);
+    } catch (err) {
+      setModerationError(
+        err instanceof Error ? err.message : "Could not restore",
+      );
+    }
+  }
 
   return (
     <article className="page announcement-page">
@@ -98,7 +156,7 @@ export default function AnnouncementPage() {
               </time>
             </>
           )}
-          {canEdit && (
+          {canEdit && !isRemoved && (
             <>
               {" · "}
               <Link
@@ -112,64 +170,185 @@ export default function AnnouncementPage() {
         </p>
       </header>
 
-      {announcement.image_url && (
-        <PostFeaturedImage
-          src={announcement.image_url}
-          alt={announcement.image_alt ?? ""}
-        />
+      {/* Slice 11 — admin moderation toolbar. Visible only to admins
+          and only on the announcement detail page (not the feed card).
+          Sits under the header so the admin can act without scrolling
+          past the content. */}
+      {isAdmin && (
+        <div className="announcement-admin-toolbar" role="region" aria-label="Moderation">
+          {isRemoved ? (
+            <>
+              <span>
+                <strong>Removed</strong>
+                {announcement.moderation?.reason && (
+                  <> · {announcement.moderation.reason}</>
+                )}
+              </span>
+              <button type="button" onClick={handleRestore}>
+                Restore announcement
+              </button>
+            </>
+          ) : (
+            <button
+              type="button"
+              className="danger"
+              onClick={() => {
+                setShowRemoveModal(true);
+                setRemoveReason("");
+                setModerationError(null);
+              }}
+            >
+              Remove announcement
+            </button>
+          )}
+          {moderationError && (
+            <span className="form-error">{moderationError}</span>
+          )}
+        </div>
       )}
 
-      <div className="announcement-body">
-        {announcement.body.split(/\n\n+/).map((para, i) => (
-          <p key={i} className="announcement-paragraph">
-            {para.split(/\n/).map((line, j, arr) => (
-              <span key={j}>
-                {line}
-                {j < arr.length - 1 && <br />}
-              </span>
-            ))}
-          </p>
-        ))}
-      </div>
+      {isRemoved ? (
+        <p className="announcement-tombstone">
+          This announcement was removed by a moderator for violating the{" "}
+          <Link to="/code-of-conduct">Code of Conduct</Link>.
+        </p>
+      ) : (
+        <>
+          {announcement.image_url && (
+            <PostFeaturedImage
+              src={announcement.image_url}
+              alt={announcement.image_alt ?? ""}
+            />
+          )}
 
-      {(() => {
-        // Render preview cards for any unique URL found in the body.
-        // Slice 9 contract: previews fall back to plain links inside
-        // <LinkPreviewCard> when the upstream OG fetch fails. We dedupe
-        // here so a body that mentions the same URL twice produces one
-        // card.
-        const urls = Array.from(
-          new Set(
-            (announcement.body.match(URL_RE) ?? [])
-              .map((u) => u.replace(/[)\].,;!?]+$/, ""))
-              .filter((u) => u.length > 0),
-          ),
-        );
-        if (urls.length === 0) return null;
-        return (
-          <section className="announcement-link-previews" aria-label="Linked previews">
-            {urls.map((u) => (
-              <LinkPreviewCard key={u} url={u} />
+          <div className="announcement-body">
+            {announcement.body.split(/\n\n+/).map((para, i) => (
+              <p key={i} className="announcement-paragraph">
+                {para.split(/\n/).map((line, j, arr) => (
+                  <span key={j}>
+                    {line}
+                    {j < arr.length - 1 && <br />}
+                  </span>
+                ))}
+              </p>
             ))}
-          </section>
-        );
-      })()}
+          </div>
 
-      {announcement.links.length > 0 && (
-        <section className="announcement-links">
-          <h2>Links</h2>
-          <ul>
-            {announcement.links.map((link, i) => (
-              <li key={i}>
-                <a href={link.url} target="_blank" rel="noopener noreferrer">
-                  {link.label}
-                </a>
-              </li>
-            ))}
-          </ul>
-        </section>
+          {(() => {
+            // Render preview cards for any unique URL found in the body.
+            const urls = Array.from(
+              new Set(
+                (announcement.body.match(URL_RE) ?? [])
+                  .map((u) => u.replace(/[)\].,;!?]+$/, ""))
+                  .filter((u) => u.length > 0),
+              ),
+            );
+            if (urls.length === 0) return null;
+            return (
+              <section
+                className="announcement-link-previews"
+                aria-label="Linked previews"
+              >
+                {urls.map((u) => (
+                  <LinkPreviewCard key={u} url={u} />
+                ))}
+              </section>
+            );
+          })()}
+
+          {announcement.links.length > 0 && (
+            <section className="announcement-links">
+              <h2>Links</h2>
+              <ul>
+                {announcement.links.map((link, i) => (
+                  <li key={i}>
+                    <a href={link.url} target="_blank" rel="noopener noreferrer">
+                      {link.label}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+        </>
+      )}
+
+      {/* Slice 11 — Remove-announcement modal. Reuses the intro-overlay
+          shell + the chip pattern from the comment-hide modal. The
+          reason is internal-audit only and stamps the moderation
+          event's data.moderation.reason. */}
+      {showRemoveModal && (
+        <div
+          className="intro-overlay"
+          onClick={() => !submitting && setShowRemoveModal(false)}
+        >
+          <form
+            className="intro-modal moderation-modal"
+            onSubmit={handleRemoveSubmit}
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Remove this announcement"
+          >
+            <h2 className="auth-title">Remove this announcement?</h2>
+            <p className="auth-description">
+              The announcement will be replaced with a tombstone for
+              everyone. The reason is stored in the moderation audit
+              log and is not shown to the public.
+            </p>
+
+            <div className="moderation-chips" role="list">
+              {REASON_CHIPS.map((chip) => (
+                <button
+                  key={chip}
+                  type="button"
+                  role="listitem"
+                  className={`moderation-chip${removeReason === chip ? " is-active" : ""}`}
+                  onClick={() => setRemoveReason(chip)}
+                  disabled={submitting}
+                >
+                  {chip}
+                </button>
+              ))}
+            </div>
+
+            <label className="form-field">
+              <span className="form-label">Reason (required)</span>
+              <textarea
+                className="form-input"
+                value={removeReason}
+                onChange={(e) => setRemoveReason(e.target.value)}
+                maxLength={500}
+                rows={3}
+                disabled={submitting}
+                placeholder="Brief description of the violation"
+              />
+            </label>
+
+            {moderationError && (
+              <p className="form-error">{moderationError}</p>
+            )}
+
+            <div className="moderation-modal-actions">
+              <button
+                type="submit"
+                className="auth-continue-button"
+                disabled={submitting || removeReason.trim().length === 0}
+              >
+                {submitting ? "Removing…" : "Remove announcement"}
+              </button>
+              <button
+                type="button"
+                className="auth-back-link"
+                onClick={() => setShowRemoveModal(false)}
+                disabled={submitting}
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
+        </div>
       )}
     </article>
   );
 }
-

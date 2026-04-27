@@ -11,6 +11,7 @@ import {
   handleRequestCode,
   handleVerify,
   handleAffirmResidency,
+  handleAcceptTos,
   handleGetMe,
   handleLogout,
 } from "../controllers/authController.js";
@@ -20,6 +21,7 @@ const router = Router();
 router.post("/request-code", handleRequestCode);
 router.post("/verify", handleVerify);
 router.post("/residency", handleAffirmResidency);
+router.post("/accept-tos", handleAcceptTos);
 router.get("/me", handleGetMe);
 router.post("/logout", handleLogout);
 

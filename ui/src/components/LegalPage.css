@@ -1,0 +1,94 @@
+/* Slice 11 — typography for the three legal pages. We restate the
+   theme tokens (Manrope for headings, Inter for body — see
+   styles/theme.css) and cap reading width to 70ch so long paragraphs
+   stay scannable on wide monitors. The styling here is deliberately
+   conservative: a legal document is a reading task, not a UI surface
+   to design around. */
+
+.legal-page {
+  /* Match the prose width to the standard reading-width recommendation.
+     The .page wrapper already centers and adds horizontal padding. */
+  max-width: 70ch;
+}
+
+.legal-prose {
+  font-family: var(--font-body);
+  font-size: var(--font-size-base);
+  line-height: var(--line-height-relaxed);
+  color: var(--color-text, #1f2937);
+}
+
+.legal-prose h1 {
+  font-family: var(--font-heading);
+  font-size: var(--font-size-3xl);
+  line-height: var(--line-height-tight);
+  margin: 0 0 var(--space-md);
+}
+
+.legal-prose h2 {
+  font-family: var(--font-heading);
+  font-size: var(--font-size-xl);
+  line-height: var(--line-height-tight);
+  margin: var(--space-xl) 0 var(--space-sm);
+}
+
+.legal-prose h3 {
+  font-family: var(--font-heading);
+  font-size: var(--font-size-lg);
+  margin: var(--space-lg) 0 var(--space-xs);
+}
+
+.legal-prose p {
+  margin: 0 0 var(--space-md);
+}
+
+.legal-prose ul,
+.legal-prose ol {
+  margin: 0 0 var(--space-md);
+  padding-left: 1.5rem;
+}
+
+.legal-prose li {
+  margin: 0 0 var(--space-xs);
+}
+
+.legal-prose blockquote {
+  /* The "Draft starter content" callout at the top of every legal doc
+     uses a blockquote — set it apart with a soft tinted background so
+     readers (and the admin doing find-and-replace later) notice it. */
+  background: var(--color-surface-warning, #fff8e6);
+  border-left: 3px solid var(--color-warning, #d4a017);
+  margin: var(--space-md) 0;
+  padding: var(--space-sm) var(--space-md);
+  font-size: var(--font-size-sm);
+  color: var(--color-text, #1f2937);
+}
+
+.legal-prose blockquote p:last-child {
+  margin-bottom: 0;
+}
+
+.legal-prose hr {
+  border: 0;
+  border-top: 1px solid var(--color-border, #e5e7eb);
+  margin: var(--space-xl) 0;
+}
+
+.legal-prose a {
+  color: var(--color-link, #1e3a5f);
+  text-decoration: underline;
+}
+
+.legal-prose code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.9em;
+  background: var(--color-surface-muted, #f3f4f6);
+  padding: 1px 5px;
+  border-radius: var(--radius-sm, 4px);
+}
+
+.legal-prose em {
+  /* The "Last updated" line uses italic — keep it visually quiet. */
+  color: var(--color-text-muted, #6b7280);
+  font-style: italic;
+}

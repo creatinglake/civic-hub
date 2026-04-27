@@ -67,11 +67,50 @@
 /* --- Footer --- */
 
 .app-footer {
-  text-align: center;
+  /* Slice 11 — two-row footer with the wordmark/tagline on the left
+     and the legal links on the right. Stacks vertically on mobile.
+     One step smaller than body text and muted, so it sits quietly
+     beneath whatever page is in focus. */
   padding: var(--space-xl) var(--space-md) var(--space-lg);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-subtle);
+  border-top: 1px solid var(--color-border, #e5e7eb);
+  margin-top: var(--space-xl);
+}
+
+.app-footer-inner {
   max-width: var(--max-width-shell);
   margin: 0 auto;
-  font-size: var(--font-size-xs);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+}
+
+.app-footer-brand {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.app-footer-brand strong {
+  font-weight: 600;
+  color: var(--color-text, #1f2937);
+}
+
+.app-footer-tagline {
+  color: var(--color-text-subtle);
+}
+
+.app-footer-links {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  flex-wrap: wrap;
+}
+
+.app-footer-links span[aria-hidden="true"] {
   color: var(--color-text-subtle);
 }
 
@@ -83,6 +122,225 @@
 
 .app-footer a:hover {
   color: var(--muted-text);
+}
+
+@media (max-width: 600px) {
+  .app-footer-inner {
+    flex-direction: column;
+    align-items: flex-start;
+    text-align: left;
+  }
+}
+
+/* --- Slice 11: AuthModal legal-acceptance checkbox + re-accept modal --- */
+
+.auth-legal-checkbox {
+  font-size: var(--font-size-sm);
+  margin-top: var(--space-md);
+}
+
+.auth-legal-checkbox a {
+  color: var(--color-link, #1e3a5f);
+  text-decoration: underline;
+}
+
+.re-accept-modal {
+  /* Re-acceptance is blocking — drop the close affordance the
+     standard intro modal uses by hiding it inside this variant. */
+  position: relative;
+}
+
+.re-accept-links {
+  list-style: none;
+  padding: 0;
+  margin: var(--space-md) 0 var(--space-sm);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  font-size: var(--font-size-sm);
+}
+
+.re-accept-links a {
+  color: var(--color-link, #1e3a5f);
+  text-decoration: underline;
+}
+
+.re-accept-version {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-subtle);
+  margin: 0 0 var(--space-md);
+}
+
+.re-accept-actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  margin-top: var(--space-md);
+}
+
+/* --- Slice 11: moderation tombstones + admin controls --- */
+
+.input-tombstone,
+.announcement-tombstone {
+  font-style: italic;
+  color: var(--color-text-subtle);
+  background: var(--color-surface-muted, #f3f4f6);
+  border-left: 3px solid var(--color-border, #d1d5db);
+  padding: var(--space-sm) var(--space-md);
+  margin: var(--space-sm) 0;
+  border-radius: var(--radius-sm, 4px);
+}
+
+.announcement-tombstone {
+  font-size: var(--font-size-base);
+  padding: var(--space-md);
+  margin: var(--space-md) 0;
+}
+
+.input-item-hidden .input-body {
+  /* Hidden comments aren't shown to residents at all — the tombstone
+     replaces them. The admin shadow body has its own selector below. */
+}
+
+.input-admin-shadow {
+  margin-top: var(--space-xs);
+  padding: var(--space-sm);
+  border: 1px dashed var(--color-border, #d1d5db);
+  border-radius: var(--radius-sm, 4px);
+  background: rgba(0, 0, 0, 0.02);
+}
+
+.input-body-shadow {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-subtle);
+  margin: 0 0 var(--space-xs);
+}
+
+.input-admin-meta {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-subtle);
+  margin: 0 0 var(--space-xs);
+}
+
+.input-admin-link {
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  font-size: var(--font-size-xs);
+  color: var(--color-link, #1e3a5f);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.input-admin-link:hover {
+  color: var(--color-link-hover, #14304a);
+}
+
+.input-admin-button {
+  font: inherit;
+  font-size: var(--font-size-xs);
+  padding: 2px 8px;
+  border: 1px solid var(--color-border, #d1d5db);
+  background: white;
+  border-radius: var(--radius-sm, 4px);
+  cursor: pointer;
+}
+
+.moderation-modal {
+  max-width: 480px;
+}
+
+.moderation-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+  margin: var(--space-sm) 0 var(--space-md);
+}
+
+.moderation-chip {
+  font: inherit;
+  font-size: var(--font-size-sm);
+  padding: 4px 10px;
+  border: 1px solid var(--color-border, #d1d5db);
+  background: white;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.moderation-chip.is-active {
+  background: var(--color-link, #1e3a5f);
+  color: white;
+  border-color: var(--color-link, #1e3a5f);
+}
+
+.moderation-modal-actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  margin-top: var(--space-md);
+}
+
+.announcement-admin-toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  margin: var(--space-md) 0;
+  padding: var(--space-sm) var(--space-md);
+  background: var(--color-surface-muted, #f9fafb);
+  border: 1px solid var(--color-border, #e5e7eb);
+  border-radius: var(--radius-sm, 4px);
+  font-size: var(--font-size-sm);
+}
+
+.announcement-admin-toolbar button {
+  font: inherit;
+  padding: 4px 10px;
+  border: 1px solid var(--color-border, #d1d5db);
+  background: white;
+  border-radius: var(--radius-sm, 4px);
+  cursor: pointer;
+}
+
+.announcement-admin-toolbar .danger {
+  color: #8c1c1c;
+  border-color: #c87c7c;
+}
+
+.admin-moderation-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--font-size-sm);
+  margin-top: var(--space-md);
+}
+
+.admin-moderation-table th,
+.admin-moderation-table td {
+  padding: var(--space-sm) var(--space-md);
+  border-bottom: 1px solid var(--color-border, #e5e7eb);
+  text-align: left;
+  vertical-align: top;
+}
+
+.admin-moderation-table th {
+  background: var(--color-surface-muted, #f9fafb);
+  font-weight: 600;
+}
+
+.admin-moderation-reason {
+  max-width: 28ch;
+  word-break: break-word;
+}
+
+.admin-page-description {
+  color: var(--color-text-subtle);
+  font-size: var(--font-size-sm);
+  margin: 0 0 var(--space-md);
+}
+
+.admin-empty {
+  color: var(--color-text-subtle);
+  font-style: italic;
 }
 
 /* --- Sections --- */

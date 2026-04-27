@@ -50,7 +50,26 @@ export interface AnnouncementProcessState {
   created_at: string;       // ISO 8601
   last_edited_at: string | null;
   edit_count: number;
+  /**
+   * Slice 11 — moderation state. Optional (null on legacy rows that
+   * pre-date the slice). When `removed` is true, the public read model
+   * replaces the body / image / links / link previews with a tombstone;
+   * the feed list endpoint excludes the announcement entirely. Restoring
+   * flips `removed` back to false and stamps `restored_at`.
+   */
+  moderation?: AnnouncementModeration | null;
 }
+
+export interface AnnouncementModeration {
+  removed: boolean;
+  removed_at: string | null;
+  removed_by: string | null;
+  reason: string | null;
+  restored_at: string | null;
+}
+
+/** Max characters in a moderation reason (matches civic.input). */
+export const MODERATION_REASON_MAX = 500;
 
 /** Length caps enforced by the module (also enforced client-side). */
 export const TITLE_MAX = 200;
@@ -77,6 +96,12 @@ export interface EmitEventFn {
     jurisdiction: string;
     data: Record<string, unknown>;
     action_url_path?: string;
+    /**
+     * Slice 11 — moderation events emit with restricted visibility so
+     * they don't appear in the public /events feed or the digest.
+     * Defaults to "public" when omitted.
+     */
+    visibility?: "public" | "restricted";
   }): Promise<unknown>;
 }
 

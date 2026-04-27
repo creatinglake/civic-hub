@@ -11,10 +11,16 @@
 
 import { getDb } from "../../db/client.js";
 import { generateId } from "../../utils/id.js";
-import type { CommunityInput, InputContext } from "./models.js";
-import { BODY_PREVIEW_LEN } from "./models.js";
+import type { CommunityInput, CommentModeration, InputContext } from "./models.js";
+import { BODY_PREVIEW_LEN, MODERATION_REASON_MAX } from "./models.js";
 
-export type { CommunityInput, EmitEventFn, InputContext } from "./models.js";
+export type {
+  CommunityInput,
+  CommentModeration,
+  EmitEventFn,
+  InputContext,
+} from "./models.js";
+export { MODERATION_REASON_MAX } from "./models.js";
 
 interface InputRow {
   id: string;
@@ -22,15 +28,35 @@ interface InputRow {
   author_id: string | null;
   body: string;
   submitted_at: string;
+  hidden_at: string | null;
+  hidden_by: string | null;
+  hidden_reason: string | null;
+  restored_at: string | null;
 }
 
 function rowToInput(row: InputRow): CommunityInput {
+  // The `hidden` flag is derived from the columns: a comment is hidden
+  // iff hidden_at is set AND a later restored_at is not. Storing the
+  // boolean explicitly in the DB would let it drift from the timestamps
+  // — derivation keeps them consistent.
+  let moderation: CommentModeration | null = null;
+  if (row.hidden_at) {
+    const restored = row.restored_at && row.restored_at >= row.hidden_at;
+    moderation = {
+      hidden: !restored,
+      hidden_at: row.hidden_at,
+      hidden_by: row.hidden_by,
+      reason: row.hidden_reason,
+      restored_at: row.restored_at,
+    };
+  }
   return {
     id: row.id,
     process_id: row.process_id,
     author_id: row.author_id ?? "",
     body: row.body,
     submitted_at: row.submitted_at,
+    moderation,
   };
 }
 
@@ -118,6 +144,141 @@ export async function getInputCount(process_id: string): Promise<number> {
     .eq("process_id", process_id);
   if (error) throw new Error(`Input: ${error.message}`);
   return count ?? 0;
+}
+
+/**
+ * Get a single community input by ID, including moderation state.
+ * Returns undefined for unknown IDs. Slice 11 admin tooling uses this
+ * to fetch the comment before applying a hide/restore decision.
+ */
+export async function getInputById(
+  id: string,
+): Promise<CommunityInput | undefined> {
+  const { data, error } = await getDb()
+    .from("community_inputs")
+    .select("*")
+    .eq("id", id)
+    .maybeSingle();
+  if (error) throw new Error(`Input: ${error.message}`);
+  if (!data) return undefined;
+  return rowToInput(data as InputRow);
+}
+
+/**
+ * Slice 11 — admin moderation: hide a comment.
+ *
+ * Records the hide on the comment row (so future reads can redact the
+ * body for the public) and emits a `civic.process.updated` event with
+ * `meta.visibility = "restricted"` and `data.moderation` populated for
+ * the audit trail. Public callers of /events never see the event;
+ * admin callers do (gated in eventController).
+ *
+ * Idempotent: hiding an already-hidden comment is a no-op (returns the
+ * current state without emitting a fresh event), so repeated clicks
+ * don't pollute the audit log.
+ */
+export async function hideComment(
+  comment_id: string,
+  admin_id: string,
+  reason: string,
+  ctx: InputContext,
+): Promise<CommunityInput> {
+  const trimmedReason = (reason ?? "").trim();
+  if (trimmedReason.length === 0) {
+    throw new Error("A reason is required when hiding a comment.");
+  }
+  if (trimmedReason.length > MODERATION_REASON_MAX) {
+    throw new Error(`Reason must be <= ${MODERATION_REASON_MAX} characters.`);
+  }
+
+  const existing = await getInputById(comment_id);
+  if (!existing) throw new Error("Comment not found");
+  if (existing.moderation?.hidden) return existing;
+
+  const now = new Date().toISOString();
+  const { data, error } = await getDb()
+    .from("community_inputs")
+    .update({
+      hidden_at: now,
+      hidden_by: admin_id,
+      hidden_reason: trimmedReason,
+      restored_at: null,
+    })
+    .eq("id", comment_id)
+    .select()
+    .single();
+  if (error) throw new Error(`Input: ${error.message}`);
+  const updated = rowToInput(data as InputRow);
+
+  await ctx.emit({
+    event_type: "civic.process.updated",
+    actor: admin_id,
+    process_id: existing.process_id,
+    hub_id: ctx.hub_id,
+    jurisdiction: ctx.jurisdiction,
+    visibility: "restricted",
+    data: {
+      moderation: {
+        action: "comment_hidden",
+        target: {
+          comment_id: existing.id,
+          comment_author_id: existing.author_id,
+        },
+        reason: trimmedReason,
+        hidden_by: admin_id,
+      },
+    },
+  });
+
+  return updated;
+}
+
+/**
+ * Slice 11 — admin moderation: restore a previously hidden comment.
+ * Records restored_at and emits a restricted-visibility event with
+ * `action: "comment_restored"`. Idempotent: restoring an already-visible
+ * comment is a no-op (no emit).
+ */
+export async function restoreComment(
+  comment_id: string,
+  admin_id: string,
+  ctx: InputContext,
+): Promise<CommunityInput> {
+  const existing = await getInputById(comment_id);
+  if (!existing) throw new Error("Comment not found");
+  if (!existing.moderation?.hidden) return existing;
+
+  const now = new Date().toISOString();
+  const { data, error } = await getDb()
+    .from("community_inputs")
+    .update({ restored_at: now })
+    .eq("id", comment_id)
+    .select()
+    .single();
+  if (error) throw new Error(`Input: ${error.message}`);
+  const updated = rowToInput(data as InputRow);
+
+  await ctx.emit({
+    event_type: "civic.process.updated",
+    actor: admin_id,
+    process_id: existing.process_id,
+    hub_id: ctx.hub_id,
+    jurisdiction: ctx.jurisdiction,
+    visibility: "restricted",
+    data: {
+      moderation: {
+        action: "comment_restored",
+        target: {
+          comment_id: existing.id,
+          comment_author_id: existing.author_id,
+        },
+        reason: existing.moderation?.reason ?? null,
+        restored_by: admin_id,
+      },
+    },
+  });
+
+  return updated;
 }
 
 /** Clear all inputs — dev/seed only. */

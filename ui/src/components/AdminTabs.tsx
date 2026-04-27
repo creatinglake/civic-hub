@@ -18,6 +18,11 @@ export default function AdminTabs() {
       <NavLink to="/admin/vote-results" className={tabClass}>
         Vote results
       </NavLink>
+      {/* Slice 11 — Moderation sits between Vote results and Meeting
+          summaries (per the slice-11 IA spec). Read-only log page. */}
+      <NavLink to="/admin/moderation" className={tabClass}>
+        Moderation
+      </NavLink>
       <NavLink to="/admin/meeting-summaries" className={tabClass}>
         Meeting summaries
       </NavLink>

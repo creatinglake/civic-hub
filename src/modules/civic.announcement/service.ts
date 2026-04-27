@@ -8,6 +8,7 @@ import type {
   AnnouncementContent,
   AnnouncementContentPatch,
   AnnouncementLink,
+  AnnouncementModeration,
   AnnouncementProcessContext,
   AnnouncementProcessState,
   CreateAnnouncementInput,
@@ -19,6 +20,7 @@ import {
   LINK_LABEL_MAX,
   LINK_URL_MAX,
   LINKS_MAX,
+  MODERATION_REASON_MAX,
   TITLE_MAX,
 } from "./models.js";
 import { canEdit } from "./lifecycle.js";
@@ -207,11 +209,157 @@ function sanitizeContent(c: AnnouncementContent): AnnouncementContent {
   return { title, body, links, image_url, image_alt };
 }
 
-/** Public read model — what GET /announcement/:id returns. */
+/**
+ * Slice 11 — admin moderation: remove an announcement. Marks the row
+ * as removed (idempotent — repeated removes are no-ops on the state)
+ * and emits a restricted-visibility `civic.process.updated` event for
+ * the audit trail. The host hub persists the new state and is
+ * responsible for excluding removed announcements from the public list
+ * endpoint and the feed-derived digest.
+ *
+ * Restoration reuses the same shape — `restored_at` is stamped and the
+ * `removed` flag flips back to false.
+ */
+export async function removeAnnouncement(
+  state: AnnouncementProcessState,
+  admin_id: string,
+  reason: string,
+  ctx: AnnouncementProcessContext,
+): Promise<{ state: AnnouncementProcessState }> {
+  const trimmedReason = (reason ?? "").trim();
+  if (trimmedReason.length === 0) {
+    throw new Error("A reason is required when removing an announcement.");
+  }
+  if (trimmedReason.length > MODERATION_REASON_MAX) {
+    throw new Error(`Reason must be <= ${MODERATION_REASON_MAX} characters.`);
+  }
+  if (state.moderation?.removed) return { state };
+
+  const now = new Date().toISOString();
+  state.moderation = {
+    removed: true,
+    removed_at: now,
+    removed_by: admin_id,
+    reason: trimmedReason,
+    restored_at: null,
+  };
+
+  await ctx.emit({
+    event_type: "civic.process.updated",
+    actor: admin_id,
+    process_id: ctx.process_id,
+    hub_id: ctx.hub_id,
+    jurisdiction: ctx.jurisdiction,
+    visibility: "restricted",
+    action_url_path: `/announcement/${ctx.process_id}`,
+    data: {
+      moderation: {
+        action: "announcement_removed",
+        reason: trimmedReason,
+        removed_by: admin_id,
+      },
+    },
+  });
+
+  return { state };
+}
+
+export async function restoreAnnouncement(
+  state: AnnouncementProcessState,
+  admin_id: string,
+  ctx: AnnouncementProcessContext,
+): Promise<{ state: AnnouncementProcessState }> {
+  if (!state.moderation?.removed) return { state };
+
+  const now = new Date().toISOString();
+  const previousReason = state.moderation.reason ?? null;
+  state.moderation = {
+    ...state.moderation,
+    removed: false,
+    restored_at: now,
+  };
+
+  await ctx.emit({
+    event_type: "civic.process.updated",
+    actor: admin_id,
+    process_id: ctx.process_id,
+    hub_id: ctx.hub_id,
+    jurisdiction: ctx.jurisdiction,
+    visibility: "restricted",
+    action_url_path: `/announcement/${ctx.process_id}`,
+    data: {
+      moderation: {
+        action: "announcement_restored",
+        reason: previousReason,
+        restored_by: admin_id,
+      },
+    },
+  });
+
+  return { state };
+}
+
+/**
+ * Slice 11 — render the moderation field for the public read model in
+ * a shape that's consistent regardless of legacy state.
+ */
+function moderationView(
+  state: AnnouncementProcessState,
+): AnnouncementModeration | null {
+  return state.moderation ?? null;
+}
+
+/**
+ * Public read model — what GET /announcement/:id returns.
+ *
+ * When the announcement has been removed by a moderator, the
+ * content fields (body, image, links) are blanked out so a non-admin
+ * caller can't reconstruct the body from the JSON payload. The page
+ * still renders a tombstone in place. Admins receive the original
+ * content via getAdminReadModel().
+ */
 export function getPublicReadModel(
   state: AnnouncementProcessState,
   processMeta: { id: string; createdAt: string },
 ): Record<string, unknown> {
+  const moderation = moderationView(state);
+  const removed = !!moderation?.removed;
+  return {
+    id: processMeta.id,
+    type: "civic.announcement",
+    title: state.content.title,
+    body: removed ? "" : state.content.body,
+    links: removed ? [] : state.content.links,
+    image_url: removed ? null : state.content.image_url ?? null,
+    image_alt: removed ? null : state.content.image_alt ?? null,
+    author_id: state.author_id,
+    author_role: state.author_role,
+    created_at: state.created_at,
+    last_edited_at: state.last_edited_at,
+    edit_count: state.edit_count,
+    moderation: moderation
+      ? {
+          removed,
+          removed_at: moderation.removed_at,
+          // The reason is internal-audit only; never expose to the
+          // public read model. Admins read it via the admin endpoint.
+          restored_at: moderation.restored_at,
+        }
+      : null,
+  };
+}
+
+/**
+ * Admin read model — same as getPublicReadModel but never redacts
+ * content, and includes the moderator's reason. Used by the admin
+ * announcement view and the moderation log so admins can audit and
+ * potentially restore.
+ */
+export function getAdminReadModel(
+  state: AnnouncementProcessState,
+  processMeta: { id: string; createdAt: string },
+): Record<string, unknown> {
+  const moderation = moderationView(state);
   return {
     id: processMeta.id,
     type: "civic.announcement",
@@ -225,6 +373,7 @@ export function getPublicReadModel(
     created_at: state.created_at,
     last_edited_at: state.last_edited_at,
     edit_count: state.edit_count,
+    moderation,
   };
 }
 

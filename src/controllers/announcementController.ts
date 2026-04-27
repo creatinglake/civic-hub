@@ -9,6 +9,7 @@
 import { Request, Response } from "express";
 import {
   emitPublicationEvents,
+  getAdminReadModel,
   getPublicReadModel,
   getPublicSummary,
   updateAnnouncement,
@@ -24,7 +25,8 @@ import {
   getProcess,
   saveProcessState,
 } from "../services/processService.js";
-import { getAuthUser } from "../middleware/auth.js";
+import { getAuthUser, isAdminEmail } from "../middleware/auth.js";
+import { getUserFromToken } from "../modules/civic.auth/index.js";
 import { extractUrls } from "../modules/civic.link_preview/index.js";
 import { warmPreviewsInBackground } from "../services/linkPreviewCache.js";
 
@@ -240,6 +242,26 @@ export async function handleUpdateAnnouncement(
   }
 }
 
+/**
+ * Best-effort detection of an admin caller. Used to decide whether the
+ * read endpoint should return the full content (admins) or the
+ * tombstone-redacted public view (everyone else). Returns false on any
+ * error / missing token — fail-closed.
+ */
+async function callerIsAdmin(req: Request): Promise<boolean> {
+  const auth = req.headers.authorization;
+  if (!auth || !auth.startsWith("Bearer ")) return false;
+  const token = auth.slice(7);
+  if (!token) return false;
+  try {
+    const user = await getUserFromToken(token);
+    if (!user) return false;
+    return isAdminEmail(user.email);
+  } catch {
+    return false;
+  }
+}
+
 export async function handleGetAnnouncement(
   req: Request,
   res: Response,
@@ -251,11 +273,16 @@ export async function handleGetAnnouncement(
       res.status(404).json({ error: "Announcement not found" });
       return;
     }
+    // Admins see the original content (and the moderator's reason)
+    // even after a removal, so they can audit and potentially restore.
+    // Everyone else gets the public view, which redacts the body /
+    // image / links to a tombstone if the announcement was removed.
+    const isAdmin = await callerIsAdmin(req);
+    const meta = { id: record.id, createdAt: record.createdAt };
     res.json(
-      getPublicReadModel(getState(record), {
-        id: record.id,
-        createdAt: record.createdAt,
-      }),
+      isAdmin
+        ? getAdminReadModel(getState(record), meta)
+        : getPublicReadModel(getState(record), meta),
     );
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
@@ -274,6 +301,15 @@ export async function handleListAnnouncements(
     const all = await getAllProcesses();
     const summaries = all
       .filter((p) => p.definition.type === "civic.announcement")
+      // Slice 11 — exclude announcements an admin has removed. Distinct
+      // from the comment-tombstone behavior: an announcement in the
+      // public list is an affirmative publication; once removed it
+      // shouldn't continue to broadcast its presence. Admins reach the
+      // record via the moderation log, not this endpoint.
+      .filter((p) => {
+        const state = getState(p) as AnnouncementProcessState;
+        return !state.moderation?.removed;
+      })
       .sort(
         (a, b) =>
           new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),

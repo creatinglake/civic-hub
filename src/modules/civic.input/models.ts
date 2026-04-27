@@ -9,7 +9,35 @@ export interface CommunityInput {
   author_id: string;
   body: string;
   submitted_at: string; // ISO 8601
+  /**
+   * Slice 11 — moderation state. Null when the comment has never been
+   * moderated. When `hidden` is true, public read-models redact `body`
+   * to a tombstone string; admins still receive the original body and
+   * the reason. A restore reverses the action — `hidden` flips back to
+   * false and `restored_at` records when. The full audit trail lives
+   * in the events table (civic.process.updated with restricted
+   * visibility), not here — these columns reflect only the most recent
+   * action.
+   */
+  moderation: CommentModeration | null;
 }
+
+/**
+ * Reason chips offered in the admin "Hide a comment" modal. Mostly
+ * informational — the chosen value is stored verbatim in the event's
+ * data.moderation.reason and in community_inputs.hidden_reason. "Other"
+ * lets an admin write a custom reason.
+ */
+export interface CommentModeration {
+  hidden: boolean;
+  hidden_at: string | null;
+  hidden_by: string | null;
+  reason: string | null;
+  restored_at: string | null;
+}
+
+/** Max characters in an admin-supplied moderation reason. */
+export const MODERATION_REASON_MAX = 500;
 
 /**
  * Event emission callback — injected by the host hub. Mirrors the pattern
@@ -27,6 +55,12 @@ export interface EmitEventFn {
     hub_id: string;
     jurisdiction: string;
     data: Record<string, unknown>;
+    /**
+     * Slice 11 — moderation events are emitted with restricted
+     * visibility so they never leak to the public /events feed or the
+     * resident-facing digest. Defaults to "public" when omitted.
+     */
+    visibility?: "public" | "restricted";
   }): Promise<unknown>;
 }
 

@@ -25,6 +25,14 @@ export interface User {
    * capped to 30 days ago.
    */
   last_digest_sent_at: string | null;
+  /**
+   * Slice 11 — most recent legal-document version the user accepted
+   * (e.g. "1.0"). null means never accepted; the UI prompts a blocking
+   * re-acceptance modal until set or until the value is older than
+   * CURRENT_LEGAL_VERSION.
+   */
+  tos_version_accepted: string | null;
+  tos_accepted_at: string | null;
 }
 
 /** Pending verification — an OTP code sent to an email */

@@ -12,6 +12,7 @@ import {
   requestVerification,
   verifyCode,
   affirmResidency,
+  acceptLegalTerms,
   getUserFromToken,
   logout,
 } from "../modules/civic.auth/index.js";
@@ -130,6 +131,45 @@ export async function handleGetMe(
     role: authorship?.role ?? null,
     author_label: authorship?.label ?? null,
   });
+}
+
+/**
+ * POST /auth/accept-tos
+ * Header: Authorization: Bearer <token>
+ * Body: { version: string }
+ *
+ * Records that the authenticated user has accepted the named version
+ * of the Hub's bundled legal documents (Terms / Privacy / Code of
+ * Conduct). The UI calls this from both the sign-up acceptance
+ * checkbox path and the re-acceptance modal that fires when a user's
+ * stored version is older than CURRENT_LEGAL_VERSION. Slice 11.
+ */
+export async function handleAcceptTos(
+  req: Request,
+  res: Response,
+): Promise<void> {
+  const token = extractToken(req);
+  if (!token) {
+    res.status(401).json({ error: "Authentication required" });
+    return;
+  }
+  const user = await getUserFromToken(token);
+  if (!user) {
+    res.status(401).json({ error: "Invalid or expired session" });
+    return;
+  }
+  const { version } = (req.body ?? {}) as { version?: unknown };
+  if (typeof version !== "string" || version.trim().length === 0) {
+    res.status(400).json({ error: "version (string) is required" });
+    return;
+  }
+  try {
+    const updated = await acceptLegalTerms(user.id, version.trim());
+    res.json({ user: updated });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Unknown error";
+    res.status(400).json({ error: message });
+  }
 }
 
 /**

@@ -39,6 +39,14 @@ export interface AuthUser {
    * unsubscribe link in every digest email.
    */
   digest_subscribed: boolean;
+  /**
+   * Slice 11 — most recent legal-document version this user accepted
+   * (e.g. "1.0"). null means the user has never accepted; the UI shows
+   * the blocking re-acceptance modal until set or until the value
+   * matches CURRENT_LEGAL_VERSION.
+   */
+  tos_version_accepted: string | null;
+  tos_accepted_at: string | null;
 }
 
 /**
@@ -85,6 +93,20 @@ export function verifyCode(
 
 export function affirmResidency(token: string): Promise<{ user: AuthUser }> {
   return request("POST", "/auth/residency", undefined, token);
+}
+
+/**
+ * Slice 11 — record that the authenticated user has accepted the named
+ * version of the Hub's bundled legal documents. Called from both the
+ * sign-up flow (via the acceptance checkbox in AuthModal) and the
+ * re-acceptance modal that fires when a user's stored version is
+ * stale. Server stamps tos_version_accepted + tos_accepted_at.
+ */
+export function acceptTos(
+  token: string,
+  version: string,
+): Promise<{ user: AuthUser }> {
+  return request("POST", "/auth/accept-tos", { version }, token);
 }
 
 export function getMe(

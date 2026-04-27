@@ -1,6 +1,12 @@
 import { useState, useEffect, useRef } from "react";
 import { useAuth } from "../context/AuthContext";
-import { requestCode, verifyCode, affirmResidency } from "../services/auth";
+import {
+  requestCode,
+  verifyCode,
+  affirmResidency,
+  acceptTos,
+} from "../services/auth";
+import { CURRENT_LEGAL_VERSION } from "../config/legal";
 
 type Step = "email" | "code" | "residency";
 
@@ -21,6 +27,14 @@ export default function AuthModal({ onComplete, onDismiss }: Props) {
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
   const [residencyChecked, setResidencyChecked] = useState(false);
+  // Slice 11 — gate sign-up on acceptance of the bundled legal docs.
+  // Pre-checked for users who have already accepted the current version
+  // (returning sign-ins on a different device, etc.) so we don't make
+  // them re-accept here when they'll just hit the modal anyway. For
+  // brand-new sign-ups it starts unchecked and submit is disabled.
+  const [legalAccepted, setLegalAccepted] = useState(
+    !!user && user.tos_version_accepted === CURRENT_LEGAL_VERSION,
+  );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
@@ -54,6 +68,10 @@ export default function AuthModal({ onComplete, onDismiss }: Props) {
       setError("Please enter a valid email address");
       return;
     }
+    if (!legalAccepted) {
+      setError("Please agree to the Terms, Privacy Policy, and Code of Conduct to continue.");
+      return;
+    }
 
     setLoading(true);
     try {
@@ -78,9 +96,26 @@ export default function AuthModal({ onComplete, onDismiss }: Props) {
     setLoading(true);
     try {
       const result = await verifyCode(email.trim(), code.trim());
-      login(result.token, result.user, result.role, result.author_label);
+      // Slice 11 — record the legal-document acceptance the user
+      // confirmed on the email step. We do this before login() so the
+      // refreshed user object the context picks up already carries the
+      // current version, which suppresses the re-acceptance modal.
+      // If the call fails (network blip, e.g.), surface it but still
+      // let the session proceed — the modal will catch the user on
+      // the next page load.
+      let userToLogin = result.user;
+      try {
+        const accepted = await acceptTos(result.token, CURRENT_LEGAL_VERSION);
+        userToLogin = accepted.user;
+      } catch (acceptErr) {
+        console.warn(
+          "[auth] accept-tos failed during sign-up; re-acceptance modal will retry.",
+          acceptErr,
+        );
+      }
+      login(result.token, userToLogin, result.role, result.author_label);
 
-      if (result.user.is_resident) {
+      if (userToLogin.is_resident) {
         // Already a resident (returning user) — done
         onComplete();
       } else {
@@ -159,12 +194,40 @@ export default function AuthModal({ onComplete, onDismiss }: Props) {
               />
             </div>
 
+            <label className="auth-checkbox-label auth-legal-checkbox">
+              <input
+                type="checkbox"
+                checked={legalAccepted}
+                onChange={(e) => setLegalAccepted(e.target.checked)}
+                disabled={loading}
+              />
+              <span>
+                I've read and agree to the{" "}
+                <a href="/terms" target="_blank" rel="noopener noreferrer">
+                  Terms of Service
+                </a>
+                ,{" "}
+                <a href="/privacy" target="_blank" rel="noopener noreferrer">
+                  Privacy Policy
+                </a>
+                , and{" "}
+                <a
+                  href="/code-of-conduct"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  Code of Conduct
+                </a>
+                .
+              </span>
+            </label>
+
             {error && <p className="form-error">{error}</p>}
 
             <button
               type="submit"
               className="auth-continue-button"
-              disabled={loading || !email.trim()}
+              disabled={loading || !email.trim() || !legalAccepted}
             >
               {loading ? "Sending..." : "Continue"}
             </button>

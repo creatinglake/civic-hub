@@ -348,6 +348,22 @@ export interface CommunityInput {
   author_id: string;
   body: string;
   submitted_at: string;
+  /**
+   * Slice 11 — moderation state. Null when the comment has never been
+   * moderated. When `hidden` is true and the viewer is not an admin,
+   * `body` is empty and `moderation.reason` is null (the reason is
+   * internal-audit only). Admin viewers receive the full unredacted
+   * record from the same endpoint.
+   */
+  moderation: CommentModerationView | null;
+}
+
+export interface CommentModerationView {
+  hidden: boolean;
+  hidden_at: string | null;
+  hidden_by: string | null;
+  reason: string | null;
+  restored_at: string | null;
 }
 
 export function getInputs(processId: string): Promise<CommunityInput[]> {
@@ -579,6 +595,24 @@ export interface Announcement {
   created_at: string;
   last_edited_at: string | null;
   edit_count: number;
+  /**
+   * Slice 11 — moderation state. Null on never-moderated announcements.
+   * When `removed` is true and the viewer is not an admin, the body /
+   * image / links fields above are blank and the page renders a
+   * tombstone in their place. Admins keep receiving the original
+   * content via the same endpoint with their token attached.
+   */
+  moderation?: AnnouncementModerationView | null;
+}
+
+export interface AnnouncementModerationView {
+  removed: boolean;
+  removed_at: string | null;
+  /** Internal-audit only — admin endpoints include this; public read does not. */
+  removed_by?: string | null;
+  /** Internal-audit only — admin endpoints include this; public read does not. */
+  reason?: string | null;
+  restored_at: string | null;
 }
 
 /** Summary row (GET /announcements). */
@@ -865,6 +899,69 @@ export interface SearchParams {
   sort?: SearchSort;
   limit?: number;
   offset?: number;
+}
+
+// --- Slice 11: admin moderation ---------------------------------------
+
+export interface ModerationLogEntry {
+  event_id: string;
+  timestamp: string;
+  process_id: string;
+  process_title: string | null;
+  action: string;
+  target_kind: "comment" | "announcement" | null;
+  reason: string | null;
+  admin: string;
+}
+
+export interface ModerationLogResponse {
+  entries: ModerationLogEntry[];
+  count: number;
+}
+
+/** Hide a community-input comment for a Code-of-Conduct violation. */
+export function adminHideComment(
+  commentId: string,
+  reason: string,
+): Promise<CommunityInput> {
+  return request("POST", `/admin/moderation/comments/${commentId}/hide`, {
+    reason,
+  });
+}
+
+/** Restore a previously hidden comment. */
+export function adminRestoreComment(commentId: string): Promise<CommunityInput> {
+  return request(
+    "POST",
+    `/admin/moderation/comments/${commentId}/restore`,
+  );
+}
+
+/** Remove an announcement (renders a tombstone for non-admin viewers). */
+export function adminRemoveAnnouncement(
+  processId: string,
+  reason: string,
+): Promise<Announcement> {
+  return request(
+    "POST",
+    `/admin/moderation/announcements/${processId}/remove`,
+    { reason },
+  );
+}
+
+/** Restore a previously removed announcement. */
+export function adminRestoreAnnouncement(
+  processId: string,
+): Promise<Announcement> {
+  return request(
+    "POST",
+    `/admin/moderation/announcements/${processId}/restore`,
+  );
+}
+
+/** Newest-first list of every moderation action. Admin-only. */
+export function adminGetModerationLog(): Promise<ModerationLogResponse> {
+  return request("GET", "/admin/moderation/log");
 }
 
 /**

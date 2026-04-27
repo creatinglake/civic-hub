@@ -172,8 +172,15 @@ export async function handleRunDigest(
       return since < acc ? since : acc;
     }, new Date().toISOString());
 
-    const allRecent =
+    const allRecentRaw =
       users.length === 0 ? [] : await getEventsSince(earliest);
+    // Slice 11 — moderation events are restricted-visibility and must
+    // never reach a resident's inbox via the digest. Filter them at
+    // the cron entry point so every per-user pass below operates on
+    // public events only.
+    const allRecent = allRecentRaw.filter(
+      (e) => e.meta?.visibility !== "restricted",
+    );
 
     // One-shot lookup of process_id → title. civic.vote and civic.brief
     // events don't carry the title inline; the module uses this as a
@@ -187,11 +194,23 @@ export async function handleRunDigest(
     // location for both civic.announcement and civic.vote_results).
     const processTitles: Record<string, string> = {};
     const processThumbnails: Record<string, string> = {};
+    // Slice 11 — track removed announcements so we can drop their
+    // events from the digest window even if the original publish event
+    // is still inside the user's "since" cursor. The feed and the
+    // public list endpoint already exclude these; the digest must too.
+    const removedAnnouncementIds = new Set<string>();
     if (users.length > 0) {
       try {
         const allProcesses = await getAllProcesses();
         for (const p of allProcesses) {
           processTitles[p.id] = p.title;
+          if (p.definition.type === "civic.announcement") {
+            const moderation = (p.state as { moderation?: { removed?: unknown } } | null | undefined)
+              ?.moderation;
+            if (moderation && (moderation as { removed?: unknown }).removed) {
+              removedAnnouncementIds.add(p.id);
+            }
+          }
           const content = (p.state as { content?: { image_url?: unknown } } | null | undefined)?.content;
           const imageUrl = content?.image_url;
           if (typeof imageUrl === "string" && imageUrl.length > 0) {
@@ -212,7 +231,13 @@ export async function handleRunDigest(
         const since = clampSince(user);
         const windowEvents: DigestEvent[] = [];
         for (const e of allRecent) {
-          if (e.timestamp > since) windowEvents.push(toDigestEvent(e, uiBase));
+          if (e.timestamp <= since) continue;
+          // Drop events for announcements an admin has removed since
+          // they were published. The user shouldn't see the removed
+          // announcement reappear in their email even if the publish
+          // event still falls inside their digest window.
+          if (e.process_id && removedAnnouncementIds.has(e.process_id)) continue;
+          windowEvents.push(toDigestEvent(e, uiBase));
         }
 
         const hub: DigestHubContext = {

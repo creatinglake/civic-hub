@@ -51,6 +51,12 @@ function rowToUser(row: Record<string, unknown>): User {
     last_digest_sent_at: row.last_digest_sent_at
       ? String(row.last_digest_sent_at)
       : null,
+    tos_version_accepted: row.tos_version_accepted
+      ? String(row.tos_version_accepted)
+      : null,
+    tos_accepted_at: row.tos_accepted_at
+      ? String(row.tos_accepted_at)
+      : null,
   };
 }
 
@@ -283,6 +289,31 @@ export async function affirmResidency(userId: string): Promise<User> {
   if (!data) throw new Error("User not found");
 
   console.log(`[auth] User ${userId} affirmed residency`);
+  return rowToUser(data);
+}
+
+/**
+ * Slice 11 — record that this user has accepted the named version of
+ * the Hub's legal documents (Terms / Privacy / Code of Conduct, treated
+ * as a single bundle). Stamps both the version and the wall-clock time.
+ * The UI bumps `version` whenever any of the three docs ships a
+ * material revision, which forces every existing user back through the
+ * re-acceptance modal on next sign-in.
+ */
+export async function acceptLegalTerms(
+  userId: string,
+  version: string,
+): Promise<User> {
+  const now = new Date().toISOString();
+  const { data, error } = await getDb()
+    .from("users")
+    .update({ tos_version_accepted: version, tos_accepted_at: now })
+    .eq("id", userId)
+    .select()
+    .maybeSingle();
+  if (error) throw new Error(`Auth: ${error.message}`);
+  if (!data) throw new Error("User not found");
+  console.log(`[auth] User ${userId} accepted legal v${version}`);
   return rowToUser(data);
 }
 

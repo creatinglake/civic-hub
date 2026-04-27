@@ -116,6 +116,13 @@ function kindFromEvent(event: CivicEvent): ProcessKind | null {
 export default function Feed({ filter, emptyFilteredAction }: Props) {
   const [events, setEvents] = useState<CivicEvent[]>([]);
   const [processMeta, setProcessMeta] = useState<Record<string, ProcessMeta>>({});
+  // Slice 11 — process_ids whose underlying announcement has been
+  // removed by a moderator. Posts pointing at these are excluded from
+  // the feed entirely. Distinct from processMeta because we need a
+  // negative signal that survives the meta cache filling in with {}.
+  const [removedProcessIds, setRemovedProcessIds] = useState<Set<string>>(
+    () => new Set(),
+  );
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -211,15 +218,30 @@ export default function Feed({ filter, emptyFilteredAction }: Props) {
         });
       } else {
         // civic.announcement — body serves as the feed summary.
-        lookup = getAnnouncement(id).then((a) => ({
-          type: "civic.announcement" as const,
-          title: a.title,
-          description: a.body,
-          imageUrl: a.image_url ?? null,
-          imageAlt: a.image_alt ?? null,
-          editCount: a.edit_count ?? 0,
-          lastEditedAt: a.last_edited_at ?? null,
-        }));
+        // Slice 11: when an admin has removed the announcement, push
+        // its id into removedProcessIds so the post-builder filter
+        // drops it. The presence of the removal still cooperates
+        // with the meta cache (resolved to {}) so we don't refetch.
+        lookup = getAnnouncement(id).then((a) => {
+          if (a.moderation?.removed) {
+            setRemovedProcessIds((prev) => {
+              if (prev.has(id)) return prev;
+              const next = new Set(prev);
+              next.add(id);
+              return next;
+            });
+            return null;
+          }
+          return {
+            type: "civic.announcement" as const,
+            title: a.title,
+            description: a.body,
+            imageUrl: a.image_url ?? null,
+            imageAlt: a.image_alt ?? null,
+            editCount: a.edit_count ?? 0,
+            lastEditedAt: a.last_edited_at ?? null,
+          };
+        });
       }
 
       lookup
@@ -248,6 +270,10 @@ export default function Feed({ filter, emptyFilteredAction }: Props) {
     const getType = (id: string) => processMeta[id]?.type;
     const out: FeedPostView[] = [];
     for (const ev of visibleEvents) {
+      // Slice 11 — drop posts whose underlying announcement has been
+      // removed by a moderator. The lookup loop above populates
+      // removedProcessIds; this is the second half of the filter.
+      if (ev.process_id && removedProcessIds.has(ev.process_id)) continue;
       const post = eventToPost(ev, getDescription, getTitle, getType);
       if (!post) continue;
       const meta = processMeta[ev.process_id];
@@ -259,7 +285,7 @@ export default function Feed({ filter, emptyFilteredAction }: Props) {
       });
     }
     return out;
-  }, [visibleEvents, processMeta]);
+  }, [visibleEvents, processMeta, removedProcessIds]);
 
   const hasMore = renderableEvents.length > visibleCount;
 

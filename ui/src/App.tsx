@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { BrowserRouter, Routes, Route, Navigate, useLocation, useParams } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useParams, Link } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
 import Nav from "./components/Nav";
 import HubBanner from "./components/HubBanner";
@@ -20,7 +20,12 @@ import VoteLog from "./pages/VoteLog";
 import PostAnnouncement from "./pages/PostAnnouncement";
 import AnnouncementPage from "./pages/Announcement";
 import Settings from "./pages/Settings";
+import Privacy from "./pages/Privacy";
+import Terms from "./pages/Terms";
+import CodeOfConduct from "./pages/CodeOfConduct";
+import AdminModeration from "./pages/AdminModeration";
 import IntroPopup, { hasSeenIntro } from "./components/IntroPopup";
+import ReAcceptModal from "./components/ReAcceptModal";
 import "./App.css";
 
 // Routes that show the hub banner above the nav. Detail/action pages
@@ -85,13 +90,57 @@ function AppContent() {
           <Route path="/settings" element={<Settings />} />
           <Route path="/about" element={<About />} />
           <Route path="/search" element={<SearchPage />} />
+          {/* Slice 11 — legal pages. Routes resolve via React Router so
+              cross-document links (Terms → Privacy etc.) don't trigger
+              full-page reloads. */}
+          <Route path="/privacy" element={<Privacy />} />
+          <Route path="/terms" element={<Terms />} />
+          <Route path="/code-of-conduct" element={<CodeOfConduct />} />
+          {/* Slice 11 — admin moderation log. Read-only list of every
+              moderation action, gated server-side via requireAdmin
+              and client-side via the AuthContext.isAdmin flag inside
+              the page. */}
+          <Route path="/admin/moderation" element={<AdminModeration />} />
         </Routes>
       </main>
 
-      <footer className="app-footer">
-        Powered by <a href="https://civic.social" target="_blank" rel="noopener noreferrer">Civic Social</a>
-      </footer>
+      <SiteFooter />
+
+      {/* Slice 11 — re-acceptance modal. Self-mounts when the signed-in
+          user's stored legal version is null or older than the current
+          bundle. Blocking — user can't interact with the app until
+          they accept or sign out. */}
+      <ReAcceptModal />
     </div>
+  );
+}
+
+function SiteFooter() {
+  return (
+    <footer className="app-footer">
+      <div className="app-footer-inner">
+        <div className="app-footer-brand">
+          <strong>Floyd Civic Hub</strong>
+          <span className="app-footer-tagline">
+            Operated by Adam Lake · Powered by{" "}
+            <a
+              href="https://civic.social"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Civic Social
+            </a>
+          </span>
+        </div>
+        <nav className="app-footer-links" aria-label="Legal">
+          <Link to="/privacy">Privacy</Link>
+          <span aria-hidden="true">·</span>
+          <Link to="/terms">Terms</Link>
+          <span aria-hidden="true">·</span>
+          <Link to="/code-of-conduct">Code of Conduct</Link>
+        </nav>
+      </div>
+    </footer>
   );
 }
 

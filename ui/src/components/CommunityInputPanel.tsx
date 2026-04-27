@@ -1,13 +1,24 @@
 // CommunityInputPanel — renders the community comments collected via
 // civic.input for a process.
 //
-// Read-only as of Slice 3.5. Comment submission now happens inside the vote
-// flow in VotePanel so comments are always tied to the act of voting.
-// This panel just displays what residents have already said.
+// Read-only as of Slice 3.5 for residents. Admins (Slice 11) get inline
+// "Hide" controls on each comment plus a "Restore" affordance on
+// already-hidden tombstones.
+//
+// Tombstone semantics: residents see "This comment was removed by a
+// moderator..." with a link to /code-of-conduct in place of the body.
+// Admins continue to see the original body alongside the tombstone so
+// they can audit / reverse the decision.
 
 import { useCallback, useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import type { CommunityInput, CommunityInputConfig } from "../services/api";
-import { getInputs } from "../services/api";
+import {
+  adminHideComment,
+  adminRestoreComment,
+  getInputs,
+} from "../services/api";
+import { useAuth } from "../context/AuthContext";
 
 interface Props {
   processId: string;
@@ -25,22 +36,78 @@ function formatRelativeTime(iso: string): string {
   return `${days}d ago`;
 }
 
+const REASON_CHIPS = [
+  "Personal attack",
+  "Harassment",
+  "Doxxing",
+  "Spam",
+  "Other",
+] as const;
+
 export default function CommunityInputPanel({ processId, config }: Props) {
+  const { isAdmin } = useAuth();
   const [inputs, setInputs] = useState<CommunityInput[]>([]);
+  // The hide modal is keyed off comment ID — null means "no modal open".
+  const [hideModalFor, setHideModalFor] = useState<string | null>(null);
+  const [hideReason, setHideReason] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const fetchInputs = useCallback(() => {
     getInputs(processId)
       .then(setInputs)
-      .catch(() => {/* silent — inputs are non-critical */});
+      .catch(() => {
+        /* silent — inputs are non-critical */
+      });
   }, [processId]);
 
   useEffect(() => {
     fetchInputs();
   }, [fetchInputs]);
 
+  // Visible-to-residents comments include hidden ones (so the tombstone
+  // takes the slot). The empty-list short-circuit must consider all of
+  // them.
   if (inputs.length === 0) return null;
 
-  const label = config?.label ?? "Shared alongside residents' votes. Does not affect vote results.";
+  const label =
+    config?.label ??
+    "Shared alongside residents' votes. Does not affect vote results.";
+
+  async function handleHideSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!hideModalFor) return;
+    if (hideReason.trim().length === 0) {
+      setError("Please choose or enter a reason.");
+      return;
+    }
+    setError(null);
+    setSubmitting(true);
+    try {
+      const updated = await adminHideComment(hideModalFor, hideReason.trim());
+      setInputs((prev) =>
+        prev.map((c) => (c.id === updated.id ? updated : c)),
+      );
+      setHideModalFor(null);
+      setHideReason("");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not hide comment");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function handleRestore(commentId: string) {
+    setError(null);
+    try {
+      const updated = await adminRestoreComment(commentId);
+      setInputs((prev) =>
+        prev.map((c) => (c.id === updated.id ? updated : c)),
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not restore");
+    }
+  }
 
   return (
     <div className="community-input-panel">
@@ -48,16 +115,146 @@ export default function CommunityInputPanel({ processId, config }: Props) {
       <p className="input-label">{label}</p>
 
       <div className="input-list">
-        <p className="input-count">{inputs.length} comment{inputs.length !== 1 ? "s" : ""}</p>
-        {inputs.map((input) => (
-          <div key={input.id} className="input-item">
-            <p className="input-body">{input.body}</p>
-            <span className="input-meta">
-              {input.author_id} &middot; {formatRelativeTime(input.submitted_at)}
-            </span>
-          </div>
-        ))}
+        <p className="input-count">
+          {inputs.length} comment{inputs.length !== 1 ? "s" : ""}
+        </p>
+        {error && <p className="form-error">{error}</p>}
+        {inputs.map((input) => {
+          const hidden = !!input.moderation?.hidden;
+          return (
+            <div
+              key={input.id}
+              className={`input-item${hidden ? " input-item-hidden" : ""}`}
+            >
+              {hidden ? (
+                <p className="input-tombstone">
+                  This comment was removed by a moderator for violating the{" "}
+                  <Link to="/code-of-conduct">Code of Conduct</Link>.
+                </p>
+              ) : (
+                <p className="input-body">{input.body}</p>
+              )}
+
+              {/* Admin-only: when hidden, show the original body next
+                  to the tombstone with a "Hidden · <reason>" label and
+                  a Restore button. When visible, show a "Hide" button
+                  inline with the meta line. */}
+              {isAdmin && hidden && (
+                <div className="input-admin-shadow">
+                  <p className="input-body input-body-shadow">{input.body}</p>
+                  <p className="input-admin-meta">
+                    <strong>Hidden</strong>
+                    {input.moderation?.reason && (
+                      <> · {input.moderation.reason}</>
+                    )}
+                    {input.moderation?.hidden_by && (
+                      <> · by {input.moderation.hidden_by}</>
+                    )}
+                  </p>
+                  <button
+                    type="button"
+                    className="input-admin-button"
+                    onClick={() => handleRestore(input.id)}
+                  >
+                    Restore
+                  </button>
+                </div>
+              )}
+
+              <span className="input-meta">
+                {input.author_id} &middot; {formatRelativeTime(input.submitted_at)}
+                {isAdmin && !hidden && (
+                  <>
+                    {" · "}
+                    <button
+                      type="button"
+                      className="input-admin-link"
+                      onClick={() => {
+                        setHideModalFor(input.id);
+                        setHideReason("");
+                        setError(null);
+                      }}
+                    >
+                      Hide for Code of Conduct violation
+                    </button>
+                  </>
+                )}
+              </span>
+            </div>
+          );
+        })}
       </div>
+
+      {hideModalFor && (
+        <div
+          className="intro-overlay"
+          onClick={() => !submitting && setHideModalFor(null)}
+        >
+          <form
+            className="intro-modal moderation-modal"
+            onSubmit={handleHideSubmit}
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Hide this comment"
+          >
+            <h2 className="auth-title">Hide this comment?</h2>
+            <p className="auth-description">
+              The reason is stored in the moderation audit log and is
+              not shown to the public. Residents see a tombstone linking
+              to the Code of Conduct.
+            </p>
+
+            <div className="moderation-chips" role="list">
+              {REASON_CHIPS.map((chip) => (
+                <button
+                  key={chip}
+                  type="button"
+                  role="listitem"
+                  className={`moderation-chip${hideReason === chip ? " is-active" : ""}`}
+                  onClick={() => setHideReason(chip)}
+                  disabled={submitting}
+                >
+                  {chip}
+                </button>
+              ))}
+            </div>
+
+            <label className="form-field">
+              <span className="form-label">Reason (required)</span>
+              <textarea
+                className="form-input"
+                value={hideReason}
+                onChange={(e) => setHideReason(e.target.value)}
+                maxLength={500}
+                rows={3}
+                disabled={submitting}
+                placeholder="Brief description of the violation"
+              />
+            </label>
+
+            {error && <p className="form-error">{error}</p>}
+
+            <div className="moderation-modal-actions">
+              <button
+                type="submit"
+                className="auth-continue-button"
+                disabled={submitting || hideReason.trim().length === 0}
+              >
+                {submitting ? "Hiding…" : "Hide comment"}
+              </button>
+              <button
+                type="button"
+                className="auth-back-link"
+                onClick={() => setHideModalFor(null)}
+                disabled={submitting}
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
     </div>
   );
 }

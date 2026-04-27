@@ -6,6 +6,7 @@ export type {
   AnnouncementContent,
   AnnouncementContentPatch,
   AnnouncementLink,
+  AnnouncementModeration,
   AnnouncementProcessContext,
   AnnouncementProcessState,
   CreateAnnouncementInput,
@@ -20,6 +21,7 @@ export {
   LINK_LABEL_MAX,
   LINK_URL_MAX,
   LINKS_MAX,
+  MODERATION_REASON_MAX,
   TITLE_MAX,
 } from "./models.js";
 
@@ -28,8 +30,11 @@ export { canEdit } from "./lifecycle.js";
 export {
   createAnnouncementState,
   emitPublicationEvents,
+  getAdminReadModel,
   getPublicReadModel,
   getPublicSummary,
+  removeAnnouncement,
+  restoreAnnouncement,
   updateAnnouncement,
 } from "./service.js";
 
