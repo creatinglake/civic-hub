@@ -37,15 +37,17 @@
 
 /* Mobile: shorter banner so `object-fit: cover` actually crops the
    image vertically (otherwise the photo's pale sky shows at the top
-   and reads as whitespace). Combined with object-position: center
-   bottom, the visible portion becomes the storefront, not the sky.
-   Also tighten the gap below the banner before the hero. */
+   and reads as whitespace). object-position: center center crops the
+   image symmetrically — the sky is hidden at the top AND the light
+   sidewalk / cars are hidden at the bottom. The visible portion is
+   the storefront mid-section. Also tighten the gap below the banner
+   before the hero. */
 @media (max-width: 600px) {
   .hub-banner {
     height: 160px;
   }
   .hub-banner-img {
-    object-position: center bottom;
+    object-position: center center;
   }
   .hub-info {
     padding-top: var(--space-md);
