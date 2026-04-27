@@ -4,11 +4,17 @@ import type { CivicEvent } from "../services/api";
 /**
  * Color/label kinds for the per-post type pill. Each maps to a token in
  * theme.css (--pill-<kind>-bg / --pill-<kind>-fg).
+ *
+ * Slice 8.5 collapsed the previous "brief" and "vote-results" kinds
+ * into a single "vote-results" pill — they were rendered separately
+ * before, but residents shouldn't see two posts per closed vote ("Civic
+ * Brief delivered" and "Vote results published"). The new feed shows
+ * exactly one "Vote results: <title>" post per closed vote, sourced
+ * from the civic.vote_results process's result_published event.
  */
 export type FeedPillKind =
   | "vote-open"
   | "vote-results"
-  | "brief"
   | "announcement"
   | "meeting";
 
@@ -33,9 +39,17 @@ interface Props {
   post: FeedPostView;
 }
 
+/**
+ * Cached process-type discriminator. The Feed container fetches process
+ * detail lazily and caches the type here so eventToPost can branch
+ * cleanly. Includes "civic.brief" as a legacy alias — process rows
+ * still have the new type after the migration, but cached metadata or
+ * federated events from older hubs may carry the old name.
+ */
 type FeedProcessKind =
   | "civic.vote"
-  | "civic.brief"
+  | "civic.vote_results"
+  | "civic.brief" // legacy alias — normalize to "civic.vote_results"
   | "civic.announcement"
   | "civic.meeting_summary";
 
@@ -63,6 +77,12 @@ export function eventToPost(
 
     case "civic.process.result_published": {
       const data = event.data as {
+        // Vote-results discriminator. Slice 8.5 emits `results_id` on
+        // new events; older events emitted before the rename carry
+        // `brief_id`. Either field signals "this is a vote-results
+        // post". Both are accepted indefinitely so no events have to
+        // be rewritten in place.
+        results_id?: string;
         brief_id?: string;
         result?: { total_votes?: number };
         participation_count?: number;
@@ -164,42 +184,53 @@ export function eventToPost(
         };
       }
 
-      // Civic Brief
-      const isBrief =
-        typeof data.brief_id === "string" || cachedType === "civic.brief";
+      // Vote results — accept either the new results_id or the legacy
+      // brief_id discriminator. cachedType bridges the same naming gap
+      // for stored process metadata.
+      const isVoteResults =
+        typeof data.results_id === "string" ||
+        typeof data.brief_id === "string" ||
+        cachedType === "civic.vote_results" ||
+        cachedType === "civic.brief";
 
-      if (isBrief) {
-        const title = getProcessTitle(event.process_id) ?? "Civic Brief";
+      if (isVoteResults) {
+        const title = getProcessTitle(event.process_id) ?? "Vote results";
         const count = data.participation_count ?? 0;
         const noun = count === 1 ? "resident" : "residents";
         const summary = data.headline_result
-          ? `${count} ${noun} — ${data.headline_result}`
-          : `${count} ${noun} participated — brief delivered to the Board.`;
+          ? `${count} ${noun} voted — ${data.headline_result}`
+          : `${count} ${noun} voted — delivered to the Board.`;
         return {
           id: event.id,
           title,
-          pillLabel: "Civic Brief",
-          pillKind: "brief",
+          pillLabel: "Vote results",
+          pillKind: "vote-results",
           summary,
           timestamp: event.timestamp,
           href: event.action_url,
         };
       }
 
-      // Vote results
-      const total = data.result?.total_votes ?? 0;
-      const title =
-        getProcessTitle(event.process_id) ?? `Process ${event.process_id}`;
-      const noun = total === 1 ? "participant" : "participants";
-      return {
-        id: event.id,
-        title,
-        pillLabel: "Vote results",
-        pillKind: "vote-results",
-        summary: `${total} ${noun} — results now public.`,
-        timestamp: event.timestamp,
-        href: event.action_url,
-      };
+      // Vote process result_published — INTENTIONALLY NOT RENDERED.
+      //
+      // Closing a vote with the civic.vote_results module registered
+      // produces TWO result_published events: one from the vote-results
+      // record (above) and one from the underlying vote (here). The
+      // vote event is preserved on the event log for audit / federation
+      // purposes — but residents would see two posts per close, which
+      // is the redundancy Slice 8.5 was created to eliminate. Filter
+      // it out by returning null. (data.result identifies the vote
+      // event uniquely; vote-results events carry results_id/brief_id
+      // and are caught above.)
+      if (data.result !== undefined || cachedType === "civic.vote") {
+        return null;
+      }
+
+      // Unknown shape — defensive fallback. A new process type emitting
+      // result_published without updating this discrimination ladder
+      // ends up here. Surface a minimal post rather than a crash, but
+      // it's worth following up to add a proper kind.
+      return null;
     }
 
     default:
@@ -279,6 +310,13 @@ function classifyHref(href: string): { kind: "internal"; to: string } | { kind: 
     if (/^\/process\/[^/]+\/?$/.test(url.pathname)) {
       return { kind: "internal", to: url.pathname };
     }
+    if (/^\/vote-results\/[^/]+\/?$/.test(url.pathname)) {
+      return { kind: "internal", to: url.pathname };
+    }
+    // Legacy /brief/:id action_urls from events emitted before Slice
+    // 8.5. Routed internally so the SPA can do its <Navigate> redirect
+    // to /vote-results/:id (App.tsx) rather than full-page bouncing
+    // through the backend's 301.
     if (/^\/brief\/[^/]+\/?$/.test(url.pathname)) {
       return { kind: "internal", to: url.pathname };
     }

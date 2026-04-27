@@ -14,7 +14,7 @@ import proposalRoutes from "./routes/proposalRoutes.js";
 import adminRoutes from "./routes/adminRoutes.js";
 import authRoutes from "./routes/authRoutes.js";
 import voteLogRoutes from "./routes/voteLogRoutes.js";
-import briefRoutes from "./routes/briefRoutes.js";
+import voteResultsRoutes from "./routes/voteResultsRoutes.js";
 import announcementRoutes from "./routes/announcementRoutes.js";
 import meetingSummaryRoutes, {
   meetingSummaryCronRouter,
@@ -88,8 +88,19 @@ app.use("/admin", adminRoutes);
 // Vote log and receipt verification
 app.use("/votes", voteLogRoutes);
 
-// Civic Briefs — public read of published briefs
-app.use("/brief", briefRoutes);
+// Vote results — public read of published vote-results pages.
+// Renamed from /brief in Slice 8.5.
+app.use("/vote-results", voteResultsRoutes);
+
+// Legacy redirect: any HTTP client that calls the old /brief/:id path
+// (direct curl, scraper, etc.) gets a 301 to the new location. Browser
+// navigation from old event action_urls is handled by the SPA via
+// React Router (see ui/src/App.tsx) because Vercel rewrites all
+// non-/api requests to index.html before they ever reach this Express
+// app in production.
+app.get("/brief/:id", (req, res) => {
+  res.redirect(301, `/vote-results/${req.params.id}`);
+});
 
 // Board / Admin announcements — post, edit, read one
 app.use("/announcement", announcementRoutes);
@@ -149,11 +160,12 @@ app.get("/", (_req, res) => {
       "POST /auth/logout": "Destroy session",
       "GET /votes/:id/log": "Public vote audit log (available after vote closes)",
       "GET /votes/:id/verify?receipt=X": "Verify a vote receipt",
-      "GET /admin/briefs": "List civic briefs for admin review (optional ?status=)",
-      "GET /admin/briefs/:id": "Get full brief detail for admin",
-      "PATCH /admin/briefs/:id": "Edit brief concerns/suggestions/notes (pending only)",
-      "POST /admin/briefs/:id/approve": "Approve brief: email + publish",
-      "GET /brief/:id": "Public read of a published civic brief",
+      "GET /admin/vote-results": "List vote results for admin review (optional ?status=)",
+      "GET /admin/vote-results/:id": "Get full vote-results detail for admin",
+      "PATCH /admin/vote-results/:id": "Edit comments/notes (pending only)",
+      "POST /admin/vote-results/:id/approve": "Approve: email Board + publish to feed",
+      "GET /vote-results/:id": "Public read of a published vote-results page",
+      "GET /brief/:id": "Legacy → 301 redirect to /vote-results/:id",
       "POST /announcement": "Post a Board announcement (Board or admin)",
       "PATCH /announcement/:id": "Edit an announcement (author only, or any admin)",
       "GET /announcement/:id": "Public read of an announcement",

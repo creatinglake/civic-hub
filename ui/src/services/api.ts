@@ -111,13 +111,15 @@ export interface ProposalSummary extends ProcessSummaryBase {
   support_threshold: number;
 }
 
-/** Civic brief summary as it appears in the public process list. The
- *  public listProcesses endpoint only returns briefs with
- *  publication_status === "published"; pending/approved briefs are
- *  filtered out server-side. */
-export interface PublishedBriefSummary {
+/** Vote-results summary as it appears in the public process list. The
+ *  public listProcesses endpoint only returns vote-results records with
+ *  publication_status === "published"; pending/approved records are
+ *  filtered out server-side.
+ *
+ *  Renamed from PublishedBriefSummary in Slice 8.5. */
+export interface PublishedVoteResultsSummary {
   id: string;
-  type: "civic.brief";
+  type: "civic.vote_results";
   title: string;
   source_process_id: string;
   publication_status: "published";
@@ -127,7 +129,7 @@ export interface PublishedBriefSummary {
   created_at: string;
 }
 
-export type ProcessSummary = VoteSummary | ProposalSummary | PublishedBriefSummary;
+export type ProcessSummary = VoteSummary | ProposalSummary | PublishedVoteResultsSummary;
 
 /** Vote detail state */
 export interface VoteState {
@@ -435,84 +437,109 @@ export async function getEvents(): Promise<CivicEvent[]> {
   return res.events;
 }
 
-// --- Civic Briefs ---
+// --- Vote results (renamed from "Civic Briefs" in Slice 8.5) ---
 
-export type BriefPublicationStatus = "pending" | "approved" | "published";
+export type VoteResultsPublicationStatus = "pending" | "approved" | "published";
 
-export interface BriefPositionBreakdown {
+export interface VoteResultsPositionBreakdown {
   option_id: string;
   option_label: string;
   count: number;
   percentage: number;
 }
 
-export interface BriefContent {
+/**
+ * Snapshot of the original vote captured at vote-results creation time.
+ * Optional because legacy records created before Slice 8.5 don't have
+ * it. UIs MUST defend against the missing field with a "context not
+ * available" fallback.
+ */
+export interface VoteContextSnapshot {
+  description: string;
+  options: Array<{ option_id: string; option_label: string }>;
+  starts_at: string | null;
+  ends_at: string | null;
+}
+
+export interface VoteResultsContent {
   title: string;
   participation_count: number;
-  position_breakdown: BriefPositionBreakdown[];
+  position_breakdown: VoteResultsPositionBreakdown[];
   comments: string[];
   admin_notes: string;
+  vote_context?: VoteContextSnapshot;
 }
 
 /** Admin list summary */
-export interface BriefSummary {
+export interface VoteResultsSummary {
   id: string;
-  type: "civic.brief";
+  type: "civic.vote_results";
   title: string;
   source_process_id: string;
-  publication_status: BriefPublicationStatus;
+  publication_status: VoteResultsPublicationStatus;
   participation_count: number;
+  vote_description_preview?: string;
   generated_at: string;
   approved_at: string | null;
   published_at: string | null;
   created_at: string;
 }
 
-/** Admin detail (full brief including editable content) */
-export interface BriefDetail extends BriefSummary {
-  content: BriefContent;
+/** Admin detail (full record including editable content). */
+export interface VoteResultsDetail extends VoteResultsSummary {
+  content: VoteResultsContent;
   delivered_to: string[];
   created_by: string;
 }
 
-/** Public brief — returned only when publication_status === "published" */
-export interface PublicBrief {
+/** Public — returned only when publication_status === "published". */
+export interface PublicVoteResults {
   id: string;
-  type: "civic.brief";
+  type: "civic.vote_results";
   title: string;
   source_process_id: string;
   participation_count: number;
-  position_breakdown: BriefPositionBreakdown[];
+  position_breakdown: VoteResultsPositionBreakdown[];
   comments: string[];
   admin_notes: string;
+  vote_context?: VoteContextSnapshot;
+  delivered_recipient_count: number;
+  approved_at: string | null;
   generated_at: string;
   published_at: string;
 }
 
-export interface BriefContentPatch {
+export interface VoteResultsContentPatch {
   comments?: string[];
   admin_notes?: string;
 }
 
-export function adminListBriefs(status?: BriefPublicationStatus): Promise<BriefSummary[]> {
+export function adminListVoteResults(
+  status?: VoteResultsPublicationStatus,
+): Promise<VoteResultsSummary[]> {
   const params = status ? `?status=${encodeURIComponent(status)}` : "";
-  return request("GET", `/admin/briefs${params}`);
+  return request("GET", `/admin/vote-results${params}`);
 }
 
-export function adminGetBrief(id: string): Promise<BriefDetail> {
-  return request("GET", `/admin/briefs/${id}`);
+export function adminGetVoteResults(id: string): Promise<VoteResultsDetail> {
+  return request("GET", `/admin/vote-results/${id}`);
 }
 
-export function adminPatchBrief(id: string, patch: BriefContentPatch): Promise<BriefDetail> {
-  return request("PATCH", `/admin/briefs/${id}`, patch);
+export function adminPatchVoteResults(
+  id: string,
+  patch: VoteResultsContentPatch,
+): Promise<VoteResultsDetail> {
+  return request("PATCH", `/admin/vote-results/${id}`, patch);
 }
 
-export function adminApproveBrief(id: string): Promise<{ message: string; brief: BriefDetail }> {
-  return request("POST", `/admin/briefs/${id}/approve`);
+export function adminApproveVoteResults(
+  id: string,
+): Promise<{ message: string; vote_results: VoteResultsDetail }> {
+  return request("POST", `/admin/vote-results/${id}/approve`);
 }
 
-export function getPublicBrief(id: string): Promise<PublicBrief> {
-  return request("GET", `/brief/${id}`);
+export function getPublicVoteResults(id: string): Promise<PublicVoteResults> {
+  return request("GET", `/vote-results/${id}`);
 }
 
 // --- Announcements ---

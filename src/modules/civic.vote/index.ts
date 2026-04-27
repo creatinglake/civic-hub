@@ -286,8 +286,9 @@ export async function submitVote(
  *
  * Emits Phase 3→4 boundary events: `ended` (participation closed) and
  * `aggregation_completed` (tally produced). Does NOT emit
- * `result_published` — that only fires once an accompanying civic.brief
- * has been approved by an admin, via finalizeVote().
+ * `result_published` — that only fires once an accompanying
+ * civic.vote_results record (formerly civic.brief, pre-Slice-8.5) has
+ * been approved by an admin, via finalizeVote().
  */
 export async function closeVote(
   state: VoteProcessState,
@@ -316,10 +317,10 @@ export async function closeVote(
  * Transition: closed → finalized
  *
  * Library-only entry point: there is no HTTP action wired to this. The
- * civic.brief module's approval flow calls this directly once an admin
- * has reviewed and approved the accompanying brief. Result publication is
- * therefore gated on admin approval; no caller outside the brief flow
- * should be able to reach this function.
+ * civic.vote_results module's approval flow calls this directly once an
+ * admin has reviewed and approved the accompanying record. Result
+ * publication is therefore gated on admin approval; no caller outside
+ * the vote-results flow should be able to reach this function.
  */
 export async function finalizeVote(
   state: VoteProcessState,

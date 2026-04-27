@@ -102,12 +102,21 @@ export async function handleListProcesses(
 ): Promise<void> {
   try {
     const all = await listProcessSummaries();
-    // Public list: hide civic.brief and civic.meeting_summary processes
-    // that aren't yet published. Pending / approved records are admin-
-    // facing and must not be visible to the public before approval.
+    // Public list: hide civic.vote_results and civic.meeting_summary
+    // processes that aren't yet published. Pending / approved records
+    // are admin-facing and must not be visible to the public before
+    // approval.
+    //
+    // The "civic.brief" branch is the Slice 8.5 transitional shim —
+    // any row whose `processes.type` column hasn't yet been migrated
+    // by 20260427000000_rename_civic_brief_to_vote_results.sql is
+    // filtered with the same publication-gate as civic.vote_results
+    // so unmigrated pending records stay invisible during the window
+    // between deploy and migration. After the operator has applied the
+    // migration this branch is dead code and can be removed.
     const filtered = all.filter((p) => {
       const type = (p as { type?: string }).type;
-      if (type === "civic.brief") {
+      if (type === "civic.vote_results" || type === "civic.brief") {
         return (p as { publication_status?: string }).publication_status === "published";
       }
       if (type === "civic.meeting_summary") {

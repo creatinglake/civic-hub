@@ -1,0 +1,205 @@
+/*
+ * Public Vote Results page (renamed from Brief.css in Slice 8.5).
+ *
+ * Layout follows Slice 8.5 §5: Heading → Delivery indicator → About
+ * this vote → Results → What residents said → Notes → Provenance.
+ *
+ * .brief-bars / .brief-bar-* / .brief-comments-list / .brief-admin-notes
+ * are kept under their old names because the AdminVoteResults page
+ * also reuses them. They're presentational primitives, not concept
+ * names — renaming them would balloon this slice without UI benefit.
+ */
+
+.vote-results-page {
+  padding: var(--space-lg);
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+.vote-results-status {
+  color: var(--color-text-subtle);
+  font-family: var(--font-body);
+  font-size: var(--font-size-base);
+  text-align: center;
+  padding: var(--space-xl) var(--space-md);
+}
+
+.vote-results-status-error {
+  color: var(--color-text);
+}
+
+.vote-results-header {
+  margin: 0 0 var(--space-lg);
+}
+
+.vote-results-eyebrow {
+  margin: 0;
+  color: var(--color-brand);
+  font-family: var(--font-heading);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.vote-results-header h1 {
+  margin: var(--space-xs) 0 var(--space-sm);
+  font-size: var(--font-size-2xl);
+  line-height: var(--line-height-tight);
+}
+
+.vote-results-meta {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-base);
+}
+
+/* Delivery indicator — short banner directly under the heading. The
+   teal aligns with the vote-results pill family in the feed/digest. */
+.vote-results-delivery {
+  margin: 0 0 var(--space-xl);
+  padding: var(--space-sm) var(--space-md);
+  background: var(--pill-vote-results-bg);
+  color: var(--pill-vote-results-fg);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+}
+
+.vote-results-section {
+  margin: 0 0 var(--space-xl);
+}
+
+.vote-results-section h2 {
+  font-family: var(--font-heading);
+  font-size: var(--font-size-xl);
+  margin: 0 0 var(--space-md);
+  color: var(--color-text);
+}
+
+.vote-results-subheading {
+  font-family: var(--font-heading);
+  font-size: var(--font-size-base);
+  font-weight: 600;
+  margin: var(--space-md) 0 var(--space-xs);
+  color: var(--color-text);
+}
+
+.vote-results-description p {
+  margin: 0 0 var(--space-sm);
+  color: var(--color-text);
+  line-height: var(--line-height-relaxed);
+}
+
+.vote-results-options-list {
+  list-style: disc;
+  padding-left: 1.25rem;
+  margin: 0 0 var(--space-md);
+  color: var(--color-text);
+  line-height: var(--line-height-base);
+}
+
+.vote-results-options-list li {
+  margin-bottom: var(--space-xs);
+}
+
+.vote-results-window {
+  margin: var(--space-sm) 0 0;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+.vote-results-context-missing {
+  margin: 0;
+  padding: var(--space-sm) var(--space-md);
+  background: var(--color-surface-alt);
+  border-radius: var(--radius-sm);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  font-style: italic;
+}
+
+.vote-results-participation {
+  margin: 0 0 var(--space-md);
+  font-size: var(--font-size-base);
+  color: var(--color-text);
+}
+
+.vote-results-participation strong {
+  font-family: var(--font-heading);
+  font-size: var(--font-size-xl);
+  color: var(--color-primary-ink);
+}
+
+.vote-results-provenance {
+  margin: var(--space-xl) 0 0;
+  padding-top: var(--space-md);
+  border-top: 1px solid var(--color-border);
+  color: var(--color-text-subtle);
+  font-size: var(--font-size-xs);
+}
+
+/* --- Shared chart + list primitives (kept under brief-* names) --- */
+
+.brief-bars {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.brief-bar-row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.brief-bar-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--space-md);
+  font-size: var(--font-size-base);
+}
+
+.brief-bar-count {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  white-space: nowrap;
+}
+
+.brief-bar-track {
+  height: 12px;
+  background: var(--color-surface-muted);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.brief-bar-fill {
+  height: 100%;
+  background: var(--color-primary);
+  border-radius: var(--radius-sm);
+  transition: width 0.3s ease;
+  min-width: 2px;
+}
+
+.brief-comments-list {
+  padding-left: 1.25rem;
+  margin: 0;
+  line-height: var(--line-height-base);
+  color: var(--color-text);
+}
+
+.brief-comments-list li {
+  margin-bottom: var(--space-xs);
+}
+
+.brief-admin-notes {
+  margin: 0;
+  color: var(--color-text);
+  line-height: var(--line-height-base);
+  white-space: pre-wrap;
+}

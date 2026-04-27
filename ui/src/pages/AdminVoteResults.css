@@ -82,3 +82,53 @@
   background: var(--success-bg, #e8f5e9);
   color: var(--success-color, #2e7d32);
 }
+
+/* --- Vote-context snapshot (read-only block on admin review) --- */
+
+.admin-vote-context {
+  margin: 0;
+  padding: var(--space-md);
+  background: var(--color-surface-alt);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  line-height: var(--line-height-base);
+}
+
+.admin-vote-context-description p {
+  margin: 0 0 var(--space-sm);
+}
+
+.admin-vote-context-description p:last-child {
+  margin-bottom: 0;
+}
+
+.admin-vote-context-options-label {
+  margin: var(--space-sm) 0 var(--space-xs);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+
+.admin-vote-context ul {
+  margin: 0;
+  padding-left: 1.25rem;
+}
+
+.admin-vote-context-window {
+  margin: var(--space-sm) 0 0;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+/* --- Vote description preview on admin list rows --- */
+
+.admin-vote-description-preview {
+  margin: var(--space-xs) 0 0;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-base);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}

@@ -128,9 +128,18 @@
   flex-shrink: 0;
 }
 
+/*
+ * Slice 8.5 collapsed the previous `vote-results` (final tally) and
+ * `brief` (admin-reviewed delivery to the Board) kinds into a single
+ * "Vote results" pill rendered against the now-canonical
+ * civic.vote_results events. The teal palette (formerly --pill-brief-*)
+ * is the keeper. The legacy `--results-*` blue tokens stay defined in
+ * theme.css for a possible future "raw vote tally without admin
+ * review" pill, but no FeedPost code path emits the `--vote-results`
+ * blue class today.
+ */
 .feed-pill--vote-open    { background: var(--pill-vote-bg);         color: var(--pill-vote-fg); }
-.feed-pill--vote-results { background: var(--pill-results-bg);      color: var(--pill-results-fg); }
-.feed-pill--brief        { background: var(--pill-brief-bg);        color: var(--pill-brief-fg); }
+.feed-pill--vote-results { background: var(--pill-vote-results-bg); color: var(--pill-vote-results-fg); }
 .feed-pill--announcement { background: var(--pill-announcement-bg); color: var(--pill-announcement-fg); }
 .feed-pill--meeting      { background: var(--pill-meeting-bg);      color: var(--pill-meeting-fg); }
 

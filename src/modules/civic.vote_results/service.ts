@@ -1,39 +1,42 @@
-// civic.brief module — service functions (pure / orchestration)
+// civic.vote_results module — service functions (pure / orchestration)
 //
 // Pure state transitions and the approval orchestration sequence. No I/O
 // lives here beyond what the injected callbacks perform. The host hub is
 // responsible for persisting state changes after these functions return.
 
 import type {
-  BriefActionOutcome,
-  BriefContent,
-  BriefContentPatch,
-  BriefProcessContext,
-  BriefProcessState,
-  CreateBriefFromVoteInput,
+  CreateVoteResultsFromVoteInput,
   FinalizeLinkedVoteFn,
   SendEmailFn,
+  VoteContextSnapshot,
+  VoteResultsActionOutcome,
+  VoteResultsContent,
+  VoteResultsContentPatch,
+  VoteResultsProcessContext,
+  VoteResultsProcessState,
 } from "./models.js";
 import { assertPublicationTransition, canApprove, canEdit } from "./lifecycle.js";
 import {
-  emitBriefAggregationCompleted,
-  emitBriefCreated,
-  emitBriefOutcomeRecorded,
-  emitBriefResultPublished,
-  emitBriefUpdated,
+  emitVoteResultsAggregationCompleted,
+  emitVoteResultsCreated,
+  emitVoteResultsOutcomeRecorded,
+  emitVoteResultsResultPublished,
+  emitVoteResultsUpdated,
 } from "./events.js";
-import { formatBriefEmail } from "./email.js";
+import { formatVoteResultsEmail } from "./email.js";
 
 /**
- * Build the initial BriefProcessState from a completed vote. Generation
- * is deterministic and synchronous: participation count = distinct voters,
- * position breakdown = sorted tally, concerns/suggestions empty (see
- * HANDOFF.md for the data-gap rationale).
+ * Build the initial VoteResultsProcessState from a completed vote.
+ * Generation is deterministic and synchronous: participation count =
+ * distinct voters, position breakdown = sorted tally, comments seeded
+ * from civic.input.
  */
-export function createBriefState(input: CreateBriefFromVoteInput): BriefProcessState {
-  const content = generateBriefContent(input);
+export function createVoteResultsState(
+  input: CreateVoteResultsFromVoteInput,
+): VoteResultsProcessState {
+  const content = generateVoteResultsContent(input);
   return {
-    type: "civic.brief",
+    type: "civic.vote_results",
     source_process_id: input.source_process_id,
     publication_status: "pending",
     generated_at: new Date().toISOString(),
@@ -44,7 +47,9 @@ export function createBriefState(input: CreateBriefFromVoteInput): BriefProcessS
   };
 }
 
-function generateBriefContent(input: CreateBriefFromVoteInput): BriefContent {
+function generateVoteResultsContent(
+  input: CreateVoteResultsFromVoteInput,
+): VoteResultsContent {
   const entries = Object.entries(input.tally).sort((a, b) => b[1] - a[1]);
   const total = input.total_votes;
   const position_breakdown = entries.map(([option_id, count]) => ({
@@ -53,6 +58,12 @@ function generateBriefContent(input: CreateBriefFromVoteInput): BriefContent {
     count,
     percentage: total > 0 ? Math.round((count / total) * 100) : 0,
   }));
+  const vote_context: VoteContextSnapshot = {
+    description: input.vote_description,
+    options: input.vote_options,
+    starts_at: input.vote_starts_at,
+    ends_at: input.vote_ends_at,
+  };
   return {
     title: input.vote_title,
     participation_count: total,
@@ -60,32 +71,37 @@ function generateBriefContent(input: CreateBriefFromVoteInput): BriefContent {
     // Seeded from civic.input. Admin can edit these in the review UI.
     comments: sanitizeList(input.comments ?? []),
     admin_notes: "",
+    vote_context,
   };
 }
 
-/** Emit the creation events. Called by the host hub once the brief row is persisted. */
+/**
+ * Emit the creation events. Called by the host hub once the vote-results
+ * row is persisted. Name kept generic — works for any module that wants
+ * a created+aggregation_completed pair at Phase 0/4.
+ */
 export async function emitCreationEvents(
-  ctx: BriefProcessContext,
+  ctx: VoteResultsProcessContext,
   actor: string,
-  state: BriefProcessState,
+  state: VoteResultsProcessState,
 ): Promise<void> {
-  await emitBriefCreated(ctx, actor, state);
-  await emitBriefAggregationCompleted(ctx, actor, state);
+  await emitVoteResultsCreated(ctx, actor, state);
+  await emitVoteResultsAggregationCompleted(ctx, actor, state);
 }
 
 /**
- * Apply an admin edit to brief content. Rejects if the brief has already
- * been approved. Emits `civic.process.updated`.
+ * Apply an admin edit to vote-results content. Rejects if the record has
+ * already been approved. Emits `civic.process.updated`.
  */
-export async function editBrief(
-  state: BriefProcessState,
+export async function editVoteResults(
+  state: VoteResultsProcessState,
   actor: string,
-  patch: BriefContentPatch,
-  ctx: BriefProcessContext,
-): Promise<BriefActionOutcome> {
+  patch: VoteResultsContentPatch,
+  ctx: VoteResultsProcessContext,
+): Promise<VoteResultsActionOutcome> {
   if (!canEdit(state)) {
     throw new Error(
-      `Brief cannot be edited: publication_status is "${state.publication_status}"`,
+      `Vote results cannot be edited: publication_status is "${state.publication_status}"`,
     );
   }
 
@@ -98,7 +114,7 @@ export async function editBrief(
   }
   state.content = content;
 
-  await emitBriefUpdated(ctx, actor, state);
+  await emitVoteResultsUpdated(ctx, actor, state);
 
   return { state, result: { content } };
 }
@@ -123,32 +139,37 @@ function sanitizeList(items: string[]): string[] {
  *
  * Sequence (Civic Process Spec Phases 5 → 6):
  *   1. publication_status = approved, approved_at = now
- *   2. send email (HALT on failure — brief stays "approved", no events emit)
+ *   2. send email (HALT on failure — record stays "approved", no events)
  *   3. record delivered_to
  *   4. emit outcome_recorded
  *   5. publication_status = published, published_at = now
- *   6. emit result_published (brief)
- *   7. finalize linked vote (which emits vote.result_published)
+ *   6. emit result_published (vote-results)
+ *   7. finalize linked vote (which emits vote.result_published — that
+ *      vote event is filtered out of Feed/digest as of Slice 8.5 to
+ *      eliminate the duplicate post; it stays on the event log for
+ *      audit / federation purposes)
  */
-export async function approveBrief(
-  state: BriefProcessState,
+export async function approveVoteResults(
+  state: VoteResultsProcessState,
   actor: string,
-  ctx: BriefProcessContext,
+  ctx: VoteResultsProcessContext,
   deps: {
     recipients: string[];
     hubLabel: string;
-    publicBriefUrl: string;
+    publicVoteResultsUrl: string;
     sendEmail: SendEmailFn;
     finalizeLinkedVote: FinalizeLinkedVoteFn;
   },
-): Promise<BriefActionOutcome> {
+): Promise<VoteResultsActionOutcome> {
   if (!canApprove(state)) {
     throw new Error(
-      `Brief cannot be approved: publication_status is "${state.publication_status}"`,
+      `Vote results cannot be approved: publication_status is "${state.publication_status}"`,
     );
   }
   if (deps.recipients.length === 0) {
-    throw new Error("Cannot approve brief: no email recipients configured (BOARD_RECIPIENT_EMAIL).");
+    throw new Error(
+      "Cannot approve vote results: no email recipients configured (BOARD_RECIPIENT_EMAIL).",
+    );
   }
 
   // Step 1: transition to approved
@@ -157,9 +178,9 @@ export async function approveBrief(
   state.approved_at = new Date().toISOString();
 
   // Step 2: deliver email (halt on failure)
-  const email = formatBriefEmail(state, {
+  const email = formatVoteResultsEmail(state, {
     hubLabel: deps.hubLabel,
-    publicUrl: deps.publicBriefUrl,
+    publicUrl: deps.publicVoteResultsUrl,
   });
   await deps.sendEmail({
     to: deps.recipients,
@@ -172,15 +193,15 @@ export async function approveBrief(
   state.delivered_to = [...deps.recipients];
 
   // Step 4: outcome recorded (Phase 5)
-  await emitBriefOutcomeRecorded(ctx, actor, state);
+  await emitVoteResultsOutcomeRecorded(ctx, actor, state);
 
   // Step 5: transition to published
   assertPublicationTransition(state.publication_status, "published");
   state.publication_status = "published";
   state.published_at = new Date().toISOString();
 
-  // Step 6: result published (Phase 6 — the brief itself)
-  await emitBriefResultPublished(ctx, actor, state);
+  // Step 6: result published (Phase 6 — the vote-results record itself)
+  await emitVoteResultsResultPublished(ctx, actor, state);
 
   // Step 7: finalize the linked vote — emits vote.result_published
   await deps.finalizeLinkedVote(state.source_process_id, actor);
@@ -197,10 +218,10 @@ export async function approveBrief(
 }
 
 /**
- * Admin-facing read model (full brief detail).
+ * Admin-facing read model (full vote-results detail).
  */
 export function getAdminReadModel(
-  state: BriefProcessState,
+  state: VoteResultsProcessState,
   processMeta: {
     id: string;
     title: string;
@@ -210,7 +231,7 @@ export function getAdminReadModel(
 ): Record<string, unknown> {
   return {
     id: processMeta.id,
-    type: "civic.brief",
+    type: "civic.vote_results",
     title: processMeta.title,
     source_process_id: state.source_process_id,
     publication_status: state.publication_status,
@@ -225,23 +246,27 @@ export function getAdminReadModel(
 }
 
 /**
- * Public read model (published briefs only). Excludes fields irrelevant or
- * sensitive for public consumption (e.g. delivered_to email list).
+ * Public read model (published vote-results only). Excludes fields
+ * irrelevant or sensitive for public consumption (e.g. delivered_to
+ * email list — only an "approved on <date>" indicator is exposed).
  */
 export function getPublicReadModel(
-  state: BriefProcessState,
+  state: VoteResultsProcessState,
   processMeta: { id: string; title: string; createdAt: string },
 ): Record<string, unknown> | null {
   if (state.publication_status !== "published") return null;
   return {
     id: processMeta.id,
-    type: "civic.brief",
+    type: "civic.vote_results",
     title: processMeta.title,
     source_process_id: state.source_process_id,
     participation_count: state.content.participation_count,
     position_breakdown: state.content.position_breakdown,
     comments: state.content.comments,
     admin_notes: state.content.admin_notes,
+    vote_context: state.content.vote_context,
+    delivered_recipient_count: state.delivered_to.length,
+    approved_at: state.approved_at,
     generated_at: state.generated_at,
     published_at: state.published_at,
   };
@@ -249,16 +274,20 @@ export function getPublicReadModel(
 
 /** Summary used by admin listing. */
 export function getAdminSummary(
-  state: BriefProcessState,
+  state: VoteResultsProcessState,
   processMeta: { id: string; title: string; createdAt: string },
 ): Record<string, unknown> {
   return {
     id: processMeta.id,
-    type: "civic.brief",
+    type: "civic.vote_results",
     title: processMeta.title,
     source_process_id: state.source_process_id,
     publication_status: state.publication_status,
     participation_count: state.content.participation_count,
+    // 200-char preview of the snapshotted vote description so the admin
+    // list row carries enough context to recognize the vote.
+    vote_description_preview:
+      state.content.vote_context?.description?.slice(0, 200) ?? "",
     generated_at: state.generated_at,
     approved_at: state.approved_at,
     published_at: state.published_at,

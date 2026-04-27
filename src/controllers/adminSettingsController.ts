@@ -1,7 +1,11 @@
 // Admin settings controller — read/write admin-configurable hub settings.
 //
 // Exposes:
-//   - brief_recipient_emails  (Slice 3 addendum)
+//   - brief_recipient_emails  (Slice 3 addendum — recipients of vote
+//                              results, sent to the Board on approval.
+//                              Field name preserved across Slice 8.5's
+//                              civic.brief → civic.vote_results rename
+//                              so existing operator config keeps working.)
 //   - announcement_authors    (Slice 4.1: {email, label} list of non-admin
 //                              users authorized to post announcements)
 //
@@ -12,9 +16,9 @@ import { Request, Response } from "express";
 import {
   type AnnouncementAuthor,
   getAnnouncementAuthors,
-  getBriefRecipients,
+  getVoteResultsRecipients,
   setAnnouncementAuthors,
-  setBriefRecipients,
+  setVoteResultsRecipients,
 } from "../services/hubSettings.js";
 import { getAuthUser } from "../middleware/auth.js";
 
@@ -25,7 +29,7 @@ interface SettingsResponse {
 
 async function loadSettings(): Promise<SettingsResponse> {
   return {
-    brief_recipient_emails: await getBriefRecipients(),
+    brief_recipient_emails: await getVoteResultsRecipients(),
     announcement_authors: await getAnnouncementAuthors(),
   };
 }
@@ -63,7 +67,7 @@ export async function handlePatchSettings(
       const input = body.brief_recipient_emails.filter(
         (e): e is string => typeof e === "string",
       );
-      await setBriefRecipients(input, actor);
+      await setVoteResultsRecipients(input, actor);
     }
 
     if (body.announcement_authors !== undefined) {

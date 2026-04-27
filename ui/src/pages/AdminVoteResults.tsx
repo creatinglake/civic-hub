@@ -1,32 +1,37 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
-  adminListBriefs,
-  adminGetBrief,
-  adminPatchBrief,
-  adminApproveBrief,
-  type BriefDetail,
-  type BriefPublicationStatus,
-  type BriefSummary,
+  adminListVoteResults,
+  adminGetVoteResults,
+  adminPatchVoteResults,
+  adminApproveVoteResults,
+  type VoteResultsDetail,
+  type VoteResultsPublicationStatus,
+  type VoteResultsSummary,
 } from "../services/api";
 import AdminTabs from "../components/AdminTabs";
-import "./AdminBriefs.css";
+import "./AdminVoteResults.css";
 
-const STATUS_FILTERS: Array<{ id: "all" | BriefPublicationStatus; label: string }> = [
+const STATUS_FILTERS: Array<{
+  id: "all" | VoteResultsPublicationStatus;
+  label: string;
+}> = [
   { id: "all", label: "All" },
   { id: "pending", label: "Pending" },
   { id: "approved", label: "Approved" },
   { id: "published", label: "Published" },
 ];
 
-export default function AdminBriefs() {
+export default function AdminVoteResults() {
   const navigate = useNavigate();
-  const { id: routeBriefId } = useParams<{ id?: string }>();
-  const view: "list" | "review" = routeBriefId ? "review" : "list";
+  const { id: routeId } = useParams<{ id?: string }>();
+  const view: "list" | "review" = routeId ? "review" : "list";
 
-  const [briefs, setBriefs] = useState<BriefSummary[]>([]);
-  const [selected, setSelected] = useState<BriefDetail | null>(null);
-  const [statusFilter, setStatusFilter] = useState<"all" | BriefPublicationStatus>("all");
+  const [records, setRecords] = useState<VoteResultsSummary[]>([]);
+  const [selected, setSelected] = useState<VoteResultsDetail | null>(null);
+  const [statusFilter, setStatusFilter] = useState<
+    "all" | VoteResultsPublicationStatus
+  >("all");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
@@ -41,8 +46,8 @@ export default function AdminBriefs() {
   function loadList() {
     setLoading(true);
     setError(null);
-    adminListBriefs()
-      .then(setBriefs)
+    adminListVoteResults()
+      .then(setRecords)
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
   }
@@ -52,49 +57,47 @@ export default function AdminBriefs() {
   }, []);
 
   const filtered = useMemo(() => {
-    if (statusFilter === "all") return briefs;
-    return briefs.filter((b) => b.publication_status === statusFilter);
-  }, [briefs, statusFilter]);
+    if (statusFilter === "all") return records;
+    return records.filter((b) => b.publication_status === statusFilter);
+  }, [records, statusFilter]);
 
   function openReview(id: string) {
     setError(null);
     setActionMessage(null);
-    navigate(`/admin/briefs/${id}`);
+    navigate(`/admin/vote-results/${id}`);
   }
 
   function backToList() {
     setConfirmingApprove(false);
     setActionMessage(null);
     setError(null);
-    navigate("/admin/briefs");
+    navigate("/admin/vote-results");
   }
 
-  // Load the selected brief whenever the URL id changes. When we navigate
-  // back to /admin/briefs (no id), clear the selection so stale state
-  // doesn't flash on next entry.
+  // Load the selected record whenever the URL id changes.
   useEffect(() => {
-    if (!routeBriefId) {
+    if (!routeId) {
       setSelected(null);
       return;
     }
     setError(null);
     setActionMessage(null);
-    adminGetBrief(routeBriefId)
-      .then((brief) => {
-        setSelected(brief);
-        setCommentsText(brief.content.comments.join("\n"));
-        setAdminNotes(brief.content.admin_notes);
+    adminGetVoteResults(routeId)
+      .then((record) => {
+        setSelected(record);
+        setCommentsText(record.content.comments.join("\n"));
+        setAdminNotes(record.content.admin_notes);
         setConfirmingApprove(false);
       })
       .catch((err: Error) => setError(err.message));
-  }, [routeBriefId]);
+  }, [routeId]);
 
   async function saveDraft() {
     if (!selected) return;
     setSaving(true);
     setError(null);
     try {
-      const updated = await adminPatchBrief(selected.id, {
+      const updated = await adminPatchVoteResults(selected.id, {
         comments: parseCommentsText(commentsText),
         admin_notes: adminNotes,
       });
@@ -112,16 +115,16 @@ export default function AdminBriefs() {
     setApproving(true);
     setError(null);
     try {
-      // Save any unsaved edits first so the published brief matches what the
-      // admin is looking at.
-      await adminPatchBrief(selected.id, {
+      // Save any unsaved edits first so the published record matches
+      // what the admin is looking at.
+      await adminPatchVoteResults(selected.id, {
         comments: parseCommentsText(commentsText),
         admin_notes: adminNotes,
       });
-      const { brief } = await adminApproveBrief(selected.id);
-      setSelected(brief);
+      const { vote_results } = await adminApproveVoteResults(selected.id);
+      setSelected(vote_results);
       setActionMessage(
-        `Approved. Brief delivered to ${brief.delivered_to.length} recipient(s) and published to the feed.`,
+        `Approved. Vote results delivered to ${vote_results.delivered_to.length} recipient(s) and published to the feed.`,
       );
       setConfirmingApprove(false);
     } catch (err) {
@@ -133,12 +136,13 @@ export default function AdminBriefs() {
 
   if (view === "review" && selected) {
     const isPending = selected.publication_status === "pending";
+    const ctx = selected.content.vote_context;
     return (
       <div className="page admin-briefs-page">
         <AdminTabs />
         <div className="admin-briefs-body">
           <button className="admin-back-link" onClick={backToList} type="button">
-            &larr; Back to Civic Briefs
+            &larr; Back to Vote results
           </button>
           <h1>Review: {selected.title}</h1>
           <p className="admin-subtitle">
@@ -169,11 +173,51 @@ export default function AdminBriefs() {
           </section>
 
           <section className="admin-detail-section">
+            <h3>About this vote</h3>
+            <p className="form-hint">
+              Snapshotted from the original vote at the time the results were
+              generated. Read-only — editing this would defeat the snapshot.
+            </p>
+            {ctx ? (
+              <div className="admin-vote-context">
+                {ctx.description && (
+                  <div className="admin-vote-context-description">
+                    {ctx.description.split(/\n\n+/).map((para, i) => (
+                      <p key={i}>{para}</p>
+                    ))}
+                  </div>
+                )}
+                {ctx.options.length > 0 && (
+                  <>
+                    <p className="admin-vote-context-options-label">
+                      <strong>Options on the ballot:</strong>
+                    </p>
+                    <ul>
+                      {ctx.options.map((o) => (
+                        <li key={o.option_id}>{o.option_label}</li>
+                      ))}
+                    </ul>
+                  </>
+                )}
+                {(ctx.starts_at || ctx.ends_at) && (
+                  <p className="admin-vote-context-window">
+                    {formatVotingWindow(ctx.starts_at, ctx.ends_at)}
+                  </p>
+                )}
+              </div>
+            ) : (
+              <p className="empty-state-inline">
+                Original vote context not available for this earlier record.
+              </p>
+            )}
+          </section>
+
+          <section className="admin-detail-section">
             <h3>Community comments</h3>
             <p className="form-hint">
               One comment per line. Empty lines are ignored; duplicates are
-              removed. This field will be pre-populated from civic.input in a
-              future slice — for now, add anything worth surfacing to the Board.
+              removed. Pre-populated from civic.input — edit anything worth
+              surfacing to the Board.
             </p>
             <textarea
               className="form-textarea"
@@ -254,8 +298,8 @@ export default function AdminBriefs() {
           )}
           {confirmingApprove && (
             <p className="form-hint" style={{ marginTop: "var(--space-sm)" }}>
-              This will deliver the brief to the Board and publish a "Civic Brief
-              delivered" post to the public feed. This cannot be undone.
+              This will deliver the vote results to the Board and publish a
+              "Vote results: …" post to the public feed. This cannot be undone.
             </p>
           )}
         </div>
@@ -267,10 +311,10 @@ export default function AdminBriefs() {
     <div className="page admin-briefs-page">
       <AdminTabs />
       <div className="admin-briefs-body">
-        <h1>Civic Briefs</h1>
+        <h1>Vote results</h1>
         <p className="admin-subtitle">
-          Review briefs generated automatically when votes close. Approval delivers
-          the brief to the Board of Supervisors and publishes it to the public feed.
+          Review and approve vote results. Approval delivers the results to the
+          Board of Supervisors and publishes them to the public feed.
         </p>
 
         <div className="admin-brief-filters">
@@ -292,27 +336,33 @@ export default function AdminBriefs() {
         {!loading && !error && filtered.length === 0 && (
           <p className="empty-state-inline">
             {statusFilter === "all"
-              ? "No briefs yet. Briefs are created automatically when votes close."
-              : `No ${statusFilter} briefs.`}
+              ? "No vote results yet. Records are created automatically when votes close."
+              : `No ${statusFilter} vote results.`}
           </p>
         )}
 
         <ul className="admin-proposal-list">
-          {filtered.map((brief) => (
+          {filtered.map((record) => (
             <li
-              key={brief.id}
+              key={record.id}
               className="admin-proposal-item"
-              onClick={() => openReview(brief.id)}
+              onClick={() => openReview(record.id)}
             >
               <div className="admin-proposal-header">
-                <h3>{brief.title}</h3>
-                <StatusChip status={brief.publication_status} />
+                <h3>{record.title}</h3>
+                <StatusChip status={record.publication_status} />
               </div>
+              {record.vote_description_preview && (
+                <p className="admin-vote-description-preview">
+                  {record.vote_description_preview}
+                  {record.vote_description_preview.length === 200 ? "…" : ""}
+                </p>
+              )}
               <div className="admin-proposal-meta">
-                <span>{brief.participation_count} votes</span>
-                <span>Generated {formatDate(brief.generated_at)}</span>
-                {brief.published_at && (
-                  <span>Published {formatDate(brief.published_at)}</span>
+                <span>{record.participation_count} votes</span>
+                <span>Generated {formatDate(record.generated_at)}</span>
+                {record.published_at && (
+                  <span>Published {formatDate(record.published_at)}</span>
                 )}
               </div>
             </li>
@@ -323,10 +373,14 @@ export default function AdminBriefs() {
   );
 }
 
-function StatusChip({ status }: { status: BriefPublicationStatus }) {
+function StatusChip({ status }: { status: VoteResultsPublicationStatus }) {
   const cls = `status-badge admin-brief-status-${status}`;
   const label =
-    status === "pending" ? "pending review" : status === "approved" ? "approved" : "published";
+    status === "pending"
+      ? "pending review"
+      : status === "approved"
+      ? "approved"
+      : "published";
   return <span className={cls}>{label}</span>;
 }
 
@@ -348,4 +402,20 @@ function formatDate(iso: string): string {
 function formatDateTime(iso: string): string {
   const d = new Date(iso);
   return `${d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })} at ${d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}`;
+}
+
+function formatVotingWindow(
+  startsAt: string | null,
+  endsAt: string | null,
+): string {
+  const fmt = (iso: string) =>
+    new Date(iso).toLocaleDateString(undefined, {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
+  if (startsAt && endsAt) return `Voting was open from ${fmt(startsAt)} to ${fmt(endsAt)}.`;
+  if (startsAt) return `Voting opened ${fmt(startsAt)}.`;
+  if (endsAt) return `Voting closed ${fmt(endsAt)}.`;
+  return "";
 }

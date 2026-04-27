@@ -7,7 +7,7 @@ import {
   getEvents,
   getMeetingSummary,
   getProcessState,
-  getPublicBrief,
+  getPublicVoteResults,
 } from "../services/api";
 import FeedPost, { eventToPost, type FeedPostView } from "./FeedPost";
 import "./Feed.css";
@@ -25,7 +25,7 @@ interface Props {
 
 type ProcessKind =
   | "civic.vote"
-  | "civic.brief"
+  | "civic.vote_results"
   | "civic.announcement"
   | "civic.meeting_summary";
 
@@ -37,15 +37,25 @@ interface ProcessMeta {
 
 /**
  * Discriminate the underlying process type for an event from its data.
+ *
  * - civic.process.started is only emitted by civic.vote today.
- * - civic.process.result_published is emitted by all three process types;
+ * - civic.process.result_published is emitted by multiple process types;
  *   we use the event's data shape to tell them apart.
+ *
+ * Slice 8.5 changes:
+ *   - Vote `result_published` events return `null` (not rendered in
+ *     feed/digest — they duplicate the vote-results post). The event
+ *     stays on the audit log but doesn't surface a feed item.
+ *   - Vote-results `result_published` is discriminated by `data.results_id`
+ *     (new) or the legacy `data.brief_id`. Both fields are accepted
+ *     indefinitely so old events keep working without rewriting.
  */
 function kindFromEvent(event: CivicEvent): ProcessKind | null {
   if (event.event_type === "civic.process.started") return "civic.vote";
   if (event.event_type === "civic.process.result_published") {
     const data = event.data as {
       brief_id?: unknown;
+      results_id?: unknown;
       result?: unknown;
       announcement?: unknown;
       meeting_summary?: unknown;
@@ -55,8 +65,13 @@ function kindFromEvent(event: CivicEvent): ProcessKind | null {
     if (data?.meeting_summary !== undefined || typeof data?.summary_id === "string") {
       return "civic.meeting_summary";
     }
-    if (typeof data?.brief_id === "string") return "civic.brief";
-    if (data?.result !== undefined) return "civic.vote";
+    if (typeof data?.results_id === "string" || typeof data?.brief_id === "string") {
+      return "civic.vote_results";
+    }
+    // Vote `result_published` (data.result present, no results_id /
+    // brief_id) — INTENTIONALLY EXCLUDED from the feed. See FeedPost
+    // for the matching filter on the rendering side.
+    if (data?.result !== undefined) return null;
   }
   return null;
 }
@@ -128,10 +143,10 @@ export default function Feed({ filter }: Props) {
             description: vote.description,
           };
         });
-      } else if (kind === "civic.brief") {
-        lookup = getPublicBrief(id).then((brief) => ({
-          type: "civic.brief" as const,
-          title: brief.title,
+      } else if (kind === "civic.vote_results") {
+        lookup = getPublicVoteResults(id).then((vr) => ({
+          type: "civic.vote_results" as const,
+          title: vr.title,
           description: undefined,
         }));
       } else if (kind === "civic.meeting_summary") {

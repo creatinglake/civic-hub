@@ -10,11 +10,11 @@ import {
   handleArchiveProposal,
 } from "../controllers/adminController.js";
 import {
-  handleAdminListBriefs,
-  handleAdminGetBrief,
-  handlePatchBrief,
-  handleApproveBrief,
-} from "../controllers/adminBriefController.js";
+  handleAdminListVoteResults,
+  handleAdminGetVoteResults,
+  handlePatchVoteResults,
+  handleApproveVoteResults,
+} from "../controllers/adminVoteResultsController.js";
 import {
   handleAdminGetMeetingSummary,
   handleAdminListMeetingSummaries,
@@ -37,11 +37,12 @@ router.get("/proposals/:id", handleAdminGetProposal);
 router.post("/proposals/:id/convert", handleConvertProposal);
 router.post("/proposals/:id/archive", handleArchiveProposal);
 
-// Civic Briefs
-router.get("/briefs", handleAdminListBriefs);
-router.get("/briefs/:id", handleAdminGetBrief);
-router.patch("/briefs/:id", handlePatchBrief);
-router.post("/briefs/:id/approve", handleApproveBrief);
+// Vote results (renamed from /admin/briefs in Slice 8.5; the underlying
+// process type is civic.vote_results, formerly civic.brief).
+router.get("/vote-results", handleAdminListVoteResults);
+router.get("/vote-results/:id", handleAdminGetVoteResults);
+router.patch("/vote-results/:id", handlePatchVoteResults);
+router.post("/vote-results/:id/approve", handleApproveVoteResults);
 
 // Meeting Summaries
 router.get("/meeting-summaries", handleAdminListMeetingSummaries);

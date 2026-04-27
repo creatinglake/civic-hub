@@ -49,12 +49,15 @@
   --color-warning: #d97706;
   --color-warning-bg: #fef3c7;
 
-  /* --- Color: post-type pills --- */
-  --pill-vote-bg: #e0ecfc;         --pill-vote-fg: #1e3a5f;
-  --pill-results-bg: #d6e4f7;      --pill-results-fg: #15325a;
-  --pill-brief-bg: #d4ede8;        --pill-brief-fg: #0f5a55;
-  --pill-announcement-bg: #fbe5d3; --pill-announcement-fg: #8c3210;
-  --pill-meeting-bg: #d9ecd9;      --pill-meeting-fg: #0f4a26;
+  /* --- Color: post-type pills ---
+     Slice 8.5 renamed --pill-brief-* to --pill-vote-results-* in line
+     with the civic.brief → civic.vote_results module rename. The hex
+     values are unchanged so the visual color family is preserved. */
+  --pill-vote-bg: #e0ecfc;             --pill-vote-fg: #1e3a5f;
+  --pill-results-bg: #d6e4f7;          --pill-results-fg: #15325a;
+  --pill-vote-results-bg: #d4ede8;     --pill-vote-results-fg: #0f5a55;
+  --pill-announcement-bg: #fbe5d3;     --pill-announcement-fg: #8c3210;
+  --pill-meeting-bg: #d9ecd9;          --pill-meeting-fg: #0f4a26;
 
   /* --- Typography --- */
   --font-body:

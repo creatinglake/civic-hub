@@ -20,8 +20,8 @@ import {
   type VoteProcessState,
 } from "../modules/civic.vote/index.js";
 import { recordVote } from "../modules/civic.receipts/index.js";
-import type { BriefProcessState } from "../modules/civic.brief/index.js";
-import { emitBriefAggregationCompleted } from "../modules/civic.brief/events.js";
+import type { VoteResultsProcessState } from "../modules/civic.vote_results/index.js";
+import { emitVoteResultsAggregationCompleted } from "../modules/civic.vote_results/events.js";
 import { getInputsByProcess } from "../modules/civic.input/index.js";
 import { getProcessFactory, getProcessHandler } from "./registry.js";
 
@@ -45,20 +45,26 @@ function syncStatus(process: Process, state: VoteProcessState): void {
 }
 
 /**
- * Spawn a civic.brief process from a just-closed vote and link the two
- * via the parent's follow_up_process_ids array (Civic Process Spec §11.3).
+ * Spawn a civic.vote_results process from a just-closed vote and link
+ * the two via the parent's follow_up_process_ids array (Civic Process
+ * Spec §11.3).
  *
- * The generic process factory emits civic.process.created for the brief;
- * we additionally fire the brief's aggregation_completed here so the
- * spec's Phase 4 boundary is observable on the event feed.
+ * The generic process factory emits civic.process.created for the
+ * vote-results record; we additionally fire its aggregation_completed
+ * here so the spec's Phase 4 boundary is observable on the event feed.
+ *
+ * The vote's description, options, and voting window are snapshotted
+ * onto the vote-results state so the published page can show residents
+ * the original question and options without having to read back to the
+ * vote process.
  */
-async function spawnBriefFromClosedVote(
+async function spawnVoteResultsFromClosedVote(
   voteProcess: Process,
   closeResult: Record<string, unknown>,
 ): Promise<Process> {
-  // Seed the brief with community comments collected during the vote. Best-
-  // effort: if the read fails we proceed with an empty list rather than
-  // block the vote-close flow — admin can still add comments manually.
+  // Seed with community comments collected during the vote. Best-effort:
+  // if the read fails we proceed with an empty list rather than block
+  // the vote-close flow — admin can still add comments manually.
   let comments: string[] = [];
   try {
     const inputs = await getInputsByProcess(voteProcess.id);
@@ -68,17 +74,26 @@ async function spawnBriefFromClosedVote(
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
     console.warn(
-      `[voteProcess] Could not read civic.input for brief seeding on ${voteProcess.id}: ${message}`,
+      `[voteProcess] Could not read civic.input for vote-results seeding on ${voteProcess.id}: ${message}`,
     );
   }
 
+  // Snapshot the vote context. options on civic.vote are bare strings
+  // for MVP, so {id, label} both equal the option string — same
+  // convention as VoteResultsPositionBreakdown.
+  const voteState = voteProcess.state as unknown as VoteProcessState;
+  const voteOptions = voteState.options.map((o) => ({
+    option_id: o,
+    option_label: o,
+  }));
+
   const factory = getProcessFactory();
-  const brief = await factory({
-    definition: { type: "civic.brief", version: "0.1" },
-    // Title mirrors the vote's title. Contextual labels ("Civic Brief
-    // delivered: …" in the feed, "Civic Brief" eyebrow on the public page,
-    // "Civic Briefs" in the admin tab, etc.) handle disambiguation so the
-    // bare title doesn't need to repeat itself.
+  const voteResults = await factory({
+    definition: { type: "civic.vote_results", version: "0.1" },
+    // Title mirrors the vote's title. Contextual labels ("Vote results"
+    // pill in the feed, "Vote results: …" page heading, "Vote results"
+    // admin tab, etc.) handle disambiguation so the bare title doesn't
+    // need to repeat itself.
     title: voteProcess.title,
     description: voteProcess.description,
     hubId: voteProcess.hubId,
@@ -87,39 +102,43 @@ async function spawnBriefFromClosedVote(
     state: {
       source_process_id: voteProcess.id,
       vote_title: voteProcess.title,
+      vote_description: voteProcess.description,
+      vote_options: voteOptions,
+      vote_starts_at: voteState.voting_opens_at,
+      vote_ends_at: voteState.voting_closes_at,
       tally: closeResult.tally,
       total_votes: closeResult.total_votes,
       comments,
     },
   });
 
-  // Emit aggregation_completed for the brief. (civic.process.created is
-  // already emitted by the generic factory in processService.)
-  const briefState = brief.state as unknown as BriefProcessState;
-  await emitBriefAggregationCompleted(
+  // Emit aggregation_completed for the vote-results record.
+  // (civic.process.created is already emitted by the generic factory.)
+  const voteResultsState = voteResults.state as unknown as VoteResultsProcessState;
+  await emitVoteResultsAggregationCompleted(
     {
-      process_id: brief.id,
-      hub_id: brief.hubId,
-      jurisdiction: brief.jurisdiction,
+      process_id: voteResults.id,
+      hub_id: voteResults.hubId,
+      jurisdiction: voteResults.jurisdiction,
       emit: emitEvent,
     },
     "system",
-    briefState,
+    voteResultsState,
   );
 
-  // Link the parent vote to the new brief. This mutation of
-  // voteProcess.state is persisted by processService after handleAction
-  // returns. Per Civic Process Spec §11.3, follow_up_process_ids is the
-  // canonical parent→child linkage.
-  const voteState = voteProcess.state as unknown as VoteProcessState & {
+  // Link the parent vote to the new vote-results record. Per Civic
+  // Process Spec §11.3, follow_up_process_ids is the canonical parent
+  // → child linkage. This mutation of voteProcess.state is persisted by
+  // processService after handleAction returns.
+  const linkedVoteState = voteProcess.state as unknown as VoteProcessState & {
     follow_up_process_ids?: string[];
   };
-  voteState.follow_up_process_ids = [
-    ...(voteState.follow_up_process_ids ?? []),
-    brief.id,
+  linkedVoteState.follow_up_process_ids = [
+    ...(linkedVoteState.follow_up_process_ids ?? []),
+    voteResults.id,
   ];
 
-  return brief;
+  return voteResults;
 }
 
 // --- Handler implementation ---
@@ -180,21 +199,28 @@ const voteProcess: ProcessHandler = {
         syncStatus(process, outcome.state);
         result = outcome.result;
 
-        // If civic.brief is registered, spawn a brief from the now-closed
-        // vote. Hubs that don't register civic.brief simply skip this step.
-        const briefHandler = getProcessHandler("civic.brief");
-        if (briefHandler) {
-          const brief = await spawnBriefFromClosedVote(process, outcome.result);
-          result = { ...result, brief_process_id: brief.id };
+        // If civic.vote_results is registered, spawn a vote-results
+        // record from the now-closed vote. Hubs that don't register
+        // civic.vote_results simply skip this step. The result key
+        // remains `brief_process_id` for backwards compatibility with
+        // any caller that reads it (the public name changed in
+        // Slice 8.5; the close-flow result shape did not).
+        const voteResultsHandler = getProcessHandler("civic.vote_results");
+        if (voteResultsHandler) {
+          const voteResults = await spawnVoteResultsFromClosedVote(
+            process,
+            outcome.result,
+          );
+          result = { ...result, brief_process_id: voteResults.id };
         }
         break;
       }
       // Note: there is intentionally no `process.finalize` action here.
       // Finalization publishes the vote result, which must be gated on
-      // admin approval of the accompanying civic.brief. The brief module's
-      // approval flow calls `finalizeVote` directly as a library import;
-      // there is no HTTP path that publishes a vote result without
-      // approved-brief orchestration.
+      // admin approval of the accompanying civic.vote_results record.
+      // The vote-results module's approval flow calls `finalizeVote`
+      // directly as a library import; there is no HTTP path that
+      // publishes a vote result without approved-results orchestration.
       default:
         throw new Error(`Unknown action type for civic.vote: ${action.type}`);
     }

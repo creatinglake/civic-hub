@@ -49,11 +49,21 @@ export interface DigestHubContext {
   manage_subscriptions_url: string;
 }
 
-/** Grouping categories surfaced in the email body. Order matters for rendering. */
+/**
+ * Grouping categories surfaced in the email body. Order matters for
+ * rendering.
+ *
+ * Slice 8.5 changes:
+ *   - "brief_published" → "vote_results_published" to match the
+ *     civic.brief → civic.vote_results module rename.
+ *   - "vote_result_published" was REMOVED. Vote-process result_published
+ *     events are now excluded from the digest entirely; the vote-results
+ *     publication covers them. The kind is gone from the union because
+ *     no code path produces it anymore.
+ */
 export type DigestItemKind =
   | "vote_opened"
-  | "vote_result_published"
-  | "brief_published"
+  | "vote_results_published"
   | "announcement"
   | "meeting_summary_published";
 

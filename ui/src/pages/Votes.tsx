@@ -4,7 +4,7 @@ import {
   listProcesses,
   listCivicProposals,
   type ProcessSummary,
-  type PublishedBriefSummary,
+  type PublishedVoteResultsSummary,
   type VoteSummary,
   type ProposalSummary,
   type CivicProposalSummary,
@@ -48,13 +48,23 @@ export default function Votes() {
     )
     .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
-  // Index published briefs by source vote id so completed-vote cards can
-  // link to their brief in one lookup.
-  const briefsByVote = useMemo(() => {
-    const map = new Map<string, PublishedBriefSummary>();
+  // Index published vote-results by source vote id so completed-vote
+  // cards can link to their results page in one lookup. (Renamed from
+  // briefsByVote in Slice 8.5; the underlying type is the same.)
+  //
+  // Also accepts the legacy "civic.brief" type literal so unmigrated
+  // rows continue to link through during the window between Slice 8.5
+  // deploy and the operator running the migration. After migration
+  // every row is "civic.vote_results" and the legacy branch is dead.
+  const voteResultsByVote = useMemo(() => {
+    const map = new Map<string, PublishedVoteResultsSummary>();
     for (const p of processes) {
-      if (p.type === "civic.brief") {
-        map.set(p.source_process_id, p);
+      const t = (p as { type?: string }).type;
+      if (t === "civic.vote_results" || t === "civic.brief") {
+        map.set(
+          (p as PublishedVoteResultsSummary).source_process_id,
+          p as PublishedVoteResultsSummary,
+        );
       }
     }
     return map;
@@ -189,7 +199,7 @@ export default function Votes() {
             ) : (
               <ul className="process-list">
                 {completedVotes.map((v) => {
-                  const brief = briefsByVote.get(v.id);
+                  const results = voteResultsByVote.get(v.id);
                   return (
                     <li key={v.id}>
                       <div className="completed-vote-card">
@@ -197,13 +207,13 @@ export default function Votes() {
                           <ProcessCard process={v} />
                         </Link>
                         <div className="completed-vote-brief-row">
-                          {brief ? (
-                            <Link to={`/brief/${brief.id}`} className="brief-link">
-                              View Civic Brief &rarr;
+                          {results ? (
+                            <Link to={`/vote-results/${results.id}`} className="brief-link">
+                              View vote results &rarr;
                             </Link>
                           ) : (
                             <span className="brief-pending-chip">
-                              Civic Brief pending review
+                              Vote results pending review
                             </span>
                           )}
                         </div>

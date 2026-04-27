@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useParams } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
 import Nav from "./components/Nav";
 import HubBanner from "./components/HubBanner";
@@ -10,10 +10,10 @@ import About from "./pages/About";
 import Propose from "./pages/Propose";
 import ProposalDetail from "./pages/ProposalDetail";
 import AdminProposals from "./pages/AdminProposals";
-import AdminBriefs from "./pages/AdminBriefs";
+import AdminVoteResults from "./pages/AdminVoteResults";
 import AdminMeetingSummaries from "./pages/AdminMeetingSummaries";
 import AdminSettings from "./pages/AdminSettings";
-import Brief from "./pages/Brief";
+import VoteResults from "./pages/VoteResults";
 import MeetingSummary from "./pages/MeetingSummary";
 import VoteLog from "./pages/VoteLog";
 import PostAnnouncement from "./pages/PostAnnouncement";
@@ -52,8 +52,15 @@ function AppContent() {
           <Route path="/proposal/:id" element={<ProposalDetail />} />
           <Route path="/votes/:id/log" element={<VoteLog />} />
           <Route path="/admin/proposals" element={<AdminProposals />} />
-          <Route path="/admin/briefs" element={<AdminBriefs />} />
-          <Route path="/admin/briefs/:id" element={<AdminBriefs />} />
+          <Route path="/admin/vote-results" element={<AdminVoteResults />} />
+          <Route path="/admin/vote-results/:id" element={<AdminVoteResults />} />
+          {/* Legacy admin paths from before the Slice 8.5 rename — redirect
+              so old bookmarks / nav muscle-memory continue to work. */}
+          <Route
+            path="/admin/briefs"
+            element={<Navigate to="/admin/vote-results" replace />}
+          />
+          <Route path="/admin/briefs/:id" element={<LegacyBriefAdminRedirect />} />
           <Route
             path="/admin/meeting-summaries"
             element={<AdminMeetingSummaries />}
@@ -63,7 +70,13 @@ function AppContent() {
             element={<AdminMeetingSummaries />}
           />
           <Route path="/admin/settings" element={<AdminSettings />} />
-          <Route path="/brief/:id" element={<Brief />} />
+          <Route path="/vote-results/:id" element={<VoteResults />} />
+          {/* Legacy public path: historical event action_urls point at
+              /brief/:id. Vercel rewrites all non-/api requests to
+              index.html, so this React Router route is the operative
+              redirect for browser navigation. The Express app also has
+              a 301 at /brief/:id for direct API/curl clients. */}
+          <Route path="/brief/:id" element={<LegacyBriefRedirect />} />
           <Route path="/meeting-summary/:id" element={<MeetingSummary />} />
           <Route path="/announcement/new" element={<PostAnnouncement />} />
           <Route path="/announcement/:id/edit" element={<PostAnnouncement />} />
@@ -78,6 +91,21 @@ function AppContent() {
       </footer>
     </div>
   );
+}
+
+/**
+ * Wrapper that pulls the :id param and 301-equivalents to the new
+ * /vote-results/:id route. <Navigate replace> keeps history clean so
+ * the back button doesn't bounce.
+ */
+function LegacyBriefRedirect() {
+  const { id } = useParams<{ id: string }>();
+  return <Navigate to={`/vote-results/${id}`} replace />;
+}
+
+function LegacyBriefAdminRedirect() {
+  const { id } = useParams<{ id: string }>();
+  return <Navigate to={`/admin/vote-results/${id}`} replace />;
 }
 
 export default function App() {

@@ -1,15 +1,22 @@
 // Hub settings service — read/write for the hub_settings key-value table.
 //
-// First consumer: brief recipient emails. The admin UI writes here, the
-// brief approval flow reads here first and falls back to the
-// BOARD_RECIPIENT_EMAIL env var if no row exists yet.
+// First consumer: vote-results recipient emails (the Board of Supervisors,
+// historically). The admin UI writes here, the vote-results approval
+// flow reads here first and falls back to the BOARD_RECIPIENT_EMAIL
+// env var if no row exists yet.
 //
 // Extendable: add more keys as other admin-configurable settings appear.
 
 import { getDb } from "../db/client.js";
 
+// IMPORTANT: the underlying DB key remains "brief_recipient_emails" for
+// historical reasons — it predates Slice 8.5's rename and live operator
+// configurations already use this name. Renaming the storage key would
+// require a separate hub_settings migration and operator coordination,
+// neither of which is in scope here. Only the JS/TS function name was
+// updated for code-level clarity.
 export const SETTING_KEYS = {
-  BRIEF_RECIPIENT_EMAILS: "brief_recipient_emails",
+  VOTE_RESULTS_RECIPIENT_EMAILS: "brief_recipient_emails",
   ANNOUNCEMENT_AUTHORS: "announcement_authors",
 } as const;
 
@@ -71,12 +78,13 @@ export async function getAllSettings(): Promise<Record<string, SettingRow>> {
 }
 
 /**
- * Resolve the brief recipient list — DB setting first, BOARD_RECIPIENT_EMAIL
- * env var as a safety-net fallback. Returns a trimmed, deduped,
- * non-empty list. Empty result means "no recipient configured anywhere".
+ * Resolve the vote-results recipient list — DB setting first,
+ * BOARD_RECIPIENT_EMAIL env var as a safety-net fallback. Returns a
+ * trimmed, deduped, non-empty list. Empty result means "no recipient
+ * configured anywhere".
  */
-export async function getBriefRecipients(): Promise<string[]> {
-  const stored = await getSetting(SETTING_KEYS.BRIEF_RECIPIENT_EMAILS);
+export async function getVoteResultsRecipients(): Promise<string[]> {
+  const stored = await getSetting(SETTING_KEYS.VOTE_RESULTS_RECIPIENT_EMAILS);
   const raw = stored ?? process.env.BOARD_RECIPIENT_EMAIL ?? "";
   const seen = new Set<string>();
   const out: string[] = [];
@@ -91,7 +99,7 @@ export async function getBriefRecipients(): Promise<string[]> {
   return out;
 }
 
-export async function setBriefRecipients(
+export async function setVoteResultsRecipients(
   emails: string[],
   updatedBy: string | null,
 ): Promise<string[]> {
@@ -106,7 +114,7 @@ export async function setBriefRecipients(
     cleaned.push(trimmed);
   }
   await setSetting(
-    SETTING_KEYS.BRIEF_RECIPIENT_EMAILS,
+    SETTING_KEYS.VOTE_RESULTS_RECIPIENT_EMAILS,
     cleaned.join(","),
     updatedBy,
   );

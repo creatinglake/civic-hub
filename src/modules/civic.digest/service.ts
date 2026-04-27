@@ -89,8 +89,8 @@ function eventToItem(
 
   // Prefer the event payload (authoritative at emit-time); fall back to
   // the caller-supplied process_titles map (covers civic.vote and
-  // civic.brief events, whose emitted payloads don't include the title).
-  // Last-ditch: a generic label so the digest still renders.
+  // civic.vote_results events, whose emitted payloads don't include
+  // the title). Last-ditch: a generic label so the digest still renders.
   const rawTitle =
     (typeof d?.announcement?.title === "string" && d.announcement.title) ||
     (typeof d?.process?.title === "string" && d.process.title) ||
@@ -108,16 +108,11 @@ function eventToItem(
       pill_label = "Vote open";
       break;
     }
-    case "vote_result_published": {
-      const total =
-        typeof d?.result?.total_votes === "number" ? d.result.total_votes : 0;
-      const noun = total === 1 ? "participant" : "participants";
-      title = rawTitle ?? "Vote results published";
-      summary = `Results published · ${total} ${noun}.`;
-      pill_label = "Vote results";
-      break;
-    }
-    case "brief_published": {
+    case "vote_results_published": {
+      // Vote-results posts replace the previous "vote_result_published"
+      // (raw vote close) and "brief_published" (admin-reviewed delivery)
+      // pair — a single post per closed vote, sourced from the
+      // civic.vote_results record.
       const count =
         typeof d?.participation_count === "number"
           ? d.participation_count
@@ -125,11 +120,11 @@ function eventToItem(
       const noun = count === 1 ? "resident" : "residents";
       const headline =
         typeof d?.headline_result === "string" ? d.headline_result : "";
-      title = rawTitle ?? "Civic Brief";
+      title = rawTitle ?? "Vote results";
       summary = headline
-        ? `Civic Brief delivered · ${count} ${noun} — ${headline}`
-        : `Civic Brief delivered · ${count} ${noun} participated.`;
-      pill_label = "Civic Brief";
+        ? `${count} ${noun} voted — ${headline}`
+        : `${count} ${noun} voted — delivered to the Board.`;
+      pill_label = "Vote results";
       break;
     }
     case "announcement": {
@@ -218,8 +213,7 @@ function buildSubject(
 
 const GROUP_LABELS: Record<DigestItemKind, string> = {
   vote_opened: "New votes open",
-  vote_result_published: "New results published",
-  brief_published: "New Civic Briefs",
+  vote_results_published: "New vote results",
   meeting_summary_published: "New meeting summaries",
   announcement: "Announcements",
 };
@@ -228,11 +222,14 @@ const GROUP_LABELS: Record<DigestItemKind, string> = {
  * Per-kind pill background/foreground hex pairs. Mirrors the
  * --pill-<kind>-bg / --pill-<kind>-fg tokens in the UI's theme.css.
  * Inlined as literals because email clients don't honor CSS vars.
+ *
+ * The vote_results_published pair uses the same teal that was
+ * --pill-brief-* before the Slice 8.5 rename — color family
+ * intentionally preserved.
  */
 const PILL_COLORS: Record<DigestItemKind, { bg: string; fg: string }> = {
   vote_opened:                { bg: "#e0ecfc", fg: "#1e3a5f" },
-  vote_result_published:      { bg: "#d6e4f7", fg: "#15325a" },
-  brief_published:            { bg: "#d4ede8", fg: "#0f5a55" },
+  vote_results_published:     { bg: "#d4ede8", fg: "#0f5a55" },
   meeting_summary_published:  { bg: "#d9ecd9", fg: "#0f4a26" },
   announcement:               { bg: "#fbe5d3", fg: "#8c3210" },
 };
