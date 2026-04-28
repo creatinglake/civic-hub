@@ -1,7 +1,13 @@
 // Debug controller — loads sample data for development testing.
 // NOT for production use. All actions go through normal business logic.
-// Gated behind CIVIC_ALLOW_SEED=true so an accidental call in production
-// cannot wipe live data.
+//
+// Two-layer safeguard against accidentally wiping live data:
+//   1. CIVIC_ALLOW_SEED=true must be set in the env. Default deny.
+//   2. SUPABASE_URL must NOT resolve to a hostname in
+//      PROTECTED_SUPABASE_HOSTS. Even if (1) is satisfied (e.g. a stale
+//      flag in a local .env), seeding against a known production
+//      Supabase project is hard-coded as a 403. To seed a fresh dev
+//      project, leave its hostname absent from the list.
 
 import { Request, Response } from "express";
 import {
@@ -20,6 +26,24 @@ import {
   FLOYD_GREEN_BOX,
   type SeedScenario,
 } from "../debug/seedData.js";
+
+// Production Supabase hostnames that MUST NEVER be seeded against.
+// Add a new entry whenever a new production project is provisioned.
+// Do NOT add dev-only project hostnames here — being absent is the
+// signal that seeding is permitted (subject to CIVIC_ALLOW_SEED).
+const PROTECTED_SUPABASE_HOSTS: ReadonlyArray<string> = [
+  "nfhyypwoporfggqcerli.supabase.co", // Floyd Civic Hub — production
+];
+
+function supabaseHostFromEnv(): string | null {
+  const raw = process.env.SUPABASE_URL?.trim();
+  if (!raw) return null;
+  try {
+    return new URL(raw).hostname.toLowerCase();
+  } catch {
+    return null;
+  }
+}
 
 async function runScenario(
   scenario: SeedScenario,
@@ -52,6 +76,23 @@ export async function handleSeed(
   _req: Request,
   res: Response,
 ): Promise<void> {
+  // Layer 2 — hard-coded production host denylist. Checked FIRST so a
+  // stale CIVIC_ALLOW_SEED=true in a local .env can never reach prod.
+  const host = supabaseHostFromEnv();
+  if (host && PROTECTED_SUPABASE_HOSTS.includes(host)) {
+    console.warn(
+      `[seed] BLOCKED: refusing to seed against protected production host "${host}". ` +
+        `Use a separate dev Supabase project for seeding.`,
+    );
+    res.status(403).json({
+      error:
+        `Seeding is permanently disabled against the production Supabase host (${host}). ` +
+        `Use a separate Supabase project for dev seeding — see civic-hub/src/controllers/debugController.ts.`,
+    });
+    return;
+  }
+
+  // Layer 1 — env flag. Default deny; opt-in per environment.
   if (process.env.CIVIC_ALLOW_SEED !== "true") {
     res.status(403).json({
       error:
