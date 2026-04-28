@@ -59,25 +59,51 @@
   font-family: var(--font-body);
 }
 
-/* Slice 9 — attached image as leading visual. Only renders when an
- * admin uploaded one; otherwise the card has no leading visual at all.
- * Sits inside the regular card padding so the corners stay rounded
- * with the card and the image has breathing room from the title below.
- */
+/* Cards with an attached image use a side-by-side layout: text body on
+ * the left, square thumbnail on the right. Stops the image from
+ * dominating the feed shell while keeping it as a recognizable visual
+ * anchor. Imageless cards keep the simpler block layout. */
+.feed-post.has-image .feed-post-link {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: var(--space-md);
+}
+
+.feed-post-body {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
 .feed-post-image {
   display: block;
-  width: 100%;
-  aspect-ratio: 16 / 9;
+  flex: 0 0 144px;
+  width: 144px;
+  height: 144px;
   background: var(--color-surface-muted);
   border-radius: var(--radius-sm);
   overflow: hidden;
-  margin: 0 0 var(--space-md);
+  margin: 0;
 }
 .feed-post-image img {
   width: 100%;
   height: 100%;
   object-fit: cover;
   display: block;
+}
+
+/* Mobile: stack image on top with a capped height so it still gives
+ * visual anchor without claiming the full card. */
+@media (max-width: 600px) {
+  .feed-post.has-image .feed-post-link {
+    flex-direction: column-reverse;
+  }
+  .feed-post-image {
+    flex: 0 0 auto;
+    width: 100%;
+    height: 180px;
+    margin: 0 0 var(--space-md);
+  }
 }
 
 /* Slice 9 — colored top border per kind. Subtle visual cue for cards

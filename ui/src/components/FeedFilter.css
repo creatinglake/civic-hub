@@ -3,7 +3,13 @@
      tab strip above and the feed cards below. */
   max-width: var(--max-width-shell);
   margin: 0 auto;
-  padding: var(--space-md) var(--space-md) 0;
+  padding: var(--space-md) var(--space-md);
+  /* Stick directly below the Feed | Votes tab strip so the filter
+     pills stay reachable while scrolling the feed. */
+  position: sticky;
+  top: calc(var(--nav-h) + var(--tabs-h));
+  z-index: 89;
+  background: var(--color-bg);
 }
 
 

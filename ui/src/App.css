@@ -1,5 +1,15 @@
 /* Civic Hub — UI styles with CSS variable theming */
 
+:root {
+  /* Heights of the persistent chrome that stacks on / and /votes:
+     top nav (always sticky) + the in-page Feed | Votes tab strip. The
+     filter rows (.feed-filter / .votes-filter) use these to compute
+     their sticky offset so the nav, tabs, and filter pills form one
+     uninterrupted band as the page scrolls. */
+  --nav-h: 61px;
+  --tabs-h: 45px;
+}
+
 .app {
   margin: 0 auto;
   background: var(--color-bg);
@@ -128,10 +138,18 @@
 
 .votes-filter {
   /* Slice 12.2 — page-shell width to match every other element on
-     the Votes page (CTA, sections, hub info). */
+     the Votes page (CTA, sections, hub info). Bottom padding gives
+     the next section heading ("Active Votes" etc.) breathing room
+     instead of sitting directly against the pills. */
   max-width: var(--max-width-shell);
   margin: 0 auto;
-  padding: var(--space-md) var(--space-md) 0;
+  padding: var(--space-md) var(--space-md);
+  /* Stick under the Feed | Votes tab strip — same chrome stack as
+     on /, so the filter pills stay reachable while the page scrolls. */
+  position: sticky;
+  top: calc(var(--nav-h) + var(--tabs-h));
+  z-index: 89;
+  background: var(--color-bg);
 }
 
 .votes-filter-list {

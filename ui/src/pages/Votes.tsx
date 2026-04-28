@@ -200,10 +200,7 @@ export default function Votes() {
 
           {showProposed && (
             <section className="section">
-              <div className="section-header-row">
-                <h2 className="section-title">Proposed Votes</h2>
-                <Link to="/propose" className="propose-link">+ Suggest a vote</Link>
-              </div>
+              <h2 className="section-title">Proposed Votes</h2>
               <p className="section-description">
                 Ideas submitted by community members. Endorse the ones
                 you care about to help them become official votes.

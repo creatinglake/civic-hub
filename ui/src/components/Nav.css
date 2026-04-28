@@ -114,13 +114,12 @@
 
 /* --- Hamburger --- */
 
-/* Hamburger is mobile-only. Desktop users reach Feed / Votes through
-   the in-page tab strip on / and /votes, and About from the top nav.
-   For routes without the tab strip (/privacy, /admin/*, /search) the
-   wordmark click returns to / which is the Feed; from there the tab
-   takes them to Votes. Two-click max from any route. */
+/* Hamburger is the universal navigation drawer entry point at every
+   breakpoint. The top nav is intentionally minimal (wordmark + search
+   + sign-in) so the wordmark area stays calm; primary surfaces (Feed,
+   Votes, About) and the legal pages all live in the drawer. */
 .civic-nav-hamburger {
-  display: none;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
   width: 44px;
@@ -329,13 +328,21 @@
   outline-offset: -2px;
 }
 
+.civic-nav-drawer-divider {
+  height: 1px;
+  background: var(--color-border);
+  margin: var(--space-xs) var(--space-md);
+  list-style: none;
+}
+
+.civic-nav-drawer-link-legal {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-subtle);
+}
+
 /* --- Breakpoints --- */
 
 @media (max-width: 768px) {
-  .civic-nav-hamburger {
-    display: inline-flex;
-  }
-
   .civic-nav-links {
     display: none;
   }

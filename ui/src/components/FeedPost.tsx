@@ -358,35 +358,44 @@ function classifyHref(href: string): { kind: "internal"; to: string } | { kind: 
 export default function FeedPost({ post }: Props) {
   const classified = classifyHref(post.href);
   const pillClass = `feed-pill feed-pill--${post.pillKind}`;
-  const articleClass = `feed-post feed-post--${post.pillKind}`;
+  const hasImage = Boolean(post.imageUrl);
+  const articleClass = `feed-post feed-post--${post.pillKind}${
+    hasImage ? " has-image" : ""
+  }`;
 
+  // When an attached image exists, the card uses a side-by-side layout
+  // (text left, square thumbnail right) on desktop and stacks the image
+  // above with a capped height on mobile — see Feed.css. Imageless cards
+  // continue to render as a single text column.
   const inner = (
     <>
-      {post.imageUrl && (
+      <div className="feed-post-body">
+        <div className="feed-post-head">
+          <h2 className="feed-post-title">{post.title}</h2>
+          <span className={pillClass}>{post.pillLabel}</span>
+        </div>
+        {post.summary && <p className="feed-post-summary">{post.summary}</p>}
+        {post.engagement && (
+          <p className="feed-post-engagement">{post.engagement}</p>
+        )}
+        <time
+          className="feed-post-time"
+          dateTime={post.timestamp}
+          title={absoluteTime(post.timestamp)}
+        >
+          {relativeTime(post.timestamp)}
+        </time>
+      </div>
+      {hasImage && (
         <span className="feed-post-image">
           <img
-            src={post.imageUrl}
+            src={post.imageUrl ?? ""}
             alt={post.imageAlt ?? ""}
             loading="lazy"
             decoding="async"
           />
         </span>
       )}
-      <div className="feed-post-head">
-        <h2 className="feed-post-title">{post.title}</h2>
-        <span className={pillClass}>{post.pillLabel}</span>
-      </div>
-      {post.summary && <p className="feed-post-summary">{post.summary}</p>}
-      {post.engagement && (
-        <p className="feed-post-engagement">{post.engagement}</p>
-      )}
-      <time
-        className="feed-post-time"
-        dateTime={post.timestamp}
-        title={absoluteTime(post.timestamp)}
-      >
-        {relativeTime(post.timestamp)}
-      </time>
     </>
   );
 

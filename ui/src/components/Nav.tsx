@@ -6,20 +6,22 @@ import SearchBar from "./SearchBar";
 import hub from "../config/hub";
 import "./Nav.css";
 
-/**
- * Slice 12.1 — Feed and Votes moved into the in-page <FeedVotesTabs>
- * strip that lives below the banner on / and /votes. The top nav now
- * only carries the secondary link (About). Mobile users still reach
- * Feed and Votes through the hamburger drawer (DRAWER_LINKS below).
- */
-const TOP_LINKS: ReadonlyArray<{ to: string; label: string; end?: boolean }> = [
-  { to: "/about", label: "About" },
-];
+// Top nav stays minimal: wordmark + search + sign-in. All primary
+// navigation lives in the always-visible hamburger drawer below.
+const TOP_LINKS: ReadonlyArray<{ to: string; label: string; end?: boolean }> = [];
 
+// Primary drawer links. Legal docs are grouped after a divider so the
+// civic surfaces stay visually distinct from the policy footer pages.
 const DRAWER_LINKS: ReadonlyArray<{ to: string; label: string; end?: boolean }> = [
   { to: "/", label: "Feed", end: true },
   { to: "/votes", label: "Votes" },
   { to: "/about", label: "About" },
+];
+
+const DRAWER_LEGAL_LINKS: ReadonlyArray<{ to: string; label: string }> = [
+  { to: "/code-of-conduct", label: "Code of Conduct" },
+  { to: "/privacy", label: "Privacy" },
+  { to: "/terms", label: "Terms" },
 ];
 
 // Six muted, accessible-on-white background colors for the avatar circle.
@@ -162,15 +164,17 @@ export default function Nav() {
               Floyd Civic Hub
             </Link>
 
-            <ul className="civic-nav-links" role="list">
-              {TOP_LINKS.map((l) => (
-                <li key={l.to}>
-                  <NavLink to={l.to} end={l.end} className={navLinkClass}>
-                    {l.label}
-                  </NavLink>
-                </li>
-              ))}
-            </ul>
+            {TOP_LINKS.length > 0 && (
+              <ul className="civic-nav-links" role="list">
+                {TOP_LINKS.map((l) => (
+                  <li key={l.to}>
+                    <NavLink to={l.to} end={l.end} className={navLinkClass}>
+                      {l.label}
+                    </NavLink>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
 
           <div className="civic-nav-right">
@@ -292,6 +296,20 @@ export default function Nav() {
                     end={l.end}
                     className={({ isActive }) =>
                       `civic-nav-drawer-link${isActive ? " is-active" : ""}`
+                    }
+                    onClick={() => setDrawerOpen(false)}
+                  >
+                    {l.label}
+                  </NavLink>
+                </li>
+              ))}
+              <li className="civic-nav-drawer-divider" role="separator" aria-hidden="true" />
+              {DRAWER_LEGAL_LINKS.map((l) => (
+                <li key={l.to}>
+                  <NavLink
+                    to={l.to}
+                    className={({ isActive }) =>
+                      `civic-nav-drawer-link civic-nav-drawer-link-legal${isActive ? " is-active" : ""}`
                     }
                     onClick={() => setDrawerOpen(false)}
                   >
