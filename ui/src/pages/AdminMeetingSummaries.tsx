@@ -478,6 +478,19 @@ export default function AdminMeetingSummaries() {
               undone.
             </p>
           )}
+
+          {/* Foot-of-page back link — review forms can run long, and
+              scrolling all the way back to the top to leave the page is
+              friction admins don't need. */}
+          <div style={{ marginTop: "var(--space-xl)" }}>
+            <button
+              className="admin-back-link"
+              onClick={backToList}
+              type="button"
+            >
+              &larr; Back to Meeting summaries
+            </button>
+          </div>
         </div>
       </div>
     );
