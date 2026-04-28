@@ -83,7 +83,7 @@ export function buildSummarizationPrompt(input: {
   has_video: boolean;
 }): string {
   const videoGuidance = input.has_video
-    ? `For each block, set start_time_seconds to the transcript timestamp where that topic begins (an integer number of seconds from the start of the video). Only use timestamps you can ground in the transcript.`
+    ? `For each block, set start_time_seconds to the transcript timestamp where that topic begins (an integer number of seconds from the start of the video). Use ONLY timestamps you can ground in a specific transcript line. If you cannot find the topic in the transcript, set start_time_seconds to null — do NOT default to 0 and do NOT guess.`
     : `This meeting has NO video recording. Set start_time_seconds to null on every block. Summarize from the minutes document only.`;
 
   const transcriptBlock = input.has_video

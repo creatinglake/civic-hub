@@ -53,9 +53,10 @@ export default function AdminMeetingSummaries() {
       .finally(() => setLoading(false));
   }
 
-  useEffect(() => {
-    loadList();
-  }, []);
+  // List loads on every transition to list view (initial mount with no
+  // routeId, plus any back-from-review navigation). Without this, the
+  // status of a just-approved summary still reads "pending" in the list
+  // until the user manually refreshes.
 
   const filtered = useMemo(() => {
     if (statusFilter === "all") return summaries;
@@ -78,6 +79,10 @@ export default function AdminMeetingSummaries() {
   useEffect(() => {
     if (!routeId) {
       setSelected(null);
+      // Refresh the list whenever we return to it (or land on it
+      // initially). Picks up any approval / publication that happened
+      // in the review view we're returning from.
+      loadList();
       return;
     }
     setError(null);

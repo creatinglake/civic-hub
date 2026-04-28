@@ -65,6 +65,22 @@ export async function summarizeMeeting(
   if (entry.source_video_url) {
     try {
       transcript = await deps.fetchYouTubeTranscript(entry.source_video_url);
+      console.log(
+        `[meeting-summary] transcript fetched source_id=${entry.source_id} segments=${transcript.length}`,
+      );
+      // Empty transcript = the video exists but has no captions available
+      // (or the provider returned a structurally-valid empty response).
+      // Without segments to ground against, Claude cannot produce real
+      // start_time_seconds and tends to default every block to 0. Flip
+      // hasVideo=false so the prompt explicitly tells Claude to leave
+      // start_time_seconds null on every block — same behavior as a
+      // meeting with no recording at all.
+      if (transcript.length === 0) {
+        console.warn(
+          `[meeting-summary] empty transcript for ${entry.source_video_url} — falling back to PDF-only summary (no captions available)`,
+        );
+        hasVideo = false;
+      }
     } catch (err) {
       // Non-fatal: if the transcript endpoint fails, fall back to PDF-only
       // summarization rather than dropping the meeting entirely. Log the
