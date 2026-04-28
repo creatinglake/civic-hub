@@ -4,11 +4,24 @@ import { useAuth } from "../context/AuthContext";
 import AuthModal from "./AuthModal";
 import SearchBar from "./SearchBar";
 import hub from "../config/hub";
+import { listProcesses } from "../services/api";
 import "./Nav.css";
 
-const PRIMARY_LINKS: ReadonlyArray<{ to: string; label: string; end?: boolean }> = [
+/**
+ * Slice 12 — primary nav links. The `promoted: true` flag makes a link
+ * stay visible on mobile (where the rest of the list collapses into
+ * the hamburger drawer). Votes is promoted because it's the most
+ * action-oriented surface — citizens come here to vote, endorse, or
+ * suggest a vote, all of which we want one tap away.
+ */
+const PRIMARY_LINKS: ReadonlyArray<{
+  to: string;
+  label: string;
+  end?: boolean;
+  promoted?: boolean;
+}> = [
   { to: "/", label: "Feed", end: true },
-  { to: "/votes", label: "Votes" },
+  { to: "/votes", label: "Votes", promoted: true },
   { to: "/about", label: "About" },
 ];
 
@@ -38,6 +51,30 @@ export default function Nav() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [showAuth, setShowAuth] = useState(false);
+
+  // Slice 12 — active-vote count badge next to the promoted Votes link.
+  // Cheap fetch on mount; the listProcesses() endpoint is the same one
+  // the Votes page uses, so the response is browser-cacheable across
+  // navigations. Failure is non-fatal — badge just stays hidden.
+  const [activeVoteCount, setActiveVoteCount] = useState<number | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    listProcesses()
+      .then((items) => {
+        if (cancelled) return;
+        const n = items.filter(
+          (p) => p.type === "civic.vote" && p.status === "active",
+        ).length;
+        setActiveVoteCount(n);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setActiveVoteCount(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const avatarRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -154,9 +191,22 @@ export default function Nav() {
 
             <ul className="civic-nav-links" role="list">
               {PRIMARY_LINKS.map((l) => (
-                <li key={l.to}>
+                <li
+                  key={l.to}
+                  className={
+                    l.promoted ? "civic-nav-link-item civic-nav-link-item-promoted" : "civic-nav-link-item"
+                  }
+                >
                   <NavLink to={l.to} end={l.end} className={navLinkClass}>
-                    {l.label}
+                    <span>{l.label}</span>
+                    {l.promoted && activeVoteCount && activeVoteCount > 0 ? (
+                      <span
+                        className="civic-nav-badge"
+                        aria-label={`${activeVoteCount} active`}
+                      >
+                        {activeVoteCount}
+                      </span>
+                    ) : null}
                   </NavLink>
                 </li>
               ))}

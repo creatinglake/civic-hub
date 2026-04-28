@@ -59,10 +59,12 @@ export default function Propose() {
 
       <Link to="/" className="back-link">&larr; Home</Link>
 
-      <h1>Propose an Issue</h1>
+      <h1>Suggest a vote</h1>
       <p className="propose-description">
-        Submit an idea for the community to consider. If enough people endorse your
-        proposal, it will be reviewed and may become an official vote.
+        Submit an idea for the community to consider. With enough
+        citizen support — your neighbors endorsing it — your suggestion
+        is reviewed and may become an official Floyd County advisory
+        vote.
       </p>
 
       {!canParticipate && (
@@ -126,7 +128,7 @@ export default function Propose() {
           className="propose-submit-button"
           disabled={submitting || !title.trim()}
         >
-          {submitting ? "Submitting..." : "Submit Proposal"}
+          {submitting ? "Submitting..." : "Submit suggestion"}
         </button>
       </form>
     </div>

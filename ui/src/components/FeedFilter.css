@@ -4,6 +4,66 @@
   padding: var(--space-md) var(--space-md) 0;
 }
 
+/* Slice 12 — pair filter pills with the Suggest-a-vote CTA. On wide
+   viewports they sit on the same row (pills left, button right). On
+   narrow viewports they stack: pills row at top, CTA centered below.
+   The wrapper keeps the CTA inside the same horizontal padding band
+   as the pills (max-width-feed) so the button doesn't drift to the
+   page edge. */
+.home-action-row {
+  max-width: var(--max-width-feed);
+  margin: 0 auto;
+  padding: var(--space-md) var(--space-md) 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+}
+.home-action-row .feed-filter {
+  /* When inside the action row, drop the inner padding/centering so
+     the pills inherit the row's layout instead of stacking under it. */
+  padding: 0;
+  margin: 0;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.home-suggest-vote-button {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-pill);
+  background: var(--color-primary, #1e3a5f);
+  color: var(--color-primary-text, #ffffff);
+  text-decoration: none;
+  font-family: var(--font-body);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  white-space: nowrap;
+  transition: background 0.15s ease;
+}
+.home-suggest-vote-button:hover {
+  background: var(--color-primary-hover, #14304a);
+}
+.home-suggest-vote-button:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+@media (max-width: 600px) {
+  .home-action-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--space-sm);
+  }
+  .home-suggest-vote-button {
+    /* Full-width on narrow viewports so it reads as a primary action
+       row rather than a small button hanging off the side. */
+    justify-content: center;
+  }
+}
+
 /* Mobile: horizontal scroll with a soft fade on the right edge to hint
  * at overflow. The scrollbar is hidden but scroll still works via touch
  * / wheel. */
