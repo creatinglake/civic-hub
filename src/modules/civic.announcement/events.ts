@@ -19,6 +19,23 @@ function bodyPreview(body: string): string {
   return body.trim().slice(0, BODY_PREVIEW_LEN);
 }
 
+/**
+ * Resolve the action_url_path for an announcement event.
+ *
+ * - Synced announcements (`state.source.share_url` set) emit the absolute
+ *   external URL as the path. The event emitter detects this and stores
+ *   it as the action_url verbatim, so feed-card clicks route directly to
+ *   the source (e.g. floydcova.gov/post/...).
+ * - Hand-authored announcements emit the internal /announcement/:id path,
+ *   prefixed with the hub's UI base by the event emitter.
+ */
+function actionPathFor(
+  ctx: AnnouncementProcessContext,
+  state: AnnouncementProcessState,
+): string {
+  return state.source?.share_url ?? announcementPath(ctx.process_id);
+}
+
 export async function emitAnnouncementCreated(
   ctx: AnnouncementProcessContext,
   actor: string,
@@ -30,12 +47,13 @@ export async function emitAnnouncementCreated(
     process_id: ctx.process_id,
     hub_id: ctx.hub_id,
     jurisdiction: ctx.jurisdiction,
-    action_url_path: announcementPath(ctx.process_id),
+    action_url_path: actionPathFor(ctx, state),
     data: {
       announcement: {
         title: state.content.title,
         body_preview: bodyPreview(state.content.body),
         author_role: state.author_role,
+        source: state.source ?? null,
       },
     },
   });
@@ -57,12 +75,13 @@ export async function emitAnnouncementResultPublished(
     process_id: ctx.process_id,
     hub_id: ctx.hub_id,
     jurisdiction: ctx.jurisdiction,
-    action_url_path: announcementPath(ctx.process_id),
+    action_url_path: actionPathFor(ctx, state),
     data: {
       announcement: {
         id: ctx.process_id,
         title: state.content.title,
         author_role: state.author_role,
+        source: state.source ?? null,
       },
     },
   });

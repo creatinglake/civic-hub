@@ -58,6 +58,28 @@ export interface AnnouncementProcessState {
    * flips `removed` back to false and stamps `restored_at`.
    */
   moderation?: AnnouncementModeration | null;
+  /**
+   * Slice 13 — provenance for synced-from-external announcements.
+   *
+   * Set when an announcement was created by an automated sync (e.g. the
+   * floyd-news-sync cron pulling from floydcova.gov/news) rather than
+   * authored directly by a human admin. Absent on hand-authored
+   * announcements. The `share_url` is the external permalink and is
+   * also used as the dedupe key on subsequent sync runs (one row per
+   * share_url, never duplicated). The feed-card click on a synced
+   * announcement routes to `share_url` externally, not to the internal
+   * /announcement/:id page.
+   */
+  source?: AnnouncementSource | null;
+}
+
+export interface AnnouncementSource {
+  /** Discriminator for the sync origin. Add new values as new connectors land. */
+  origin: "floyd-news";
+  /** External permalink — also serves as the dedupe key. */
+  share_url: string;
+  /** ISO 8601 timestamp of when the sync ingested this entry. */
+  ingested_at: string;
 }
 
 export interface AnnouncementModeration {
@@ -126,6 +148,11 @@ export interface CreateAnnouncementInput {
   author_role: AnnouncementAuthorRole;
   image_url?: string | null;
   image_alt?: string | null;
+  /**
+   * Slice 13 — populated by automated sync paths. Hand-authored
+   * announcements leave this undefined.
+   */
+  source?: AnnouncementSource | null;
 }
 
 /** Partial update used by PATCH /announcement/:id. */

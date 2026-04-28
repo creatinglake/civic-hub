@@ -15,6 +15,7 @@ import {
   type AnnouncementAuthorRole,
   type AnnouncementLink,
   type AnnouncementProcessState,
+  type AnnouncementSource,
   type CreateAnnouncementInput,
 } from "../modules/civic.announcement/index.js";
 
@@ -51,6 +52,13 @@ const announcementProcess: ProcessHandler = {
       image_alt:
         typeof input.image_alt === "string" || input.image_alt === null
           ? (input.image_alt as string | null)
+          : undefined,
+      // Synced-from-external announcements pass `source` here so the module
+      // records provenance and the event emitter can route the action_url
+      // to the external permalink. Hand-authored announcements omit it.
+      source:
+        input.source && typeof input.source === "object"
+          ? (input.source as AnnouncementSource)
           : undefined,
     };
     return createAnnouncementState(createInput) as unknown as Record<string, unknown>;

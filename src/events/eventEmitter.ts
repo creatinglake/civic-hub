@@ -24,7 +24,14 @@ export async function emitEvent(input: CreateEventInput): Promise<CivicEvent> {
   // action_url is the user-facing UI URL (per Civic Event Spec §3 — "link to
   // take action"). Defaults to /process/:id; callers can override via
   // action_url_path when a process type has a distinct public page.
+  //
+  // Synced-content callers (e.g. floyd-news-sync) can pass a fully-qualified
+  // external URL via action_url_path — when the value starts with http(s)://
+  // it's used verbatim as the action_url instead of being prefixed with the
+  // hub's UI base. This lets a feed card click route directly to an
+  // external source (Floyd's news post, etc.) rather than an internal page.
   const path = input.action_url_path ?? `/process/${input.process_id}`;
+  const isAbsolute = /^https?:\/\//i.test(path);
   const event: CivicEvent = {
     id: generateId("evt"),
     version: "1.0",
@@ -33,7 +40,7 @@ export async function emitEvent(input: CreateEventInput): Promise<CivicEvent> {
     process_id: input.process_id,
     actor: input.actor,
     jurisdiction: input.jurisdiction,
-    action_url: `${ui}${path}`,
+    action_url: isAbsolute ? path : `${ui}${path}`,
     source: {
       hub_id: input.hub_id,
       hub_url: hub,

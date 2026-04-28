@@ -9,6 +9,7 @@ export type {
   AnnouncementModeration,
   AnnouncementProcessContext,
   AnnouncementProcessState,
+  AnnouncementSource,
   CreateAnnouncementInput,
   EmitEventFn,
 } from "./models.js";
@@ -37,6 +38,12 @@ export {
   restoreAnnouncement,
   updateAnnouncement,
 } from "./service.js";
+
+export {
+  emitAnnouncementCreated,
+  emitAnnouncementResultPublished,
+  emitAnnouncementUpdated,
+} from "./events.js";
 
 export const PROCESS_DESCRIPTOR = {
   type: "civic.announcement",

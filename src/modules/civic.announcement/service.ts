@@ -33,13 +33,21 @@ import {
 export function createAnnouncementState(
   input: CreateAnnouncementInput,
 ): AnnouncementProcessState {
-  const content = sanitizeContent({
-    title: input.title,
-    body: input.body,
-    links: input.links ?? [],
-    image_url: input.image_url ?? null,
-    image_alt: input.image_alt ?? null,
-  });
+  // Synced announcements (set on input.source) never have a body — the
+  // user clicks the card and reads the post on the source site. Allow
+  // body to be empty in that case; hand-authored announcements still
+  // require a non-empty body.
+  const allowEmptyBody = Boolean(input.source);
+  const content = sanitizeContent(
+    {
+      title: input.title,
+      body: input.body,
+      links: input.links ?? [],
+      image_url: input.image_url ?? null,
+      image_alt: input.image_alt ?? null,
+    },
+    { allowEmptyBody },
+  );
   return {
     type: "civic.announcement",
     content,
@@ -48,6 +56,7 @@ export function createAnnouncementState(
     created_at: new Date().toISOString(),
     last_edited_at: null,
     edit_count: 0,
+    source: input.source ?? null,
   };
 }
 
@@ -136,7 +145,10 @@ export async function updateAnnouncement(
   };
 }
 
-function sanitizeContent(c: AnnouncementContent): AnnouncementContent {
+function sanitizeContent(
+  c: AnnouncementContent,
+  opts: { allowEmptyBody?: boolean } = {},
+): AnnouncementContent {
   const title = (c.title ?? "").trim();
   if (title.length === 0) {
     throw new Error("Announcement title is required.");
@@ -146,7 +158,7 @@ function sanitizeContent(c: AnnouncementContent): AnnouncementContent {
   }
 
   const body = (c.body ?? "").trim();
-  if (body.length === 0) {
+  if (!opts.allowEmptyBody && body.length === 0) {
     throw new Error("Announcement body is required.");
   }
   if (body.length > BODY_MAX) {

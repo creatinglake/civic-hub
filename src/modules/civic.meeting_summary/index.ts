@@ -58,6 +58,7 @@ export {
   buildCreateInput,
   buildDescription,
   discoverMeetings,
+  parseJsonArray,
   summarizeMeeting,
 } from "./pipeline.js";
 
