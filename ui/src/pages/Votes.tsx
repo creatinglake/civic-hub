@@ -12,6 +12,7 @@ import {
 import HubInfo from "../components/HubInfo";
 import ProcessCard from "../components/ProcessCard";
 import ProposalCard from "../components/ProposalCard";
+import FeedVotesTabs from "../components/FeedVotesTabs";
 
 /**
  * Slice 12 — Votes-page filter pills mirror the home-feed pattern.
@@ -121,6 +122,12 @@ export default function Votes() {
   return (
     <div className="page page-home">
       <HubInfo />
+
+      {/* Slice 12.1 — Feed | Votes tab strip. Sits below HubInfo so
+          site identity reads first, then the user picks what surface
+          they want. Same component on the Home page; the active
+          state comes from the URL via NavLink. */}
+      <FeedVotesTabs />
 
       {/* Slice 12 — pinned suggest-a-vote CTA at the top of the Votes
           page. Higher visual weight than the inline "Be the first..."

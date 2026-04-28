@@ -1,10 +1,10 @@
-import { Link } from "react-router-dom";
 import HubInfo from "../components/HubInfo";
 import Feed from "../components/Feed";
 import FeedFilter, {
   useFeedFilter,
   useFilterPredicate,
 } from "../components/FeedFilter";
+import FeedVotesTabs from "../components/FeedVotesTabs";
 
 export default function Home() {
   const { active, setActive } = useFeedFilter();
@@ -13,18 +13,14 @@ export default function Home() {
   return (
     <div className="page page-home">
       <HubInfo />
-      {/* Slice 12 — pair the filter pills with a primary CTA so the
-          most action-oriented thing (suggesting a new vote) is one
-          tap away from the feed without burying it in the hamburger.
-          The wrapper handles wrapping on narrow screens — pills can
-          horizontally scroll while the button stays anchored on the
-          row below if there's no room. */}
-      <div className="home-action-row">
-        <FeedFilter active={active} onChange={setActive} />
-        <Link to="/propose" className="home-suggest-vote-button">
-          + Suggest a vote
-        </Link>
-      </div>
+      {/* Slice 12.1 — primary tabs between the chronological Feed and
+          the action-oriented Votes page. Persistent across both routes
+          so the user always knows the toggle is there. The
+          context-specific surfaces (filter pills here; suggest-a-vote
+          CTA on Votes) live below the tabs so they only appear in the
+          relevant context. */}
+      <FeedVotesTabs />
+      <FeedFilter active={active} onChange={setActive} />
       <Feed
         filter={filter}
         emptyFilteredAction={

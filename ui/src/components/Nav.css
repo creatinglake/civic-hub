@@ -114,8 +114,12 @@
 
 /* --- Hamburger --- */
 
+/* Slice 12.1 — hamburger is now visible on every breakpoint. With
+   Feed/Votes moved out of the top nav into the in-page tab strip,
+   the drawer is the universal escape hatch for routes without the
+   tab strip (e.g. /privacy, /admin, /search). */
 .civic-nav-hamburger {
-  display: none;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
   width: 44px;
@@ -326,54 +330,9 @@
 
 /* --- Breakpoints --- */
 
-/* --- Slice 12: badge next to a promoted link --- */
-
-.civic-nav-link {
-  /* The link is now `display: inline-flex` (already), so the badge sits
-     inline-end of the label with a small gap. */
-  gap: var(--space-xs);
-}
-
-.civic-nav-badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 18px;
-  height: 18px;
-  padding: 0 6px;
-  border-radius: 999px;
-  background: var(--pill-vote-fg, #1e3a5f);
-  color: #ffffff;
-  font-size: var(--font-size-xs);
-  font-weight: 600;
-  line-height: 1;
-  letter-spacing: 0;
-}
-
 @media (max-width: 768px) {
-  .civic-nav-hamburger {
-    display: inline-flex;
-  }
-
-  /* Slice 12 — keep .civic-nav-links rendering on mobile, but show only
-     the promoted item(s). Feed and About fall into the hamburger drawer
-     as before. The promoted item (Votes) sits visibly inline next to
-     the wordmark. */
   .civic-nav-links {
-    display: flex;
-    gap: var(--space-md);
-  }
-  .civic-nav-link-item {
     display: none;
-  }
-  .civic-nav-link-item-promoted {
-    display: list-item;
-  }
-  /* On the promoted link in mobile, the underline-style active state
-     reads as cluttered next to the hamburger; switch to the muted-text
-     pattern so the visible "Votes" label stays calm. */
-  .civic-nav-link-item-promoted .civic-nav-link.is-active {
-    border-bottom-color: transparent;
   }
 
   .civic-nav-wordmark {

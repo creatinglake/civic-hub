@@ -1,0 +1,55 @@
+/* Slice 12.1 — Feed | Votes primary in-page tabs.
+   Underline-style active state. The strip itself has a bottom border
+   that the active-tab underline visually breaks through, so it reads
+   as one continuous control rather than two tabs floating in space.
+   Lives below banner / hub-info, above the page-specific filter row
+   or CTA. */
+
+.feed-votes-tabs {
+  max-width: var(--max-width-feed);
+  margin: 0 auto;
+  padding: 0 var(--space-md);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.feed-votes-tabs-list {
+  list-style: none;
+  display: flex;
+  gap: var(--space-lg);
+  margin: 0;
+  padding: 0;
+}
+
+.feed-votes-tab {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: var(--space-sm) var(--space-xs);
+  font-family: var(--font-body);
+  font-size: var(--font-size-base);
+  font-weight: 500;
+  color: var(--color-text-muted);
+  text-decoration: none;
+  border-bottom: 2px solid transparent;
+  /* Negative margin pulls the tab's bottom border down to overlap the
+     strip's own bottom border, so the active underline replaces it
+     rather than sitting on top. */
+  margin-bottom: -1px;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.feed-votes-tab:hover {
+  color: var(--color-text);
+}
+
+.feed-votes-tab.is-active {
+  color: var(--color-text);
+  border-bottom-color: var(--color-primary, #1e3a5f);
+  font-weight: 600;
+}
+
+.feed-votes-tab:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
