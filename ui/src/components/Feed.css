@@ -1,6 +1,10 @@
 .feed {
+  /* Slice 12.2 — match page-shell width so feed cards align with the
+     tab strip / filter pills above and with the section containers
+     used on the Votes page. The cards themselves stay readable
+     because the inner content paddings handle horizontal rhythm. */
   padding: var(--space-lg) var(--space-md);
-  max-width: var(--max-width-feed);
+  max-width: var(--max-width-shell);
   margin: 0 auto;
 }
 

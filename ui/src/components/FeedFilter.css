@@ -1,5 +1,7 @@
 .feed-filter {
-  max-width: var(--max-width-feed);
+  /* Slice 12.2 — match the page-shell width so pills line up with the
+     tab strip above and the feed cards below. */
+  max-width: var(--max-width-shell);
   margin: 0 auto;
   padding: var(--space-md) var(--space-md) 0;
 }

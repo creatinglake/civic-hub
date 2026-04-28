@@ -114,12 +114,13 @@
 
 /* --- Hamburger --- */
 
-/* Slice 12.1 — hamburger is now visible on every breakpoint. With
-   Feed/Votes moved out of the top nav into the in-page tab strip,
-   the drawer is the universal escape hatch for routes without the
-   tab strip (e.g. /privacy, /admin, /search). */
+/* Hamburger is mobile-only. Desktop users reach Feed / Votes through
+   the in-page tab strip on / and /votes, and About from the top nav.
+   For routes without the tab strip (/privacy, /admin/*, /search) the
+   wordmark click returns to / which is the Feed; from there the tab
+   takes them to Votes. Two-click max from any route. */
 .civic-nav-hamburger {
-  display: inline-flex;
+  display: none;
   align-items: center;
   justify-content: center;
   width: 44px;
@@ -331,6 +332,10 @@
 /* --- Breakpoints --- */
 
 @media (max-width: 768px) {
+  .civic-nav-hamburger {
+    display: inline-flex;
+  }
+
   .civic-nav-links {
     display: none;
   }

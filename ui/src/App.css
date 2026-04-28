@@ -57,7 +57,9 @@
 /* --- Slice 12: Suggest-a-vote CTA + Votes-page pill filtering --- */
 
 .suggest-vote-cta {
-  max-width: var(--max-width-feed);
+  /* Slice 12.2 — page-shell width so the CTA card aligns with the
+     tab strip / filter row / sections above and below. */
+  max-width: var(--max-width-shell);
   margin: 0 auto;
   padding: var(--space-md) var(--space-md) 0;
 }
@@ -125,7 +127,9 @@
 /* --- Votes-page filter pills (mirror of FeedFilter, scoped) --- */
 
 .votes-filter {
-  max-width: var(--max-width-feed);
+  /* Slice 12.2 — page-shell width to match every other element on
+     the Votes page (CTA, sections, hub info). */
+  max-width: var(--max-width-shell);
   margin: 0 auto;
   padding: var(--space-md) var(--space-md) 0;
 }

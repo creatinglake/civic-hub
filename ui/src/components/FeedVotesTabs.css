@@ -6,7 +6,9 @@
    or CTA. */
 
 .feed-votes-tabs {
-  max-width: var(--max-width-feed);
+  /* Slice 12.2 — match the page-shell width so the tab strip aligns
+     with the hub info above and the section containers below. */
+  max-width: var(--max-width-shell);
   margin: 0 auto;
   padding: 0 var(--space-md);
   border-bottom: 1px solid var(--color-border);
