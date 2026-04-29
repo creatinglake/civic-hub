@@ -375,6 +375,43 @@ export async function logout(token: string): Promise<void> {
   await getDb().from("sessions").delete().eq("token", token);
 }
 
+/**
+ * Slice 13.11 — self-service account deletion. Removes the user row,
+ * which cascades to sessions (FK ON DELETE CASCADE). Pending email
+ * verifications are keyed by email separately and need a manual
+ * delete so the email is fully reusable for a fresh sign-up.
+ *
+ * Intentionally orphans references that don't have FK cascade:
+ *   - proposal_supports.user_id
+ *   - vote_participation.user_id
+ *   - community_inputs.author_id
+ *   - any event.actor strings that mention the user's id
+ *
+ * Those rows stay so the public record (vote tallies, comments,
+ * endorsements) doesn't get retroactively erased. The deleted
+ * user's identity is gone — anything that references their id
+ * resolves to nothing on join, which the UI renders as no
+ * attribution (the desired GDPR-style anonymization without
+ * mutilating the civic record).
+ *
+ * vote_records have NO user_id by design (Slice 4), so individual
+ * vote secrecy is preserved automatically.
+ */
+export async function deleteAccount(
+  userId: string,
+  email: string,
+): Promise<void> {
+  if (!userId || !email) {
+    throw new Error("Auth: deleteAccount requires both userId and email.");
+  }
+  const db = getDb();
+  // pending_verifications first so a stale code can't be used to
+  // race a fresh signup against the in-flight delete.
+  await db.from("pending_verifications").delete().eq("email", email.toLowerCase());
+  const { error } = await db.from("users").delete().eq("id", userId);
+  if (error) throw new Error(`Auth: ${error.message}`);
+}
+
 // --- Dev/test utilities ---
 
 // --- Digest subscription (Slice 5) ---

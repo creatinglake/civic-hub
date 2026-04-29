@@ -118,3 +118,12 @@ export function getMe(
 export function logoutApi(token: string): Promise<{ message: string }> {
   return request("POST", "/auth/logout", undefined, token);
 }
+
+/**
+ * Slice 13.11 — self-service account deletion. Removes the user
+ * and frees their email for re-use. Caller is expected to clear
+ * local token storage and redirect after success.
+ */
+export function deleteAccount(token: string): Promise<{ message: string }> {
+  return request("DELETE", "/auth/me", undefined, token);
+}

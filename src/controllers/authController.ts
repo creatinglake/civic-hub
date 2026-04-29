@@ -13,6 +13,7 @@ import {
   verifyCode,
   affirmResidency,
   acceptLegalTerms,
+  deleteAccount,
   getUserFromToken,
   logout,
 } from "../modules/civic.auth/index.js";
@@ -185,6 +186,39 @@ export async function handleLogout(
     await logout(token);
   }
   res.json({ message: "Logged out" });
+}
+
+/**
+ * DELETE /auth/me
+ * Header: Authorization: Bearer <token>
+ *
+ * Slice 13.11 — self-service account deletion. Resolves the bearer
+ * token to a user, then removes the user row + pending_verifications
+ * for that email. Sessions cascade. Public-record references
+ * (comments, endorsements, vote-participation) are intentionally
+ * orphaned, not deleted — see deleteAccount() doc comment.
+ */
+export async function handleDeleteAccount(
+  req: Request,
+  res: Response,
+): Promise<void> {
+  const token = extractToken(req);
+  if (!token) {
+    res.status(401).json({ error: "Authentication required" });
+    return;
+  }
+  try {
+    const user = await getUserFromToken(token);
+    if (!user) {
+      res.status(401).json({ error: "Invalid or expired session" });
+      return;
+    }
+    await deleteAccount(user.id, user.email);
+    res.json({ message: "Account deleted" });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Unknown error";
+    res.status(500).json({ error: message });
+  }
 }
 
 // --- Helpers ---

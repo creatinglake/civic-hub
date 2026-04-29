@@ -83,3 +83,77 @@
   font-size: var(--font-size-sm);
   color: var(--color-text-subtle);
 }
+
+/* Slice 13.11 — danger zone (account deletion). Distinct red border
+ * + heading + button styling so it reads as a destructive surface
+ * separate from regular settings panels. */
+.settings-danger-zone {
+  margin-top: var(--space-xl);
+  border-color: var(--color-error, #c1351a);
+}
+
+.settings-danger-zone h3 {
+  color: var(--color-error, #c1351a);
+}
+
+.settings-danger-button {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: var(--space-sm) var(--space-md);
+  background: var(--color-error, #c1351a);
+  color: #fff;
+  border: 1px solid var(--color-error, #c1351a);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-body);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, opacity 0.15s;
+}
+
+.settings-danger-button:hover:not(:disabled) {
+  background: var(--color-error-hover, #9c2a14);
+}
+
+.settings-danger-button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.settings-danger-confirm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.settings-danger-confirm p {
+  margin: 0;
+  color: var(--color-text);
+}
+
+.settings-danger-actions {
+  display: flex;
+  gap: var(--space-sm);
+  margin-top: var(--space-xs);
+  flex-wrap: wrap;
+}
+
+.settings-danger-cancel {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: var(--space-sm) var(--space-md);
+  background: var(--color-surface);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-body);
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.settings-danger-cancel:hover:not(:disabled) {
+  background: var(--color-surface-alt);
+}
