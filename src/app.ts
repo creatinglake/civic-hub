@@ -23,6 +23,7 @@ import meetingSummaryRoutes, {
   meetingSummaryCronRouter,
 } from "./routes/meetingSummaryRoutes.js";
 import { floydNewsSyncCronRouter } from "./routes/floydNewsSyncRoutes.js";
+import feedbackRoutes from "./routes/feedbackRoutes.js";
 import {
   digestCronRouter,
   digestUnsubscribeRouter,
@@ -122,6 +123,11 @@ app.use("/link-preview", linkPreviewRoutes);
 // supabase/migrations/20260427200000_add_search_doc.sql).
 app.use("/search", searchRoutes);
 
+// Slice 14 — operator-facing product feedback. Anonymous or authed.
+// Persists to feedback_submissions (NOT events) and best-effort emails
+// the operator. See civic-hub/src/modules/civic.feedback.
+app.use("/feedback", feedbackRoutes);
+
 // Meeting summaries (Slice 6):
 //   /meeting-summary/:id    — public read of published summaries
 app.use("/meeting-summary", meetingSummaryRoutes);
@@ -191,6 +197,7 @@ app.get("/", (_req, res) => {
       "POST /upload/post-image": "Upload a featured image (multipart, authed)",
       "GET /link-preview?url=X": "Fetch (cached) OpenGraph preview for a URL",
       "GET /search?q=X": "Full-text search across all process types (public)",
+      "POST /feedback": "Submit product feedback (anonymous or authed; honeypot-gated)",
       "POST /internal/digest/run": "Cron-triggered daily email digest (CRON_SECRET bearer)",
       "GET /unsubscribe/digest?token=X": "Unsubscribe from the daily digest",
       "PATCH /user/settings/digest": "Toggle digest subscription (authed)",

@@ -982,3 +982,25 @@ export function search(params: SearchParams): Promise<SearchResultPage> {
   if (typeof params.offset === "number") sp.set("offset", String(params.offset));
   return request("GET", `/search?${sp.toString()}`);
 }
+
+// --- Slice 14 — feedback ---
+
+export type FeedbackCategory = "idea" | "bug" | "moderation" | "general";
+
+export interface SubmitFeedbackInput {
+  category: FeedbackCategory;
+  message: string;
+  name?: string | null;
+  email?: string | null;
+  /**
+   * Honeypot — real users leave this empty. Bots fill every input. The
+   * server returns 200 either way so spam can't probe the difference.
+   */
+  website?: string;
+}
+
+export function submitFeedback(
+  input: SubmitFeedbackInput,
+): Promise<{ message: string; submission_id?: string }> {
+  return request("POST", "/feedback", input);
+}

@@ -18,6 +18,13 @@ const DRAWER_LINKS: ReadonlyArray<{ to: string; label: string; end?: boolean }> 
   { to: "/about", label: "About" },
 ];
 
+// Secondary drawer link — active-input affordance; styled like the
+// primary links (full-weight, regular size), not the muted legal
+// group below it. Slice 14.
+const DRAWER_SECONDARY_LINKS: ReadonlyArray<{ to: string; label: string }> = [
+  { to: "/feedback", label: "Send feedback" },
+];
+
 const DRAWER_LEGAL_LINKS: ReadonlyArray<{ to: string; label: string }> = [
   { to: "/code-of-conduct", label: "Code of Conduct" },
   { to: "/privacy", label: "Privacy" },
@@ -304,6 +311,19 @@ export default function Nav() {
                 </li>
               ))}
               <li className="civic-nav-drawer-divider" role="separator" aria-hidden="true" />
+              {DRAWER_SECONDARY_LINKS.map((l) => (
+                <li key={l.to}>
+                  <NavLink
+                    to={l.to}
+                    className={({ isActive }) =>
+                      `civic-nav-drawer-link${isActive ? " is-active" : ""}`
+                    }
+                    onClick={() => setDrawerOpen(false)}
+                  >
+                    {l.label}
+                  </NavLink>
+                </li>
+              ))}
               {DRAWER_LEGAL_LINKS.map((l) => (
                 <li key={l.to}>
                   <NavLink

@@ -23,6 +23,7 @@ import Settings from "./pages/Settings";
 import Privacy from "./pages/Privacy";
 import Terms from "./pages/Terms";
 import CodeOfConduct from "./pages/CodeOfConduct";
+import Feedback from "./pages/Feedback";
 import AdminModeration from "./pages/AdminModeration";
 import IntroPopup, { hasSeenIntro } from "./components/IntroPopup";
 import ReAcceptModal from "./components/ReAcceptModal";
@@ -102,6 +103,10 @@ function AppContent() {
           <Route path="/privacy" element={<Privacy />} />
           <Route path="/terms" element={<Terms />} />
           <Route path="/code-of-conduct" element={<CodeOfConduct />} />
+          {/* Slice 14 — operator-facing feedback form. Open to anonymous
+              and signed-in users; submissions persist to the
+              feedback_submissions table and best-effort email the operator. */}
+          <Route path="/feedback" element={<Feedback />} />
           {/* Slice 11 — admin moderation log. Read-only list of every
               moderation action, gated server-side via requireAdmin
               and client-side via the AuthContext.isAdmin flag inside
@@ -138,7 +143,9 @@ function SiteFooter() {
             </a>
           </span>
         </div>
-        <nav className="app-footer-links" aria-label="Legal">
+        <nav className="app-footer-links" aria-label="Legal and feedback">
+          <Link to="/feedback">Send feedback</Link>
+          <span aria-hidden="true">·</span>
           <Link to="/privacy">Privacy</Link>
           <span aria-hidden="true">·</span>
           <Link to="/terms">Terms</Link>
