@@ -37,6 +37,13 @@
     <meta property="og:title" content="Floyd County, VA — Civic Hub" />
     <meta property="og:description" content="Vote on local issues and see where our community stands." />
     <meta property="og:type" content="website" />
+    <!-- Slice 15 — static OG image. The SPA can't inject per-vote OG
+         tags (crawlers don't run JS), so every shared link unfurls
+         with the Hub banner + generic title. Per-vote OG would need
+         a server-side bot-detection rewrite (Slice 15.1 candidate). -->
+    <meta property="og:image" content="/floyd-banner.jpg" />
+    <meta property="og:image:alt" content="Downtown Floyd, Virginia — the Floyd Civic Hub" />
+    <meta name="twitter:card" content="summary_large_image" />
   </head>
   <body>
     <div id="root"></div>

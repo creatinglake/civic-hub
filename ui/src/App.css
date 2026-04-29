@@ -651,6 +651,12 @@
   flex-wrap: wrap;
 }
 
+/* Share affordance — sits between the meta row and the interaction
+ * panel on votes / proposals that are still gathering attention. */
+.process-share-row {
+  margin: -1rem 0 2rem;
+}
+
 /* --- Vote panel --- */
 
 .vote-panel {

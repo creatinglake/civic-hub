@@ -4,6 +4,7 @@ import { getCivicProposal, supportCivicProposal, type CivicProposalDetail } from
 import { useAuth } from "../context/AuthContext";
 import { useRequireAuth } from "../hooks/useRequireAuth";
 import AuthModal from "../components/AuthModal";
+import ShareButton from "../components/ShareButton";
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString("en-US", {
@@ -106,6 +107,20 @@ export default function ProposalDetail() {
         <span>Proposed by {proposal.submitted_by}</span>
         <span>Submitted {formatDate(proposal.created_at)}</span>
       </div>
+
+      {/* Share — visible while the proposal is actively gathering
+          (or has gathered) endorsements; the whole reason a user
+          wants to share is to push it past the threshold. Suppressed
+          for converted / archived where sharing no longer drives
+          action. */}
+      {(proposal.status === "submitted" || proposal.status === "endorsed") && (
+        <div className="process-share-row">
+          <ShareButton
+            title={proposal.title}
+            shareText={`Endorse this proposal: ${proposal.title}`}
+          />
+        </div>
+      )}
 
       {/* Endorsement section */}
       {proposal.status === "submitted" && (

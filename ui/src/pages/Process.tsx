@@ -8,6 +8,7 @@ import ProposalPanel from "../components/ProposalPanel";
 import IssueContent from "../components/IssueContent";
 import CommunityInputPanel from "../components/CommunityInputPanel";
 import AuthModal from "../components/AuthModal";
+import ShareButton from "../components/ShareButton";
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString("en-US", {
@@ -125,6 +126,29 @@ export default function Process() {
         {isVote && process.status === "closed" && <span>Voting closed</span>}
         {isVote && process.status === "finalized" && <span>Voting finalized</span>}
       </div>
+
+      {/* Share — visible while the surface is gathering attention.
+          Active votes (turn out the vote) + the proposal "gathering
+          support" states. Suppressed once voting closes / a proposal
+          archives — at that point sharing the URL no longer drives
+          action. The link itself still works; users who really want
+          to share can copy from the address bar. */}
+      {((isVote &&
+        (process.status === "active" ||
+          process.status === "proposed" ||
+          process.status === "threshold_met")) ||
+        (isProposal && process.status !== "closed")) && (
+        <div className="process-share-row">
+          <ShareButton
+            title={process.title}
+            shareText={
+              isProposal
+                ? `Endorse this proposal: ${process.title}`
+                : `Vote on: ${process.title}`
+            }
+          />
+        </div>
+      )}
 
       {/* Vote/Proposal interaction panel */}
       {isVote && (
