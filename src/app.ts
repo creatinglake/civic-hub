@@ -23,6 +23,7 @@ import meetingSummaryRoutes, {
   meetingSummaryCronRouter,
 } from "./routes/meetingSummaryRoutes.js";
 import { floydNewsSyncCronRouter } from "./routes/floydNewsSyncRoutes.js";
+import { adminDigestCronRouter } from "./routes/adminDigestRoutes.js";
 import feedbackRoutes from "./routes/feedbackRoutes.js";
 import {
   digestCronRouter,
@@ -133,14 +134,16 @@ app.use("/feedback", feedbackRoutes);
 app.use("/meeting-summary", meetingSummaryRoutes);
 
 // Digest (Slice 5) + Meeting summary (Slice 6) + Floyd-news-sync
-// (Slice 13) crons all mount here. Vercel Cron POSTs with the
-// CRON_SECRET bearer, auto-injected.
+// (Slice 13) + Admin-digest (Slice 16) crons all mount here. Vercel
+// Cron POSTs with the CRON_SECRET bearer, auto-injected.
 //   /internal/digest/run
 //   /internal/meeting-summary/run
 //   /internal/floyd-news-sync/run
+//   /internal/admin-digest/run
 app.use("/internal", digestCronRouter);
 app.use("/internal", meetingSummaryCronRouter);
 app.use("/internal", floydNewsSyncCronRouter);
+app.use("/internal", adminDigestCronRouter);
 app.use("/unsubscribe", digestUnsubscribeRouter);
 app.use("/user/settings", userSettingsRouter);
 
@@ -203,6 +206,7 @@ app.get("/", (_req, res) => {
       "PATCH /user/settings/digest": "Toggle digest subscription (authed)",
       "POST /internal/meeting-summary/run": "Cron-triggered meeting discovery + summarization (CRON_SECRET bearer)",
       "POST /internal/floyd-news-sync/run": "Cron-triggered Floyd news/announcement sync (CRON_SECRET bearer)",
+      "POST /internal/admin-digest/run": "Cron-triggered admin queue digest (CRON_SECRET bearer)",
       "GET /admin/meeting-summaries": "List meeting summaries for admin review (optional ?status=)",
       "GET /admin/meeting-summaries/:id": "Get full meeting summary detail for admin",
       "PATCH /admin/meeting-summaries/:id": "Edit meeting summary blocks/notes (pending only)",
