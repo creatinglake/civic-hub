@@ -107,6 +107,20 @@ export function eventToPost(
           id?: string;
           title?: string;
           author_role?: string;
+          /**
+           * Slice 13 — provenance for synced-from-external announcements.
+           * When `source.origin === "floyd-news"`, the card was ingested
+           * by the Floyd-news-sync cron rather than authored by a hub
+           * admin. We reuse the regular announcement pill color (orange
+           * "Admin announcement" palette) so synced cards visually
+           * group with admin-authored ones — they still match the
+           * "Announcements" filter pill the same way.
+           */
+          source?: {
+            origin?: string;
+            share_url?: string;
+            ingested_at?: string;
+          } | null;
         };
         meeting_summary?: {
           id?: string;
@@ -140,6 +154,13 @@ export function eventToPost(
             ? "Admin"
             : rawLabel;
         const isAdmin = normalized === "Admin";
+        // Slice 13 — synced-from-external announcements carry
+        // source.origin = "floyd-news". They reuse the admin
+        // announcement palette (orange) so they group with the
+        // standard "Announcements" filter visually. The label still
+        // reads as the syncing organization ("Floyd County
+        // Government announcement") to distinguish the source.
+        const isSynced = data.announcement?.source?.origin === "floyd-news";
         const pillLabel = isAdmin
           ? "Admin announcement"
           : `${normalized} announcement`;
@@ -150,8 +171,10 @@ export function eventToPost(
           // Non-admin authors (Board members, committees, etc.) get a
           // distinct pill + card border color so residents can tell
           // which announcements come from elected officials vs the
-          // hub administrator.
-          pillKind: isAdmin ? "announcement" : "announcement-author",
+          // hub administrator. Synced announcements (Floyd County
+          // Government cron) use the admin palette so they don't get
+          // confused with elected-official posts.
+          pillKind: isAdmin || isSynced ? "announcement" : "announcement-author",
           summary: summaryFromDescription(
             getProcessDescription(event.process_id),
           ),
