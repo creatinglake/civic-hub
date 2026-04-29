@@ -44,7 +44,7 @@ const CHOICES: FeedFilterChoice[] = [
   },
   {
     key: "meeting_summary",
-    label: "Meeting summaries",
+    label: "BOS meeting summaries",
     pillClass: "feed-filter-pill--meeting",
   },
 ];
