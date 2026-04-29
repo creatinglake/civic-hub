@@ -79,6 +79,15 @@ export interface CreateProcessInput {
   createdBy: string;
   state?: Record<string, unknown>;
   content?: ProcessContent;
+  /**
+   * Slice 13 — explicit ISO 8601 timestamp override for the auto-emitted
+   * `civic.process.created` event. Sync paths (e.g. floyd-news-sync)
+   * pass the underlying content's real-world publication time so the
+   * feed displays synced items in their natural chronological position
+   * rather than clustering at ingest time. The processes table's
+   * `created_at` column is still set by the database default.
+   */
+  eventTimestamp?: string;
 }
 
 export interface ProcessAction {

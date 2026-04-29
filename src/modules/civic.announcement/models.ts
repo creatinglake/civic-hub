@@ -124,6 +124,12 @@ export interface EmitEventFn {
      * Defaults to "public" when omitted.
      */
     visibility?: "public" | "restricted";
+    /**
+     * Slice 13 — optional ISO 8601 timestamp override for sync paths
+     * that want the event to reflect real-world publication time.
+     * Emitter stamps `now` when omitted.
+     */
+    timestamp?: string;
   }): Promise<unknown>;
 }
 

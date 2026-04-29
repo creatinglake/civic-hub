@@ -36,7 +36,12 @@ export async function emitEvent(input: CreateEventInput): Promise<CivicEvent> {
     id: generateId("evt"),
     version: "1.0",
     event_type: input.event_type,
-    timestamp: new Date().toISOString(),
+    // Sync paths (e.g. floyd-news-sync) override timestamp with the
+    // underlying content's real-world publication time so the feed
+    // displays synced items in their natural chronological position
+    // instead of clustering them at ingest time. All other callers
+    // omit input.timestamp and stamp "now".
+    timestamp: input.timestamp ?? new Date().toISOString(),
     process_id: input.process_id,
     actor: input.actor,
     jurisdiction: input.jurisdiction,

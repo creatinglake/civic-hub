@@ -40,6 +40,7 @@ export async function emitAnnouncementCreated(
   ctx: AnnouncementProcessContext,
   actor: string,
   state: AnnouncementProcessState,
+  opts: { timestamp?: string } = {},
 ): Promise<void> {
   await ctx.emit({
     event_type: "civic.process.created",
@@ -56,6 +57,7 @@ export async function emitAnnouncementCreated(
         source: state.source ?? null,
       },
     },
+    timestamp: opts.timestamp,
   });
 }
 
@@ -63,11 +65,16 @@ export async function emitAnnouncementCreated(
  * Emitted immediately after `created` — announcements skip Phases 1–5
  * and go directly to publication. See HANDOFF.md for the spec-compliance
  * note about skipped phases for instant-publish announcements.
+ *
+ * Sync paths (e.g. floyd-news-sync) pass `opts.timestamp` to backdate
+ * the event to the underlying content's real-world publication time so
+ * the feed orders synced items chronologically.
  */
 export async function emitAnnouncementResultPublished(
   ctx: AnnouncementProcessContext,
   actor: string,
   state: AnnouncementProcessState,
+  opts: { timestamp?: string } = {},
 ): Promise<void> {
   await ctx.emit({
     event_type: "civic.process.result_published",
@@ -84,6 +91,7 @@ export async function emitAnnouncementResultPublished(
         source: state.source ?? null,
       },
     },
+    timestamp: opts.timestamp,
   });
 }
 

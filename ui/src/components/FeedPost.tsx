@@ -216,7 +216,7 @@ export function eventToPost(
         return {
           id: event.id,
           title,
-          pillLabel: "Meeting summary",
+          pillLabel: "BOS meeting summary",
           pillKind: "meeting",
           summary,
           timestamp: event.timestamp,

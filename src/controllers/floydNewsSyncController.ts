@@ -201,6 +201,12 @@ export async function handleRunFloydNewsSync(
           description: body,
           jurisdiction: "us-va-floyd",
           createdBy: CRON_ACTOR,
+          // Slice 13.4: backdate the auto-emitted civic.process.created
+          // event to the post's RSS pubDate when available so the feed
+          // orders synced items chronologically with the rest of the
+          // hub's activity (instead of clustering at ingest time).
+          // Falls back to "now" when pubDate didn't parse.
+          eventTimestamp: entry.pub_date_iso ?? undefined,
           state: {
             title: entry.title,
             body,
@@ -223,7 +229,12 @@ export async function handleRunFloydNewsSync(
           jurisdiction: record.jurisdiction,
           emit: emitEvent,
         };
-        await emitAnnouncementResultPublished(ctx, CRON_ACTOR, state);
+        await emitAnnouncementResultPublished(ctx, CRON_ACTOR, state, {
+          // Same backdating as the created event — the feed renders
+          // result_published as the announcement card, so its timestamp
+          // is what determines the card's position in the feed.
+          timestamp: entry.pub_date_iso ?? undefined,
+        });
 
         record.status = "finalized";
         await saveProcessState(record);

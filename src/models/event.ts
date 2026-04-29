@@ -53,4 +53,13 @@ export interface CreateEventInput {
   dedupe_key?: string;
   visibility?: "public" | "restricted";
   action_url_path?: string; // e.g. "/brief/abc123"; defaults to "/process/:id"
+  /**
+   * Slice 13 — explicit ISO 8601 timestamp override. Only used by sync
+   * paths that want the event to reflect the real-world publication
+   * time of the underlying content (e.g. floyd-news-sync uses Floyd's
+   * RSS pubDate so synced announcements interleave chronologically with
+   * other events in the feed instead of bunching at ingest time). Hand-
+   * authored callers omit this and the emitter stamps `now`.
+   */
+  timestamp?: string;
 }

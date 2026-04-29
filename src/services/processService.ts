@@ -147,6 +147,10 @@ export async function createProcess(
         title: input.title,
       },
     },
+    // Sync paths pass eventTimestamp = real-world publication time so the
+    // feed orders synced items chronologically. Hand-authored callers omit
+    // it and the emitter stamps `now`.
+    timestamp: input.eventTimestamp,
   });
 
   return process;
