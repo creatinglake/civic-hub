@@ -5,8 +5,22 @@ import {
   verifyCode,
   affirmResidency,
   acceptTos,
+  type AuthRole,
+  type AuthUser,
 } from "../services/auth";
 import { CURRENT_LEGAL_VERSION } from "../config/legal";
+
+/**
+ * Slice 13.10: deferred login() until the residency + legal gate
+ * passes. Prevents users from ending up with a partial session if
+ * they close the modal between code verification and the gate.
+ */
+interface PendingAuth {
+  token: string;
+  user: AuthUser;
+  role: AuthRole;
+  author_label: string | null;
+}
 
 type Step = "email" | "code" | "residency";
 
@@ -26,6 +40,10 @@ export default function AuthModal({ onComplete, onDismiss }: Props) {
   });
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
+  // Slice 13.10 — verifyCode result is held here UNTIL the residency
+  // gate passes. We do not call login() at the verify step anymore so
+  // dismissing the modal at the gate leaves no session behind.
+  const [pendingAuth, setPendingAuth] = useState<PendingAuth | null>(null);
   // Slice 13.9 — single combined gate checkbox for new users: residency
   // affirmation + legal-doc acceptance in one click. Returning residents
   // (is_resident=true) skip this step entirely. The app-root
@@ -89,15 +107,24 @@ export default function AuthModal({ onComplete, onDismiss }: Props) {
     setLoading(true);
     try {
       const result = await verifyCode(email.trim(), code.trim());
-      login(result.token, result.user, result.role, result.author_label);
 
       if (result.user.is_resident) {
-        // Returning resident — already accepted residency at first
-        // sign-up. The app-root ReAcceptModal catches them if their
-        // legal-version is stale, so no extra gate here.
+        // Returning resident — fully signed up before. login() now,
+        // complete. The app-root ReAcceptModal catches them if their
+        // legal-version is stale.
+        login(result.token, result.user, result.role, result.author_label);
         onComplete();
       } else {
-        // New user — combined residency + legal acceptance step.
+        // New user — hold the credentials in local state and route
+        // to the combined residency + legal gate. login() will only
+        // fire if/when they pass the gate; closing the modal here
+        // leaves no session behind.
+        setPendingAuth({
+          token: result.token,
+          user: result.user,
+          role: result.role,
+          author_label: result.author_label,
+        });
         setStep("residency");
       }
     } catch (err) {
@@ -118,7 +145,15 @@ export default function AuthModal({ onComplete, onDismiss }: Props) {
       return;
     }
 
-    if (!token) {
+    // Two paths into the residency step:
+    //   1. Brand-new sign-up — pendingAuth holds the verified-but-not-
+    //      yet-logged-in credentials from handleVerifyCode. login()
+    //      will fire only after the gate passes.
+    //   2. Returning user already logged in (re-opened the modal
+    //      because is_resident is still false) — useAuth's token
+    //      applies. updateUser() refreshes the cached state.
+    const tokenToUse = pendingAuth?.token ?? token ?? null;
+    if (!tokenToUse) {
       setError("Session expired. Please start over.");
       return;
     }
@@ -130,10 +165,10 @@ export default function AuthModal({ onComplete, onDismiss }: Props) {
       // error the user can retry on this same step rather than getting
       // half-completed sign-ups. acceptTos failure is non-fatal — the
       // re-acceptance modal will catch them on next page load.
-      const residencyResult = await affirmResidency(token);
+      const residencyResult = await affirmResidency(tokenToUse);
       let nextUser = residencyResult.user;
       try {
-        const accepted = await acceptTos(token, CURRENT_LEGAL_VERSION);
+        const accepted = await acceptTos(tokenToUse, CURRENT_LEGAL_VERSION);
         nextUser = accepted.user;
       } catch (acceptErr) {
         console.warn(
@@ -141,7 +176,14 @@ export default function AuthModal({ onComplete, onDismiss }: Props) {
           acceptErr,
         );
       }
-      updateUser(nextUser);
+      // Only NOW does the session actually start — login() fires with
+      // the residency-affirmed user. If the user had closed the modal
+      // before reaching this point, no login() ever happened.
+      if (pendingAuth) {
+        login(tokenToUse, nextUser, pendingAuth.role, pendingAuth.author_label);
+      } else {
+        updateUser(nextUser);
+      }
       onComplete();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to confirm residency");
