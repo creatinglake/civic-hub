@@ -147,8 +147,23 @@ export default function Feed({ filter, emptyFilteredAction }: Props) {
     };
   }, []);
 
+  // Slice 13 fix — pre-filter to events that produce a feed post before
+  // applying the user-facing type filter or paginating.
+  //
+  // Background: each rendered card maps to a single `civic.process.started`
+  // (vote-open) or `civic.process.result_published` (everything else)
+  // event. The events feed also contains `civic.process.created`,
+  // `civic.process.aggregation_completed`, `civic.process.updated`, etc.
+  // that don't render. Without this pre-filter, those non-renderable
+  // events count against the PAGE_SIZE budget and can starve the visible
+  // window — most acutely when synced events are backdated and the
+  // most-recent N events become a cluster of `created` events from the
+  // sync run.
   const renderableEvents = useMemo(
-    () => (filter ? events.filter(filter) : events),
+    () => {
+      const base = events.filter((e) => kindFromEvent(e) !== null);
+      return filter ? base.filter(filter) : base;
+    },
     [events, filter],
   );
 
