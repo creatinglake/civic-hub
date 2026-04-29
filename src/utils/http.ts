@@ -52,6 +52,26 @@ export async function fetchHtml(url: string): Promise<string> {
   return res.text();
 }
 
+/**
+ * Fetch an RSS / Atom feed (or any XML body) as a string. Same timeout
+ * + non-http(s) guard as fetchHtml; only the accept header differs so
+ * picky CDNs serve the XML variant cleanly.
+ */
+export async function fetchXml(url: string): Promise<string> {
+  const res = await fetchWithTimeout(url, {
+    method: "GET",
+    headers: {
+      "user-agent":
+        "Mozilla/5.0 (compatible; CivicHub/0.1; +https://civic.social)",
+      accept: "application/rss+xml, application/atom+xml, application/xml, text/xml",
+    },
+  });
+  if (!res.ok) {
+    throw new Error(`fetchXml ${url} — ${res.status} ${res.statusText}`);
+  }
+  return res.text();
+}
+
 export async function fetchPdf(
   url: string,
 ): Promise<{ bytes: Uint8Array; mime: string }> {

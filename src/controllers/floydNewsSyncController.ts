@@ -1,16 +1,18 @@
 // civic.floyd_news_sync controller — POST /internal/floyd-news-sync/run
 //
 // Cron-triggered (and manually triggerable with the same CRON_SECRET).
-// Discovers new news posts on the configured source URL, filters out
+// Discovers new news posts from Floyd's Wix RSS feed, filters out
 // past-dated events, dedupes against already-ingested rows, and creates
 // one civic.announcement per new entry (auto-published, no admin
-// review). Per-meeting failures are isolated; one bad post does not
+// review). Per-entry failures are isolated; one bad post does not
 // abort the run.
 //
 // Per Slice 13 design: synced announcements have `state.source` set so
 // the event emitter routes the action_url to the external permalink.
 // The feed-card click goes directly to floydcova.gov, not the internal
-// /announcement/:id page.
+// /announcement/:id page. Per Slice 13.1 redesign: no thumbnails (Wix
+// document scans are unreadable), body comes from the RSS description
+// when present (otherwise empty), no Claude usage on this path.
 
 import { Request, Response } from "express";
 import {
@@ -24,8 +26,7 @@ import {
   saveProcessState,
 } from "../services/processService.js";
 import { emitEvent } from "../events/eventEmitter.js";
-import { callClaude, DEFAULT_MODEL } from "../utils/anthropic.js";
-import { fetchHtml } from "../utils/http.js";
+import { fetchXml } from "../utils/http.js";
 import {
   emitAnnouncementResultPublished,
   type AnnouncementProcessContext,
@@ -33,8 +34,8 @@ import {
   type AnnouncementSource,
 } from "../modules/civic.announcement/index.js";
 
-const DEFAULT_SOURCE_URL = "https://www.floydcova.gov/news";
-const DEFAULT_MAX_PER_RUN = 3;
+const DEFAULT_SOURCE_URL = "https://www.floydcova.gov/blog-feed.xml";
+const DEFAULT_MAX_PER_RUN = 5;
 const CRON_ACTOR = "system:floyd-news-sync-cron";
 const SYNCED_AUTHOR_ROLE = "Floyd County Government";
 
@@ -48,9 +49,7 @@ function requireCronSecret(req: Request): boolean {
 }
 
 function enabled(): boolean {
-  // Default: enabled. Operator opts out via FLOYD_NEWS_SYNC_ENABLED=false
-  // (e.g. while testing the cron in a preview environment without burning
-  // through Anthropic credits).
+  // Default: enabled. Operator opts out via FLOYD_NEWS_SYNC_ENABLED=false.
   const v = process.env.FLOYD_NEWS_SYNC_ENABLED?.trim().toLowerCase();
   return v !== "false";
 }
@@ -63,19 +62,14 @@ function maxPerRun(): number {
   return Math.floor(n);
 }
 
-function modelName(): string {
-  return process.env.ANTHROPIC_MODEL?.trim() || DEFAULT_MODEL;
-}
-
 function sourceUrl(): string {
   return process.env.FLOYD_NEWS_SOURCE_URL?.trim() || DEFAULT_SOURCE_URL;
 }
 
 function todayIsoLocal(): string {
-  // Server-local YYYY-MM-DD. The Vercel function runs in UTC; for a
-  // Virginia jurisdiction this can drift by ±1 day at the day boundary
-  // but doesn't materially affect the filter (a post made within hours
-  // of an event date is unlikely to be exactly on the boundary).
+  // Server-local YYYY-MM-DD. Vercel runs in UTC; for a Virginia
+  // jurisdiction this can drift by ±1 day at the day boundary but
+  // doesn't materially affect the filter.
   return new Date().toISOString().slice(0, 10);
 }
 
@@ -85,8 +79,7 @@ function announcementState(record: { state: Record<string, unknown> }): Announce
 
 /**
  * Build the set of share_urls already ingested as civic.announcement
- * rows. Used for dedupe — one announcement per share_url, ever. Linear
- * scan over all announcement processes; fine at MVP scale.
+ * rows. Used for dedupe — one announcement per share_url, ever.
  */
 async function existingShareUrls(): Promise<Set<string>> {
   const all = await getAllProcesses();
@@ -116,17 +109,8 @@ export async function handleRunFloydNewsSync(
     return;
   }
 
-  if (!process.env.ANTHROPIC_API_KEY) {
-    res.status(500).json({
-      error:
-        "ANTHROPIC_API_KEY must be set. Create a key at https://console.anthropic.com and add it to Vercel env vars.",
-    });
-    return;
-  }
-
   const cfg: FloydNewsSyncConfig = {
     source_url: sourceUrl(),
-    model: modelName(),
   };
 
   const started = Date.now();
@@ -143,7 +127,7 @@ export async function handleRunFloydNewsSync(
 
     const entries: FloydNewsEntry[] = await discoverNewsEntries(
       cfg,
-      { fetchHtml, callClaude },
+      { fetchText: fetchXml },
       today,
     );
     discovered = entries.length;
@@ -166,7 +150,7 @@ export async function handleRunFloydNewsSync(
         continue;
       }
 
-      const meetingStart = Date.now();
+      const entryStart = Date.now();
       try {
         const source: AnnouncementSource = {
           origin: "floyd-news",
@@ -177,34 +161,27 @@ export async function handleRunFloydNewsSync(
         const record = await createProcess({
           definition: { type: "civic.announcement", version: "0.1" },
           title: entry.title,
-          // No body for synced announcements — the click goes external.
-          // The descriptor's `description` is the body in the existing
-          // pattern; pass an empty string and the announcement module's
-          // `allowEmptyBody` branch (createAnnouncementState) accepts it
-          // when a source is set.
-          description: "",
+          // Body is whatever Floyd published in the RSS description
+          // (~25% of items have one). Empty otherwise — the card
+          // renders title + pill + timestamp without a body line.
+          description: entry.body,
           jurisdiction: "us-va-floyd",
           createdBy: CRON_ACTOR,
           state: {
             title: entry.title,
-            body: "",
+            body: entry.body,
             author_id: CRON_ACTOR,
             author_role: SYNCED_AUTHOR_ROLE,
             links: [],
-            image_url: entry.image_url,
-            // Wix listing thumbnails don't ship with alt text; without
-            // a real alt we render the image purely as decoration.
-            // Empty string is fine — the announcement validator allows
-            // null/empty alt and the public read model handles both.
+            // Slice 13.1: no thumbnails for synced announcements.
+            // Wix's document-scan thumbnails are unreadable noise;
+            // cards look better without them.
+            image_url: null,
             image_alt: null,
             source,
           },
         });
 
-        // Auto-publish: announcements skip Phases 1-5 and go directly
-        // to publication. The generic createProcess emitted a generic
-        // civic.process.created; we also emit the module's richer
-        // result_published so feed/digest pick it up.
         const state = announcementState(record);
         const ctx: AnnouncementProcessContext = {
           process_id: record.id,
@@ -218,13 +195,13 @@ export async function handleRunFloydNewsSync(
         await saveProcessState(record);
 
         console.log(
-          `[floyd-news-sync] created process=${record.id} share_url=${entry.share_url} duration_ms=${Date.now() - meetingStart}`,
+          `[floyd-news-sync] created process=${record.id} share_url=${entry.share_url} body_len=${entry.body.length} duration_ms=${Date.now() - entryStart}`,
         );
         created += 1;
       } catch (err) {
         const msg = err instanceof Error ? err.message : "unknown error";
         console.warn(
-          `[floyd-news-sync] failed share_url=${entry.share_url} error=${msg} duration_ms=${Date.now() - meetingStart}`,
+          `[floyd-news-sync] failed share_url=${entry.share_url} error=${msg} duration_ms=${Date.now() - entryStart}`,
         );
         failed += 1;
       }

@@ -6,16 +6,14 @@ export type {
 } from "./models.js";
 
 export {
-  trimNewsHtml,
-  isValidEntry,
+  parseRssFeed,
+  parseEventDate,
+  parseRfc822ToIso,
   isFutureOrUndated,
 } from "./connector.js";
 
-export { buildDiscoveryPrompt } from "./prompts.js";
-
 export {
   discoverNewsEntries,
-  type CallClaudeFn,
-  type FetchHtmlFn,
   type DiscoverDeps,
+  type FetchTextFn,
 } from "./pipeline.js";
