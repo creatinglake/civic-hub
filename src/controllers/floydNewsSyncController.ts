@@ -17,6 +17,7 @@
 import { Request, Response } from "express";
 import {
   discoverNewsEntries,
+  paraphraseTitle,
   type FloydNewsEntry,
   type FloydNewsSyncConfig,
 } from "../modules/civic.floyd_news_sync/index.js";
@@ -27,6 +28,7 @@ import {
 } from "../services/processService.js";
 import { emitEvent } from "../events/eventEmitter.js";
 import { fetchXml } from "../utils/http.js";
+import { callClaude, DEFAULT_MODEL } from "../utils/anthropic.js";
 import {
   emitAnnouncementResultPublished,
   type AnnouncementProcessContext,
@@ -64,6 +66,10 @@ function maxPerRun(): number {
 
 function sourceUrl(): string {
   return process.env.FLOYD_NEWS_SOURCE_URL?.trim() || DEFAULT_SOURCE_URL;
+}
+
+function modelName(): string {
+  return process.env.ANTHROPIC_MODEL?.trim() || DEFAULT_MODEL;
 }
 
 function todayIsoLocal(): string {
@@ -158,18 +164,46 @@ export async function handleRunFloydNewsSync(
           ingested_at: new Date().toISOString(),
         };
 
+        // When the RSS description is empty (~75% of Floyd's posts),
+        // ask Claude for a strict paraphrase of the title (and event
+        // date if present). The prompt is locked to forbid invented
+        // specifics — see paraphrase.ts. A Claude failure is
+        // non-fatal: we fall back to an empty body and log a warning.
+        let body = entry.body;
+        if (!body) {
+          if (!process.env.ANTHROPIC_API_KEY) {
+            console.warn(
+              `[floyd-news-sync] no body and ANTHROPIC_API_KEY unset — skipping paraphrase for ${entry.share_url}`,
+            );
+          } else {
+            try {
+              body = await paraphraseTitle(
+                { title: entry.title, event_date: entry.event_date },
+                { callClaude, model: modelName() },
+              );
+              console.log(
+                `[floyd-news-sync] paraphrased share_url=${entry.share_url} → "${body.slice(0, 80)}${body.length > 80 ? "…" : ""}"`,
+              );
+            } catch (err) {
+              const msg = err instanceof Error ? err.message : "unknown error";
+              console.warn(
+                `[floyd-news-sync] paraphrase failed for ${entry.share_url}: ${msg} — falling back to empty body`,
+              );
+            }
+          }
+        }
+
         const record = await createProcess({
           definition: { type: "civic.announcement", version: "0.1" },
           title: entry.title,
-          // Body is whatever Floyd published in the RSS description
-          // (~25% of items have one). Empty otherwise — the card
-          // renders title + pill + timestamp without a body line.
-          description: entry.body,
+          // Body is RSS description verbatim when present, else a
+          // strict Claude paraphrase of the title, else empty.
+          description: body,
           jurisdiction: "us-va-floyd",
           createdBy: CRON_ACTOR,
           state: {
             title: entry.title,
-            body: entry.body,
+            body,
             author_id: CRON_ACTOR,
             author_role: SYNCED_AUTHOR_ROLE,
             links: [],
@@ -195,7 +229,7 @@ export async function handleRunFloydNewsSync(
         await saveProcessState(record);
 
         console.log(
-          `[floyd-news-sync] created process=${record.id} share_url=${entry.share_url} body_len=${entry.body.length} duration_ms=${Date.now() - entryStart}`,
+          `[floyd-news-sync] created process=${record.id} share_url=${entry.share_url} body_len=${body.length} body_source=${entry.body ? "rss" : body ? "paraphrase" : "empty"} duration_ms=${Date.now() - entryStart}`,
         );
         created += 1;
       } catch (err) {

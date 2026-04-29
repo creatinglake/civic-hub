@@ -17,3 +17,11 @@ export {
   type DiscoverDeps,
   type FetchTextFn,
 } from "./pipeline.js";
+
+export {
+  buildParaphrasePrompt,
+  cleanParaphrase,
+  paraphraseTitle,
+  type ParaphraseDeps,
+  type ParaphraseInput,
+} from "./paraphrase.js";
