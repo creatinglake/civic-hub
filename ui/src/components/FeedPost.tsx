@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import type { CivicEvent } from "../services/api";
 import { useIsWideViewport } from "../hooks/useIsWideViewport";
+import hub from "../config/hub";
 
 /**
  * Color/label kinds for the per-post type pill. Each maps to a token in
@@ -224,7 +225,7 @@ export function eventToPost(
         return {
           id: event.id,
           title,
-          pillLabel: "BOS meeting summary",
+          pillLabel: `${hub.governing_body_short} meeting summary`,
           pillKind: "meeting",
           summary,
           timestamp: event.timestamp,
@@ -250,7 +251,7 @@ export function eventToPost(
         // showed up when both lines said "N residents voted".
         const summary = data.headline_result
           ? String(data.headline_result)
-          : "Delivered to the Board of Supervisors.";
+          : `Delivered to the ${hub.governing_body_name}.`;
         return {
           id: event.id,
           title,

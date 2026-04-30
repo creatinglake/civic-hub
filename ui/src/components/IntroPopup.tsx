@@ -86,11 +86,7 @@ export default function IntroPopup({ onDismiss }: Props) {
           Welcome to the {hub.name}.
         </h2>
 
-        <p className="intro-popup-text">
-          This is where Floyd County residents weigh in on local issues, read
-          Board of Supervisors meeting summaries, and stay in the loop between
-          elections.
-        </p>
+        <p className="intro-popup-text">{hub.intro_body}</p>
 
         <div className="intro-popup-actions">
           <button

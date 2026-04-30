@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
+import hub from "../config/hub";
 import "./FeedFilter.css";
 
 /**
@@ -44,7 +45,7 @@ const CHOICES: FeedFilterChoice[] = [
   },
   {
     key: "meeting_summary",
-    label: "BOS meeting summaries",
+    label: `${hub.governing_body_short} meeting summaries`,
     pillClass: "feed-filter-pill--meeting",
   },
 ];

@@ -4,6 +4,7 @@ import { submitProposal } from "../services/api";
 import { useAuth } from "../context/AuthContext";
 import { useRequireAuth } from "../hooks/useRequireAuth";
 import AuthModal from "../components/AuthModal";
+import hub from "../config/hub";
 
 export default function Propose() {
   const navigate = useNavigate();
@@ -63,7 +64,7 @@ export default function Propose() {
       <p className="propose-description">
         Submit an idea for the community to consider. With enough
         citizen support — your neighbors endorsing it — your suggestion
-        is reviewed and may become an official Floyd County advisory
+        is reviewed and may become an official {hub.jurisdiction} advisory
         vote.
       </p>
 
