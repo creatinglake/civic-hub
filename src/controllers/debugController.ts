@@ -50,7 +50,7 @@ async function runScenario(
 ): Promise<Record<string, unknown>> {
   const process = await createProcess(scenario.process);
 
-  for (const action of scenario.actions) {
+  for (const action of scenario.actions ?? []) {
     await executeAction(process.id, action);
   }
 

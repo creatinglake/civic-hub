@@ -12,7 +12,13 @@ export interface SeedScenario {
     state: Record<string, unknown>;
     content?: Record<string, unknown>;
   };
-  actions: { type: string; actor: string; payload: Record<string, unknown> }[];
+  /**
+   * Generic process actions — used by civic.vote and civic.proposal
+   * scenarios that go through the standard action dispatcher.
+   * Optional: announcement and meeting-summary scenarios bypass
+   * action dispatch entirely (see autoSeed.ts type-aware runScenario).
+   */
+  actions?: { type: string; actor: string; payload: Record<string, unknown> }[];
   inputs?: { author_id: string; body: string }[];
 }
 
