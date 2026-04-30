@@ -57,6 +57,32 @@ const hub = {
   banner_alt:
     import.meta.env.VITE_HUB_BANNER_ALT ??
     "Downtown Floyd, Virginia — the Floyd Civic Hub",
+  /**
+   * Slice 19a — governance terminology. Per-jurisdiction copy for
+   * the elected body that votes are delivered to and whose meetings
+   * get summarized. Floyd's BoS is "Board of Supervisors"; a town
+   * demo's might be "Town Council"; a city might be "City Council."
+   *
+   * `governing_body_name` is the long form (delivered-to text, admin
+   * pages); `governing_body_short` is the abbreviation used in pills
+   * and filter labels where width matters.
+   */
+  governing_body_name:
+    import.meta.env.VITE_HUB_GOVERNING_BODY_NAME ??
+    "Board of Supervisors",
+  governing_body_short:
+    import.meta.env.VITE_HUB_GOVERNING_BODY_SHORT ?? "BOS",
+  /**
+   * Welcome-popup body and AuthModal residency-intro copy. These are
+   * jurisdiction-specific freeform strings that don't generalize via
+   * a templating placeholder, so they're full-body env-overridable.
+   */
+  intro_body:
+    import.meta.env.VITE_HUB_INTRO_BODY ??
+    "This is where Floyd County residents weigh in on local issues, read Board of Supervisors meeting summaries, and stay in the loop between elections.",
+  residency_intro:
+    import.meta.env.VITE_HUB_RESIDENCY_INTRO ??
+    "To participate in Floyd County civic processes, please confirm your residency and review the policies below.",
 };
 
 export default hub;

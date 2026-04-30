@@ -21,9 +21,40 @@ import {
   FLOYD_GREEN_BOX,
   type SeedScenario,
 } from "./seedData.js";
+import {
+  ATHENS_FLOCK_CAMERA,
+  ATHENS_GREEN_BOX,
+} from "./seedDataAthens.js";
 
 function allowSeed(): boolean {
   return process.env.CIVIC_ALLOW_SEED === "true";
+}
+
+/**
+ * Slice 19b — fixture selector. Each Vercel deployment can pick which
+ * jurisdiction's seed data to load via CIVIC_SEED_FIXTURE. Floyd is
+ * the default so production behavior is unchanged; the Athens fixture
+ * powers the public demo at demo-hub.civic.social.
+ *
+ * Add a new fixture by exporting scenarios from a new seed-data
+ * module and adding a case below — handlers should be cheap (just
+ * scenario references) so adding a fixture is a one-line change.
+ */
+function selectScenarios(): SeedScenario[] {
+  const fixture = process.env.CIVIC_SEED_FIXTURE?.trim().toLowerCase();
+  switch (fixture) {
+    case "athens":
+      return [ATHENS_GREEN_BOX, ATHENS_FLOCK_CAMERA];
+    case "floyd":
+    case undefined:
+    case "":
+      return [FLOYD_GREEN_BOX, FLOYD_FLOCK_CAMERA];
+    default:
+      console.warn(
+        `[auto-seed] Unknown CIVIC_SEED_FIXTURE="${fixture}" — falling back to floyd.`,
+      );
+      return [FLOYD_GREEN_BOX, FLOYD_FLOCK_CAMERA];
+  }
 }
 
 async function runScenario(scenario: SeedScenario): Promise<void> {
@@ -70,9 +101,12 @@ export async function seedOnStartup(): Promise<void> {
       return;
     }
 
-    console.log("[auto-seed] Seeding initial data...");
-    await runScenario(FLOYD_GREEN_BOX);
-    await runScenario(FLOYD_FLOCK_CAMERA);
+    const scenarios = selectScenarios();
+    const fixtureName = process.env.CIVIC_SEED_FIXTURE?.trim().toLowerCase() || "floyd";
+    console.log(`[auto-seed] Seeding initial data (fixture: ${fixtureName})...`);
+    for (const scenario of scenarios) {
+      await runScenario(scenario);
+    }
     console.log("[auto-seed] Done\n");
   })().catch((err) => {
     console.error("[auto-seed] failed:", err);

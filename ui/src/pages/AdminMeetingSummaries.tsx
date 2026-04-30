@@ -11,6 +11,7 @@ import {
   type SummaryBlock,
 } from "../services/api";
 import AdminTabs from "../components/AdminTabs";
+import hub from "../config/hub";
 import "./AdminMeetingSummaries.css";
 
 const STATUS_FILTERS: Array<{
@@ -271,7 +272,7 @@ export default function AdminMeetingSummaries() {
               value={meetingTitle}
               onChange={(e) => setMeetingTitle(e.target.value)}
               disabled={!isPending}
-              placeholder="Board of Supervisors Regular Meeting"
+              placeholder={`${hub.governing_body_name} Regular Meeting`}
             />
           </section>
 
@@ -502,8 +503,8 @@ export default function AdminMeetingSummaries() {
       <div className="admin-meeting-summaries-body">
         <h1>Meeting summaries</h1>
         <p className="admin-subtitle">
-          AI-generated summaries of Board of Supervisors meetings. Review
-          topic blocks and approve to publish to the public feed.
+          AI-generated summaries of {hub.governing_body_name} meetings.
+          Review topic blocks and approve to publish to the public feed.
         </p>
 
         <div className="admin-brief-filters">

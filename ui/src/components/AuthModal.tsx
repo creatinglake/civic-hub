@@ -302,10 +302,7 @@ export default function AuthModal({ onComplete, onDismiss }: Props) {
         {step === "residency" && (
           <form onSubmit={handleResidency}>
             <h2 className="auth-title">One last thing</h2>
-            <p className="auth-description">
-              To participate in Floyd County civic processes, please confirm
-              your residency and review the policies below.
-            </p>
+            <p className="auth-description">{hub.residency_intro}</p>
 
             <label className="auth-checkbox-label auth-legal-checkbox">
               <input

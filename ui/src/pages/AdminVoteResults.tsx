@@ -11,6 +11,7 @@ import {
 } from "../services/api";
 import AdminTabs from "../components/AdminTabs";
 import PostImagePicker from "../components/PostImagePicker";
+import hub from "../config/hub";
 import "./AdminVoteResults.css";
 
 const STATUS_FILTERS: Array<{
@@ -344,7 +345,7 @@ export default function AdminVoteResults() {
         <h1>Vote results</h1>
         <p className="admin-subtitle">
           Review and approve vote results. Approval delivers the results to the
-          Board of Supervisors and publishes them to the public feed.
+          {" "}{hub.governing_body_name} and publishes them to the public feed.
         </p>
 
         <div className="admin-brief-filters">

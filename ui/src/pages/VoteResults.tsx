@@ -4,6 +4,7 @@ import { getPublicVoteResults, type PublicVoteResults } from "../services/api";
 import { relativeTime, absoluteTime } from "../components/FeedPost";
 import PostFeaturedImage from "../components/PostFeaturedImage";
 import LinkPreviewCard from "../components/LinkPreviewCard";
+import hub from "../config/hub";
 import "./VoteResults.css";
 
 const URL_RE = /\bhttps?:\/\/\S+/gi;
@@ -86,9 +87,9 @@ export default function VoteResultsPage() {
         month: "long",
         day: "numeric",
       });
-      return `Delivered to the Board of Supervisors on ${dateLabel}.`;
+      return `Delivered to the ${hub.governing_body_name} on ${dateLabel}.`;
     }
-    return "Delivered to the Board of Supervisors.";
+    return `Delivered to the ${hub.governing_body_name}.`;
   })();
 
   return (
