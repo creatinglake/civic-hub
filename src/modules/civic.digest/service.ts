@@ -287,18 +287,20 @@ function renderGroupHtml(
   kind: DigestItemKind,
 ): string {
   const { bg, fg } = PILL_COLORS[kind];
-  // Each row uses a table so the pill aligns against the right edge and
-  // (Slice 9) any thumbnail aligns against the left edge across email
-  // clients. Inline styles only — Outlook and Gmail strip <style>
-  // blocks. Title is the click target.
+  // Each row is a <table> wrapped in a single <a display:block> so the
+  // entire row — title, summary, pill, and the whitespace between — is
+  // one click target. The HTML5 spec allows anchors to wrap flow
+  // content including tables, and major email clients (Apple Mail,
+  // Gmail web/mobile, Outlook 365, Outlook desktop) all honor it.
+  // Inner anchors are removed (nested anchors are invalid). The
+  // chevron column on the right signals interactivity without the
+  // blue-underlined-link look — the row reads as a tappable card.
   const rows = items
     .map((item) => {
       const thumbCell = item.thumbnail_url
         ? `
               <td valign="top" width="60" style="padding:0 12px 0 0;">
-                <a href="${escapeAttr(item.action_url)}" style="display:block;line-height:0;">
-                  <img src="${escapeAttr(item.thumbnail_url)}" alt="" width="60" height="60" style="display:block;width:60px;height:60px;border-radius:8px;object-fit:cover;border:0;" />
-                </a>
+                <img src="${escapeAttr(item.thumbnail_url)}" alt="" width="60" height="60" style="display:block;width:60px;height:60px;border-radius:8px;object-fit:cover;border:0;" />
               </td>`
         : "";
       const summaryBlock = item.summary
@@ -306,18 +308,21 @@ function renderGroupHtml(
         : "";
       return `
         <li style="margin:0 0 18px;padding:0;list-style:none;">
-          <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;">
-            <tr>
-              ${thumbCell}
-              <td valign="top" style="padding:0 12px 0 0;">
-                <a href="${escapeAttr(item.action_url)}" style="font-family:${FONT_HEADING};color:#1a1a1a;text-decoration:none;font-weight:600;font-size:18px;line-height:1.25;display:inline-block;">${escapeHtml(item.title)}</a>
-                ${summaryBlock}
-              </td>
-              <td valign="top" align="right" style="white-space:nowrap;">
-                <span style="display:inline-block;background:${bg};color:${fg};font-family:${FONT_BODY};font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;padding:3px 10px;border-radius:9999px;">${escapeHtml(item.pill_label)}</span>
-              </td>
-            </tr>
-          </table>
+          <a href="${escapeAttr(item.action_url)}" style="display:block;text-decoration:none;color:inherit;">
+            <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;">
+              <tr>
+                ${thumbCell}
+                <td valign="top" style="padding:0 12px 0 0;">
+                  <span style="font-family:${FONT_HEADING};color:#1a1a1a;font-weight:600;font-size:18px;line-height:1.25;display:inline-block;">${escapeHtml(item.title)}</span>
+                  ${summaryBlock}
+                </td>
+                <td valign="top" align="right" style="white-space:nowrap;padding:0 8px 0 0;">
+                  <span style="display:inline-block;background:${bg};color:${fg};font-family:${FONT_BODY};font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;padding:3px 10px;border-radius:9999px;">${escapeHtml(item.pill_label)}</span>
+                </td>
+                <td valign="top" align="right" width="16" style="white-space:nowrap;font-family:${FONT_BODY};font-size:18px;line-height:1.25;color:#9ca3af;">&rsaquo;</td>
+              </tr>
+            </table>
+          </a>
         </li>
       `;
     })
