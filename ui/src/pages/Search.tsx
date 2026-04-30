@@ -9,6 +9,7 @@ import {
 } from "../services/api";
 import SearchBar from "../components/SearchBar";
 import { relativeTime, absoluteTime } from "../components/FeedPost";
+import hub from "../config/hub";
 // FeedFilter.css carries the .feed-filter-pill--<kind> rules we
 // reuse for the post-type filter row on this page. Imported here
 // since Search doesn't render <FeedFilter> directly.
@@ -230,7 +231,7 @@ export default function SearchPage() {
 
       <header className="search-page-header">
         <h1>
-          {q ? <>Search results for <em>{q}</em></> : "Search Floyd Civic Hub"}
+          {q ? <>Search results for <em>{q}</em></> : `Search ${hub.name}`}
         </h1>
         <div className="search-page-input">
           <SearchBar inDrawer initialValue={q} />

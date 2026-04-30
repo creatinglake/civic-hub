@@ -9,6 +9,7 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { setDigestSubscription } from "../services/api";
+import hub from "../config/hub";
 import {
   deleteAccount as deleteAccountApi,
   getMe,
@@ -124,7 +125,7 @@ export default function Settings() {
       <div className="settings-body">
         <h1>Settings</h1>
         <p className="settings-subtitle">
-          Manage how you hear from {"Floyd Civic Hub"}.
+          Manage how you hear from {hub.name}.
         </p>
 
         {error && <p className="form-error">{error}</p>}

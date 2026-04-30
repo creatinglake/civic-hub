@@ -168,7 +168,7 @@ export default function Nav() {
             </button>
 
             <Link to="/" className="civic-nav-wordmark" aria-label={`${hub.jurisdiction} home`}>
-              Floyd Civic Hub
+              {hub.name}
             </Link>
 
             {TOP_LINKS.length > 0 && (

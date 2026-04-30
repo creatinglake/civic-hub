@@ -32,17 +32,24 @@
         min-height: 100dvh;
       }
     </style>
-    <title>Floyd County, VA — Civic Hub</title>
-    <meta name="description" content="Vote on local issues and see where our community stands. Floyd County, Virginia Civic Hub." />
-    <meta property="og:title" content="Floyd County, VA — Civic Hub" />
-    <meta property="og:description" content="Vote on local issues and see where our community stands." />
+    <!-- Slice 18 — title / OG metadata are env-driven via Vite's
+         %VITE_VAR% substitution so per-deployment Vercel projects
+         (Floyd production, civic.social demo, future per-county
+         hubs) render their own branding from the same `main` build.
+         Defaults below match Floyd; overrides go in each Vercel
+         project's Production-scoped env vars. -->
+    <title>%VITE_HUB_PAGE_TITLE%</title>
+    <meta name="description" content="%VITE_HUB_DESCRIPTION%" />
+    <meta property="og:title" content="%VITE_HUB_PAGE_TITLE%" />
+    <meta property="og:description" content="%VITE_HUB_DESCRIPTION%" />
     <meta property="og:type" content="website" />
-    <!-- Slice 15 — static OG image. The SPA can't inject per-vote OG
-         tags (crawlers don't run JS), so every shared link unfurls
-         with the Hub banner + generic title. Per-vote OG would need
-         a server-side bot-detection rewrite (Slice 15.1 candidate). -->
-    <meta property="og:image" content="/floyd-banner.jpg" />
-    <meta property="og:image:alt" content="Downtown Floyd, Virginia — the Floyd Civic Hub" />
+    <!-- Static OG image. The SPA can't inject per-vote OG tags
+         (crawlers don't run JS), so every shared link unfurls
+         with the Hub banner + generic title. Per-vote OG would
+         need a server-side bot-detection rewrite (Slice 15.1
+         candidate). -->
+    <meta property="og:image" content="%VITE_HUB_BANNER_URL%" />
+    <meta property="og:image:alt" content="%VITE_HUB_BANNER_ALT%" />
     <meta name="twitter:card" content="summary_large_image" />
   </head>
   <body>

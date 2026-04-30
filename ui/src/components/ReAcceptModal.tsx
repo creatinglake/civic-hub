@@ -14,6 +14,7 @@
 import { useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import { acceptTos } from "../services/auth";
+import hub from "../config/hub";
 import {
   CURRENT_LEGAL_VERSION,
   CURRENT_LEGAL_LAST_UPDATED,
@@ -82,7 +83,7 @@ export default function ReAcceptModal() {
             : "We've updated our Terms"}
         </h2>
         <p id="re-accept-body" className="auth-description">
-          To keep using the Floyd Civic Hub, please review our Terms of
+          To keep using the {hub.name}, please review our Terms of
           Service, Privacy Policy, and Code of Conduct. These protect
           you and help us run the Hub fairly.
         </p>

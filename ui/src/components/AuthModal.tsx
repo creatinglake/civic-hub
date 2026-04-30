@@ -9,6 +9,7 @@ import {
   type AuthUser,
 } from "../services/auth";
 import { CURRENT_LEGAL_VERSION } from "../config/legal";
+import hub from "../config/hub";
 
 /**
  * Slice 13.10: deferred login() until the residency + legal gate
@@ -314,7 +315,7 @@ export default function AuthModal({ onComplete, onDismiss }: Props) {
                 disabled={loading}
               />
               <span>
-                I confirm that I am a resident of Floyd County, Virginia, and
+                I confirm that I am a resident of {hub.jurisdiction}, and
                 I have read and agree to the{" "}
                 <a href="/terms" target="_blank" rel="noopener noreferrer">
                   Terms of Service

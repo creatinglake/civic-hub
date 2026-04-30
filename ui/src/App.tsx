@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { BrowserRouter, Routes, Route, Navigate, useLocation, useParams, Link } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
+import hub from "./config/hub";
 import Nav from "./components/Nav";
 import HubBanner from "./components/HubBanner";
 import Home from "./pages/Home";
@@ -131,7 +132,7 @@ function SiteFooter() {
     <footer className="app-footer">
       <div className="app-footer-inner">
         <div className="app-footer-brand">
-          <strong>Floyd Civic Hub</strong>
+          <strong>{hub.name}</strong>
           <span className="app-footer-tagline">
             Operated by Adam Lake · Powered by{" "}
             <a
