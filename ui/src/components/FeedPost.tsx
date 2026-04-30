@@ -157,13 +157,20 @@ export function eventToPost(
         // Slice 13 — synced-from-external announcements carry
         // source.origin = "floyd-news". They reuse the admin
         // announcement palette (orange) so they group with the
-        // standard "Announcements" filter visually. The label still
-        // reads as the syncing organization ("Floyd County
-        // Government announcement") to distinguish the source.
+        // standard "Announcements" filter visually. The label reads
+        // as the syncing organization ("Floyd County Gov") to
+        // distinguish the source.
         const isSynced = data.announcement?.source?.origin === "floyd-news";
-        const pillLabel = isAdmin
-          ? "Admin announcement"
-          : `${normalized} announcement`;
+        // Pill carries just the role; the section context already
+        // says "Announcement" (filter pill / digest section header),
+        // so a trailing " announcement" suffix would be redundant
+        // and was making longer roles wrap rows. "Government" is
+        // abbreviated to "Gov" via abbreviateGovernment for the
+        // same width reason. Future polish: per-kind icons —
+        // tracked in civic-hub#11.
+        // MUST stay in sync with the digest-side helper in
+        // civic-hub/src/modules/civic.digest/service.ts.
+        const pillLabel = abbreviateGovernment(normalized);
         return {
           id: event.id,
           title,
@@ -285,6 +292,20 @@ function summaryFromDescription(description: string | undefined): string {
   if (!description) return "";
   const firstLine = description.split(/\r?\n/).find((l) => l.trim().length > 0);
   return firstLine?.trim() ?? "";
+}
+
+/**
+ * Width-saver for announcement pill labels. Replaces the standalone
+ * word "Government" with "Gov" so labels like "Floyd County Government"
+ * render as "Floyd County Gov" — keeps the role recognizable while
+ * shaving the chars that were causing pills to wrap rows on the feed
+ * and in the email digest.
+ *
+ * MUST stay in sync with the email-side helper in
+ * civic-hub/src/modules/civic.digest/service.ts.
+ */
+function abbreviateGovernment(label: string): string {
+  return label.replace(/\bGovernment\b/gi, "Gov");
 }
 
 /**

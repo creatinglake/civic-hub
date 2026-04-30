@@ -116,3 +116,9 @@ rowMatches.forEach((row, i) => {
     `  Row ${i + 1}: wrap=${wrapAnchor ? "yes" : "NO"}, anchors=${innerAnchorCount}, chevron=${hasChevron ? "yes" : "NO"}, pill="${pillMatch?.[1] ?? "?"}"`,
   );
 });
+
+// Dump full HTML to a file so we can open it in a browser for visual inspection.
+import { writeFileSync } from "node:fs";
+writeFileSync("/tmp/digest-preview.html", html);
+console.log("");
+console.log("--- full HTML written to /tmp/digest-preview.html ---");

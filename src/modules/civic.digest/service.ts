@@ -136,26 +136,25 @@ function eventToItem(
           : "";
       title = rawTitle ?? "New announcement";
       summary = truncate(preview, 160);
-      // Match the feed's role-aware pill: legacy "board" normalizes to
-      // "Board member"; admin always reads "Admin announcement"; any
-      // other free-form label suffixes "announcement".
+      // Pill label carries just the role; the digest section header
+      // ("ANNOUNCEMENTS") and the feed filter pill ("Announcements")
+      // already supply the type context, so a trailing " announcement"
+      // suffix is redundant and made longer pills (notably "Floyd
+      // County Government announcement") wrap rows in the email digest.
+      // "Government" is abbreviated to "Gov" for the same width reason.
+      // Future polish: pair the pill label with a per-kind icon
+      // (megaphone / ballot / etc.) — tracked in civic-hub#11.
       const rawRole =
         typeof d?.announcement?.author_role === "string"
           ? d.announcement.author_role
           : null;
-      // Match the feed's normalization: legacy lowercase "admin" and
-      // missing role both become "Admin"; "board" becomes "Board
-      // member"; anything else is rendered verbatim.
       const normalized =
         rawRole === "board"
           ? "Board member"
           : rawRole === "admin" || !rawRole
           ? "Admin"
           : rawRole;
-      pill_label =
-        normalized === "Admin"
-          ? "Admin announcement"
-          : `${normalized} announcement`;
+      pill_label = abbreviateGovernment(normalized);
       break;
     }
     case "meeting_summary_published": {
@@ -405,6 +404,23 @@ function escapeAttr(s: string): string {
 function truncate(s: string, max: number): string {
   if (s.length <= max) return s;
   return s.slice(0, max - 1).trimEnd() + "…";
+}
+
+/**
+ * Width-saver for announcement pill labels. Replaces the standalone word
+ * "Government" with "Gov" so labels like "Floyd County Government" render
+ * as "Floyd County Gov" — keeps the role recognizable while shaving the
+ * ~5 chars that were causing pills to wrap rows in the email digest.
+ *
+ * Case-insensitive match; replacement is always "Gov" (rendered uppercase
+ * by the pill's CSS in the email and in the feed).
+ *
+ * MUST stay in sync with the feed-side helper in
+ * civic-hub/ui/src/components/FeedPost.tsx so email + feed pills look
+ * identical for the same author.
+ */
+function abbreviateGovernment(label: string): string {
+  return label.replace(/\bGovernment\b/gi, "Gov");
 }
 
 /**
