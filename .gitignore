@@ -3,6 +3,12 @@ dist/
 *.js.map
 *.d.ts.map
 .env
+# Slice 18 — the UI's env file carries public branding defaults
+# (VITE_HUB_*) and ships in the bundle. Whitelist so production
+# builds get the Floyd defaults without an out-of-band setup step.
+# DO NOT put secrets here — Vite exposes VITE_-prefixed vars to
+# client code. Backend/server env vars belong in civic-hub/.env.
+!ui/.env
 
 # OS artifacts
 .DS_Store

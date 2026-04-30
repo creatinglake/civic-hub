@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
+import hub from "../config/hub";
 import "./IntroPopup.css";
 
 const STORAGE_KEY = "seen_intro_popup";
@@ -82,7 +83,7 @@ export default function IntroPopup({ onDismiss }: Props) {
     >
       <div className="intro-popup-body">
         <h2 id="intro-popup-title" className="intro-popup-title">
-          Welcome to the Floyd Civic Hub.
+          Welcome to the {hub.name}.
         </h2>
 
         <p className="intro-popup-text">
