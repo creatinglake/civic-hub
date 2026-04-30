@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import type { CivicEvent } from "../services/api";
+import { useIsWideViewport } from "../hooks/useIsWideViewport";
 
 /**
  * Color/label kinds for the per-post type pill. Each maps to a token in
@@ -401,6 +402,12 @@ function classifyHref(href: string): { kind: "internal"; to: string } | { kind: 
 
 export default function FeedPost({ post }: Props) {
   const classified = classifyHref(post.href);
+  // External links open in a new tab on desktop (multi-tab is the
+  // dominant research pattern there) but stay in the same tab on
+  // mobile so the browser back button + iOS's native "back to Floyd
+  // Civic Hub" chip both work. Power users can still ⌘-click /
+  // middle-click to force a new tab on either device.
+  const isWideViewport = useIsWideViewport();
   const pillClass = `feed-pill feed-pill--${post.pillKind}`;
   const hasImage = Boolean(post.imageUrl);
   const articleClass = `feed-post feed-post--${post.pillKind}${
@@ -453,8 +460,9 @@ export default function FeedPost({ post }: Props) {
         <a
           href={post.href}
           className="feed-post-link"
-          target="_blank"
-          rel="noopener noreferrer"
+          {...(isWideViewport
+            ? { target: "_blank", rel: "noopener noreferrer" }
+            : { rel: "noopener" })}
         >
           {inner}
         </a>
