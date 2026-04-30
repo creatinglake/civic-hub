@@ -78,6 +78,29 @@ export async function requestVerification(
     throw new Error("Invalid email address");
   }
 
+  // Slice 19c — when CIVIC_DEMO_BYPASS_CODE is set, the deployment
+  // is a demo (e.g. demo-hub.civic.social) where any visitor signs
+  // in with the displayed bypass code instead of a real OTP. Skip
+  // the OTP generation, the pending_verifications insert, and the
+  // Resend send entirely so demo signups don't:
+  //   1. fire a real email to throwaway addresses,
+  //   2. burn against the Resend monthly quota,
+  //   3. confuse visitors who weren't expecting an email and now
+  //      wonder why one arrived with a different code than the one
+  //      the IntroPopup told them to use.
+  // verifyCode() already accepts the bypass code without needing a
+  // pending_verifications row (it short-circuits the existence
+  // check), so skipping the insert here doesn't break the flow.
+  const demoBypass = process.env.CIVIC_DEMO_BYPASS_CODE?.trim();
+  if (demoBypass) {
+    console.log(
+      `[auth] Demo-mode signin requested for ${normalizedEmail} — bypass code active, skipping email.`,
+    );
+    return {
+      message: "Demo mode — use the displayed bypass code to sign in.",
+    };
+  }
+
   const code = generateOTP();
   const now = new Date();
   const expires = new Date(now.getTime() + OTP_TTL_MS);
