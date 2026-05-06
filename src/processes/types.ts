@@ -29,6 +29,17 @@ export interface ProcessHandler {
 
   /** Produce a summary for list views */
   getSummary(process: Process): Record<string, unknown>;
+
+  /**
+   * Slice 7 — optional ActivityPub serializer override.
+   * If implemented, called instead of the default processToActivityPub().
+   * Handlers that don't implement this get the default Note serialization.
+   */
+  toActivityPub?: (
+    process: Process,
+    hubActorId: string,
+    hubBaseUrl: string,
+  ) => Record<string, unknown>;
 }
 
 /**

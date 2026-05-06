@@ -7,13 +7,14 @@ import {
   handleGetProcessState,
 } from "../controllers/processController.js";
 import { requireResident, requireAdmin } from "../middleware/auth.js";
+import { applyFederationContentNegotiation } from "../middleware/federation.js";
 
 const router = Router();
 
 // Read layer — public
 router.get("/", handleListProcesses);
 router.get("/:id/state", handleGetProcessState);
-router.get("/:id", handleGetProcess);
+router.get("/:id", applyFederationContentNegotiation, handleGetProcess);
 
 // Internal control surfaces — gated
 // Creating a process directly (e.g. seeding, admin creation) is admin-only.

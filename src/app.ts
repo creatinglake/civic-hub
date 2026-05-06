@@ -30,6 +30,10 @@ import {
   digestUnsubscribeRouter,
   userSettingsRouter,
 } from "./routes/digestRoutes.js";
+import federationRoutes, {
+  webfingerRouter,
+  processApRouter,
+} from "./routes/federationRoutes.js";
 import { handleListAnnouncements } from "./controllers/announcementController.js";
 import { ensureSeeded } from "./debug/autoSeed.js";
 import { pingDb } from "./db/client.js";
@@ -81,7 +85,9 @@ app.use(ensureSeeded as express.RequestHandler);
 app.use("/auth", authRoutes);
 
 // --- Internal control surfaces ---
-// Process endpoints are internal. External systems should use /events.
+// Federation: /process/:id.json must be mounted before processRoutes so
+// the .json suffix route matches before the generic /:id handler.
+app.use("/process", processApRouter);
 app.use("/process", processRoutes);
 app.use("/process", inputRoutes);
 
@@ -155,6 +161,12 @@ app.use("/events", eventRoutes);
 // Discovery manifest
 app.use("/.well-known", discoveryRoutes);
 
+// Federation (Slice 7) — ActivityPub endpoints
+// /actor, /inbox, /outbox — hub-level federation
+app.use("/", federationRoutes);
+// /.well-known/webfinger — AP discovery
+app.use("/.well-known", webfingerRouter);
+
 // Debug / seed (development only)
 app.use("/debug", debugRoutes);
 
@@ -218,6 +230,11 @@ app.get("/", (_req, res) => {
       "GET /events?process_id=X&type=Y": "Combine filters",
       "GET /events?pretty=true": "Pretty-print event output",
       "GET /.well-known/civic.json": "Discovery manifest",
+      "GET /.well-known/webfinger?resource=acct:X": "Webfinger discovery (federation)",
+      "GET /actor": "Hub ActivityPub Actor (federation)",
+      "POST /inbox": "ActivityPub inbox stub (federation)",
+      "GET /outbox": "ActivityPub outbox stub (federation)",
+      "GET /process/:id.json": "ActivityPub JSON for a process (federation)",
       "GET /debug/seed": "Seed sample data (dev only)",
       "GET /health": "Health check",
     },

@@ -9,6 +9,7 @@ import {
   getProcessState,
 } from "../services/processService.js";
 import { getAuthUser } from "../middleware/auth.js";
+import { handleGetProcessAP } from "./federationController.js";
 
 export async function handleCreateProcess(
   req: Request,
@@ -47,6 +48,10 @@ export async function handleGetProcess(
   req: Request,
   res: Response,
 ): Promise<void> {
+  if (res.locals.wantsActivityPub) {
+    return handleGetProcessAP(req, res);
+  }
+
   const id = req.params.id as string;
   try {
     const process = await getProcess(id);
