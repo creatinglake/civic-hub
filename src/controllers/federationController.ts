@@ -7,8 +7,9 @@ import {
   AP_CONTENT_TYPE,
   JRD_CONTENT_TYPE,
 } from "../modules/civic.federation/index.js";
-import { getProcess } from "../services/processService.js";
+import { getProcess, createProcess } from "../services/processService.js";
 import { getProcessHandler } from "../processes/registry.js";
+import { generateId } from "../utils/id.js";
 
 export function handleGetActor(_req: Request, res: Response): void {
   const config = getActorConfig();
@@ -73,6 +74,42 @@ export async function handleGetProcessAP(
     }
 
     res.type(AP_CONTENT_TYPE).json(apObject);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Unknown error";
+    res.status(500).json({ error: message });
+  }
+}
+
+export async function handleCreateTestProcess(
+  _req: Request,
+  res: Response,
+): Promise<void> {
+  try {
+    const id = generateId("proc");
+    const process = await createProcess({
+      id,
+      definition: { type: "civic.vote", version: "0.1" },
+      title: "Community Park Bench Installation Program",
+      description:
+        "Should the Town of Athens install new park benches along Main Street and in the town square to improve walkability and create gathering spaces for residents?",
+      createdBy: "user:civic-admin",
+      state: {
+        options: [
+          "Yes — install benches along Main Street and the town square",
+          "No — the current seating is sufficient",
+          "Yes, but only in the town square",
+        ],
+      },
+    });
+
+    const config = getActorConfig();
+    const apUrl = `${config.baseUrl}/process/${process.id}`;
+    res.status(201).json({
+      message: "Test process created",
+      id: process.id,
+      mastodon_search_url: apUrl,
+      ap_json_url: `${apUrl}.json`,
+    });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
     res.status(500).json({ error: message });

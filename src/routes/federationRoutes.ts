@@ -6,6 +6,7 @@ import {
   handleInbox,
   handleOutbox,
   handleGetProcessAP,
+  handleCreateTestProcess,
 } from "../controllers/federationController.js";
 
 const federationRoutes = Router();
@@ -13,6 +14,7 @@ const federationRoutes = Router();
 federationRoutes.get("/actor", requireFederationEnabled, handleGetActor);
 federationRoutes.post("/inbox", requireFederationEnabled, handleInbox);
 federationRoutes.get("/outbox", requireFederationEnabled, handleOutbox);
+federationRoutes.post("/federation/test-process", requireFederationEnabled, handleCreateTestProcess);
 
 export const webfingerRouter = Router();
 webfingerRouter.get("/webfinger", requireFederationEnabled, handleWebfinger);
