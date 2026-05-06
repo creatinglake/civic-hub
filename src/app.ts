@@ -34,6 +34,10 @@ import federationRoutes, {
   webfingerRouter,
   processApRouter,
 } from "./routes/federationRoutes.js";
+import {
+  handleNodeInfoWellKnown,
+  handleNodeInfo,
+} from "./controllers/nodeinfoController.js";
 import { handleListAnnouncements } from "./controllers/announcementController.js";
 import { ensureSeeded } from "./debug/autoSeed.js";
 import { pingDb } from "./db/client.js";
@@ -166,6 +170,9 @@ app.use("/.well-known", discoveryRoutes);
 app.use("/", federationRoutes);
 // /.well-known/webfinger — AP discovery
 app.use("/.well-known", webfingerRouter);
+// NodeInfo — server metadata for Mastodon and other AP software
+app.get("/.well-known/nodeinfo", handleNodeInfoWellKnown);
+app.get("/nodeinfo/2.0", handleNodeInfo);
 
 // Debug / seed (development only)
 app.use("/debug", debugRoutes);
@@ -231,6 +238,8 @@ app.get("/", (_req, res) => {
       "GET /events?pretty=true": "Pretty-print event output",
       "GET /.well-known/civic.json": "Discovery manifest",
       "GET /.well-known/webfinger?resource=acct:X": "Webfinger discovery (federation)",
+      "GET /.well-known/nodeinfo": "NodeInfo discovery (federation)",
+      "GET /nodeinfo/2.0": "NodeInfo 2.0 metadata (federation)",
       "GET /actor": "Hub ActivityPub Actor (federation)",
       "POST /inbox": "ActivityPub inbox stub (federation)",
       "GET /outbox": "ActivityPub outbox stub (federation)",

@@ -36,7 +36,15 @@ export function getActorConfig(): HubActorConfig {
     "",
   );
 
-  const publicKeyPem = process.env.FEDERATION_PUBLIC_KEY_PEM ?? "";
+  let publicKeyPem = process.env.FEDERATION_PUBLIC_KEY_PEM ?? "";
+  // Vercel may store the PEM as a single line with literal \n — restore real newlines
+  if (publicKeyPem.includes("\\n")) {
+    publicKeyPem = publicKeyPem.replace(/\\n/g, "\n");
+  }
+  // Ensure PEM headers are present (user may have pasted just the base64 block)
+  if (publicKeyPem && !publicKeyPem.startsWith("-----")) {
+    publicKeyPem = `-----BEGIN PUBLIC KEY-----\n${publicKeyPem.trim()}\n-----END PUBLIC KEY-----`;
+  }
 
   return {
     baseUrl,
