@@ -1,6 +1,7 @@
 import { Process } from "../../models/process.js";
 import { ActivityStreamsObject } from "./models.js";
 import { AP_CONTEXT, AP_PUBLIC } from "./context.js";
+import { uiBaseUrl } from "../../utils/baseUrl.js";
 
 const CIVIC_TYPE_MAP: Record<string, string> = {
   "civic.vote": "Vote",
@@ -76,18 +77,19 @@ export function processToActivityPub(
   hubActorId: string,
   hubBaseUrl: string,
 ): ActivityStreamsObject {
-  const processUrl = `${hubBaseUrl}/process/${process.id}`;
+  const apId = `${hubBaseUrl}/process/${process.id}`;
+  const humanUrl = `${uiBaseUrl()}/process/${process.id}`;
 
   return {
     "@context": AP_CONTEXT,
-    id: processUrl,
+    id: apId,
     type: ["Note", `civic:${mapCivicType(process.definition.type)}`],
     summary: process.title ?? "",
     content: renderContentHtml(process),
     attributedTo: hubActorId,
     published: process.createdAt,
     updated: process.updatedAt !== process.createdAt ? process.updatedAt : undefined,
-    url: processUrl,
+    url: humanUrl,
     to: [AP_PUBLIC],
   };
 }
