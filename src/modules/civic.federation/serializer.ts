@@ -15,6 +15,10 @@ function mapCivicType(processType: string): string {
   return CIVIC_TYPE_MAP[processType] ?? processType.replace("civic.", "");
 }
 
+function hubDisplayName(): string {
+  return process.env.HUB_DISPLAY_NAME ?? process.env.VITE_HUB_NAME ?? "Civic Hub";
+}
+
 function renderContentHtml(process: Process): string {
   const parts: string[] = [];
   const type = process.definition.type;
@@ -59,6 +63,10 @@ function renderContentHtml(process: Process): string {
   if (parts.length === 0) {
     parts.push(`<p>${escapeHtml(process.title)}</p>`);
   }
+
+  const uiOrigin = baseUrl().replace(/\/api$/, "");
+  const processPageUrl = `${uiOrigin}/process/${process.id}`;
+  parts.push(`<p><a href="${processPageUrl}">View on ${escapeHtml(hubDisplayName())} →</a></p>`);
 
   return parts.join("\n");
 }
