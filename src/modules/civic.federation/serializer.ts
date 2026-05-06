@@ -1,7 +1,7 @@
 import { Process } from "../../models/process.js";
 import { ActivityStreamsObject } from "./models.js";
 import { AP_CONTEXT, AP_PUBLIC } from "./context.js";
-import { uiBaseUrl } from "../../utils/baseUrl.js";
+import { uiBaseUrl, baseUrl } from "../../utils/baseUrl.js";
 
 const CIVIC_TYPE_MAP: Record<string, string> = {
   "civic.vote": "Vote",
@@ -78,7 +78,9 @@ export function processToActivityPub(
   hubBaseUrl: string,
 ): ActivityStreamsObject {
   const apId = `${hubBaseUrl}/process/${process.id}`;
-  const humanUrl = `${uiBaseUrl()}/process/${process.id}`;
+  // UI URL: strip /api suffix from BASE_URL so clicks land on the SPA, not the API
+  const uiOrigin = baseUrl().replace(/\/api$/, "");
+  const humanUrl = `${uiOrigin}/process/${process.id}`;
 
   return {
     "@context": AP_CONTEXT,
