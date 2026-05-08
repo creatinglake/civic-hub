@@ -74,7 +74,7 @@ export default function Process() {
   if (loading) return <p className="detail-page">Loading...</p>;
   if (error) return (
     <div className="page detail-page">
-      <Link to="/" className="back-link">&larr; Back to home</Link>
+      <Link to="/votes" className="back-link">&larr; All votes</Link>
       <p className="error">Error: {error}</p>
       <button className="retry-button" onClick={() => { setLoading(true); setError(null); fetchState(); }}>
         Try again
@@ -94,8 +94,8 @@ export default function Process() {
         <AuthModal onComplete={handleAuthComplete} onDismiss={closeAuthModal} />
       )}
 
-      <Link to="/" className="back-link">
-        &larr; {isProposal ? "All proposals" : "All votes"}
+      <Link to="/votes" className="back-link back-link-sticky">
+        &larr; All votes
       </Link>
 
       <div className="process-header">

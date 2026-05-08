@@ -179,7 +179,6 @@ export const FLOYD_FLOCK_CAMERA: SeedScenario = {
         body: "The goal is to provide a clear signal of community sentiment between elections. This vote is advisory and does not directly determine policy.",
         recipients: [
           "Floyd County Board of Supervisors",
-          "Floyd County Sheriff\u2019s Office",
         ],
       },
     },

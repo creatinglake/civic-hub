@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import {
   listProcesses,
@@ -54,6 +54,25 @@ export default function Votes() {
     setParams(updated, { replace: true });
   }
 
+  const restoredRef = useRef(false);
+
+  const saveScroll = useCallback(() => {
+    sessionStorage.setItem("votes_scroll_y", String(window.scrollY));
+  }, []);
+
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout>;
+    const handler = () => {
+      clearTimeout(timer);
+      timer = setTimeout(saveScroll, 100);
+    };
+    window.addEventListener("scroll", handler, { passive: true });
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener("scroll", handler);
+    };
+  }, [saveScroll]);
+
   useEffect(() => {
     Promise.all([listProcesses(), listCivicProposals()])
       .then(([procs, props]) => {
@@ -63,6 +82,15 @@ export default function Votes() {
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    if (loading || restoredRef.current) return;
+    restoredRef.current = true;
+    const saved = sessionStorage.getItem("votes_scroll_y");
+    if (saved) {
+      requestAnimationFrame(() => window.scrollTo(0, parseInt(saved, 10)));
+    }
+  }, [loading]);
 
   const activeVotes = processes
     .filter((p): p is VoteSummary =>

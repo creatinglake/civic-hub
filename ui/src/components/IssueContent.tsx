@@ -97,15 +97,15 @@ export default function IssueContent({ content }: Props) {
           <h3>What happens after this vote</h3>
           {content.after_vote.recipients.length > 0 && (
             <p className="after-vote-recipients">
-              Results from this vote will be shared with:
+              Results from this vote will be shared with{" "}
+              <strong>
+                {content.after_vote.recipients.length === 1
+                  ? content.after_vote.recipients[0]
+                  : content.after_vote.recipients.slice(0, -1).join(", ") +
+                    " and/or " +
+                    content.after_vote.recipients[content.after_vote.recipients.length - 1]}
+              </strong>.
             </p>
-          )}
-          {content.after_vote.recipients.length > 0 && (
-            <ul className="after-vote-recipient-list">
-              {content.after_vote.recipients.map((r, i) => (
-                <li key={i}>{r}</li>
-              ))}
-            </ul>
           )}
           <p className="after-vote-body">{content.after_vote.body}</p>
         </div>
