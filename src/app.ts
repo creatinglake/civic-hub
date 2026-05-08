@@ -33,6 +33,7 @@ import {
 import { handleListAnnouncements } from "./controllers/announcementController.js";
 import { ensureSeeded } from "./debug/autoSeed.js";
 import { pingDb } from "./db/client.js";
+import { validateEmailConfig } from "./utils/email.js";
 
 const app = express();
 
@@ -54,6 +55,8 @@ if (isProd && parsedOrigins.length === 0) {
 
 const allowedOrigins = new Set(parsedOrigins);
 const allowAnyOrigin = !isProd && parsedOrigins.length === 0;
+
+validateEmailConfig();
 
 app.use((req, res, next) => {
   const origin = req.headers.origin as string | undefined;

@@ -256,9 +256,11 @@ export default function AuthModal({ onComplete, onDismiss }: Props) {
             <p className="auth-description">
               We sent a 6-digit code to <strong>{email}</strong>
             </p>
-            <p className="auth-hint">
-              Use code: 000000
-            </p>
+            {hub.demo_mode && hub.demo_bypass_code && (
+              <p className="auth-hint">
+                Use code: {hub.demo_bypass_code}
+              </p>
+            )}
 
             <div className="form-field">
               <label htmlFor="auth-code" className="form-label">Verification code</label>
@@ -268,7 +270,7 @@ export default function AuthModal({ onComplete, onDismiss }: Props) {
                 className="form-input auth-code-input"
                 value={code}
                 onChange={(e) => setCode(e.target.value)}
-                placeholder="123456"
+                placeholder="------"
                 maxLength={6}
                 autoFocus
                 disabled={loading}

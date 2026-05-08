@@ -8,6 +8,46 @@
 //                       "Floyd Civic Hub <noreply@floyd.civic.social>"
 //                       Defaults to the Resend sandbox if unset.
 
+/**
+ * Validate email configuration at startup. Logs warnings for missing
+ * or malformed values so misconfigurations surface in deploy logs
+ * rather than failing silently per-request.
+ */
+export function validateEmailConfig(): void {
+  const apiKey = process.env.RESEND_API_KEY;
+  const from = process.env.RESEND_FROM;
+  const isProd = process.env.NODE_ENV === "production";
+
+  if (!apiKey) {
+    const msg = "RESEND_API_KEY is not set — emails will NOT be sent.";
+    if (isProd) {
+      console.error(`[email] ❌ ${msg} OTP sign-in will fail silently.`);
+    } else {
+      console.warn(`[email] ⚠️  ${msg} OTP codes will be logged to console.`);
+    }
+    return;
+  }
+
+  if (!from) {
+    console.warn(
+      '[email] ⚠️  RESEND_FROM is not set — using Resend sandbox sender. ' +
+      'Emails may land in spam or be rejected.',
+    );
+  } else {
+    const emailMatch = from.match(/<([^>]+)>/);
+    const addr = emailMatch ? emailMatch[1] : from;
+    const domain = addr.split("@")[1];
+    if (!domain || !domain.includes(".")) {
+      console.error(
+        `[email] ❌ RESEND_FROM domain looks malformed: "${domain}" (full value: "${from}"). ` +
+        'Emails will likely be rejected by Resend.',
+      );
+    } else {
+      console.log(`[email] ✓ RESEND_FROM domain: ${domain}`);
+    }
+  }
+}
+
 export interface SendEmailInput {
   to: string;
   subject: string;

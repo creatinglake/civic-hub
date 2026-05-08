@@ -83,6 +83,13 @@ const hub = {
   residency_intro:
     import.meta.env.VITE_HUB_RESIDENCY_INTRO ??
     "To participate in Floyd County civic processes, please confirm your residency and review the policies below.",
+  /**
+   * When true, the UI shows demo-specific affordances (e.g. the
+   * bypass-code hint on the sign-in modal). Set only on demo/preview
+   * Vercel projects — NEVER on production deployments.
+   */
+  demo_mode: import.meta.env.VITE_DEMO_MODE === "true",
+  demo_bypass_code: import.meta.env.VITE_DEMO_BYPASS_CODE ?? "",
 };
 
 export default hub;

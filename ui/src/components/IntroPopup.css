@@ -41,6 +41,17 @@
   margin: 0 0 var(--space-lg);
 }
 
+.intro-popup-demo-hint {
+  font-family: var(--font-body);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-relaxed);
+  color: var(--color-text);
+  background: var(--color-surface-alt, #f3f4f6);
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-sm);
+  margin: 0 0 var(--space-lg);
+}
+
 .intro-popup-actions {
   display: flex;
   gap: var(--space-sm);
