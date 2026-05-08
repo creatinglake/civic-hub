@@ -94,7 +94,7 @@ export default function IssueContent({ content }: Props) {
       {/* What happens after this vote */}
       {content.after_vote && (
         <div className="issue-after-vote">
-          <h3>What happens after this vote</h3>
+          <h3>What happens after this vote?</h3>
           {content.after_vote.recipients.length > 0 && (
             <p className="after-vote-recipients">
               Results from this vote will be shared with{" "}

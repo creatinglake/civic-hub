@@ -93,7 +93,7 @@ export default function ProposalDetail() {
         <AuthModal onComplete={handleAuthComplete} onDismiss={closeAuthModal} />
       )}
 
-      <Link to="/votes" className="back-link back-link-sticky">&larr; All votes</Link>
+      <Link to="/votes" className="back-link back-link-sticky">&larr; Back to votes</Link>
 
       <div className="process-header">
         <h1>{proposal.title}</h1>

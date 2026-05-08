@@ -74,7 +74,7 @@ export default function Process() {
   if (loading) return <p className="detail-page">Loading...</p>;
   if (error) return (
     <div className="page detail-page">
-      <Link to="/votes" className="back-link">&larr; All votes</Link>
+      <Link to="/votes" className="back-link">&larr; Back to votes</Link>
       <p className="error">Error: {error}</p>
       <button className="retry-button" onClick={() => { setLoading(true); setError(null); fetchState(); }}>
         Try again
@@ -95,7 +95,7 @@ export default function Process() {
       )}
 
       <Link to="/votes" className="back-link back-link-sticky">
-        &larr; All votes
+        &larr; Back to votes
       </Link>
 
       <div className="process-header">
@@ -152,7 +152,13 @@ export default function Process() {
         </div>
       )}
 
-      {/* Vote/Proposal interaction panel */}
+      {/* Structured issue content (only for processes with content) */}
+      {hasContent && voteState?.content && (
+        <IssueContent content={voteState.content} />
+      )}
+
+      {/* Vote/Proposal interaction panel — placed after issue content
+          so residents read the context before acting. */}
       {isVote && (
         <VotePanel
           process={process as VoteState}
@@ -167,11 +173,6 @@ export default function Process() {
           actor={currentActor}
           onEndorsed={fetchState}
         />
-      )}
-
-      {/* Structured issue content (only for processes with content) */}
-      {hasContent && voteState?.content && (
-        <IssueContent content={voteState.content} />
       )}
 
       {/* Comment form for proposed processes (gathering support phase) */}
