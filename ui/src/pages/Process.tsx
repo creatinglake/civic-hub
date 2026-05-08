@@ -7,6 +7,7 @@ import VotePanel from "../components/VotePanel";
 import ProposalPanel from "../components/ProposalPanel";
 import IssueContent from "../components/IssueContent";
 import CommunityInputPanel from "../components/CommunityInputPanel";
+import ProposalCommentForm from "../components/ProposalCommentForm";
 import AuthModal from "../components/AuthModal";
 import ShareButton from "../components/ShareButton";
 
@@ -44,6 +45,7 @@ export default function Process() {
   const [process, setProcess] = useState<ProcessState | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [commentRefresh, setCommentRefresh] = useState(0);
 
   const currentActor = actorId ?? "anonymous";
 
@@ -172,11 +174,18 @@ export default function Process() {
         <IssueContent content={voteState.content} />
       )}
 
-      {/* Community comments — show for any vote with collected inputs.
-          Submission now happens inline with voting via VotePanel's comment
-          textarea; this panel is read-only display of past comments. */}
+      {/* Comment form for proposed processes (gathering support phase) */}
+      {isVote && id && (process.status === "proposed" || process.status === "threshold_met") && (
+        <ProposalCommentForm
+          proposalId={id}
+          onCommentAdded={() => setCommentRefresh((n) => n + 1)}
+        />
+      )}
+
+      {/* Community comments */}
       {isVote && id && (
         <CommunityInputPanel
+          key={commentRefresh}
           processId={id}
           config={voteState?.content?.community_input}
         />

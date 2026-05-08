@@ -348,13 +348,7 @@ export interface CommunityInput {
   author_id: string;
   body: string;
   submitted_at: string;
-  /**
-   * Slice 11 — moderation state. Null when the comment has never been
-   * moderated. When `hidden` is true and the viewer is not an admin,
-   * `body` is empty and `moderation.reason` is null (the reason is
-   * internal-audit only). Admin viewers receive the full unredacted
-   * record from the same endpoint.
-   */
+  phase: "proposal" | "vote" | null;
   moderation: CommentModerationView | null;
 }
 

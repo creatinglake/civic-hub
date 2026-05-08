@@ -11,12 +11,13 @@
 
 import { getDb } from "../../db/client.js";
 import { generateId } from "../../utils/id.js";
-import type { CommunityInput, CommentModeration, InputContext } from "./models.js";
+import type { CommunityInput, CommentModeration, CommentPhase, InputContext } from "./models.js";
 import { BODY_PREVIEW_LEN, MODERATION_REASON_MAX } from "./models.js";
 
 export type {
   CommunityInput,
   CommentModeration,
+  CommentPhase,
   EmitEventFn,
   InputContext,
 } from "./models.js";
@@ -28,6 +29,7 @@ interface InputRow {
   author_id: string | null;
   body: string;
   submitted_at: string;
+  phase: string | null;
   hidden_at: string | null;
   hidden_by: string | null;
   hidden_reason: string | null;
@@ -56,6 +58,7 @@ function rowToInput(row: InputRow): CommunityInput {
     author_id: row.author_id ?? "",
     body: row.body,
     submitted_at: row.submitted_at,
+    phase: (row.phase as CommentPhase) ?? null,
     moderation,
   };
 }
@@ -76,6 +79,7 @@ export async function submitInput(
   author_id: string,
   body: string,
   ctx: InputContext,
+  phase?: CommentPhase,
 ): Promise<CommunityInput> {
   if (!body || body.trim().length === 0) {
     throw new Error("Input body cannot be empty");
@@ -86,18 +90,24 @@ export async function submitInput(
 
   const { data, error } = await getDb()
     .from("community_inputs")
-    .insert({
-      id,
-      process_id,
-      author_id,
-      body: trimmed,
-    })
+    .insert({ id, process_id, author_id, body: trimmed })
     .select()
     .single();
 
   if (error) throw new Error(`Input: ${error.message}`);
 
+  // Phase is set in a separate update to tolerate PostgREST schema cache
+  // lag after the column was added. Once the cache has refreshed this
+  // could be inlined into the insert, but the two-step is harmless.
+  if (phase) {
+    await getDb()
+      .from("community_inputs")
+      .update({ phase })
+      .eq("id", id);
+  }
+
   const input = rowToInput(data as InputRow);
+  input.phase = phase ?? null;
 
   // Emit the participation event. The preview is truncated so events stay
   // cheap to index and distribute; consumers that want the full body read

@@ -5,11 +5,34 @@ import {
   submitInput,
   getInputsByProcess,
   type CommunityInput,
+  type CommentPhase,
 } from "../modules/civic.input/index.js";
 import { getProcess } from "../services/processService.js";
+import { getDb } from "../db/client.js";
 import { getAuthUser, isAdminEmail } from "../middleware/auth.js";
 import { emitEvent } from "../events/eventEmitter.js";
 import { getUserFromToken } from "../modules/civic.auth/index.js";
+
+const HUB_ID = "civic-hub-local";
+
+async function proposalExists(id: string): Promise<boolean> {
+  const { data } = await getDb()
+    .from("proposals")
+    .select("id")
+    .eq("id", id)
+    .maybeSingle();
+  return !!data;
+}
+
+async function getSourceProposalId(processId: string): Promise<string | null> {
+  const { data } = await getDb()
+    .from("processes")
+    .select("source_proposal_id")
+    .eq("id", processId)
+    .maybeSingle();
+  return (data as { source_proposal_id: string | null } | null)
+    ?.source_proposal_id ?? null;
+}
 
 /**
  * Redact a hidden comment for non-admin viewers (Slice 11). The body
@@ -58,17 +81,29 @@ export async function handleSubmitInput(
 
   try {
     const process = await getProcess(processId);
-    if (!process) {
+    let hubId: string;
+    let jurisdiction: string;
+    let phase: CommentPhase;
+
+    if (process) {
+      hubId = process.hubId;
+      jurisdiction = process.jurisdiction;
+      phase = "vote";
+    } else if (await proposalExists(processId)) {
+      hubId = HUB_ID;
+      jurisdiction = "local";
+      phase = "proposal";
+    } else {
       res.status(404).json({ error: "Process not found" });
       return;
     }
 
     const user = getAuthUser(res);
     const input = await submitInput(processId, user.id, body, {
-      hub_id: process.hubId,
-      jurisdiction: process.jurisdiction,
+      hub_id: hubId,
+      jurisdiction,
       emit: emitEvent,
-    });
+    }, phase);
     res.status(201).json(input);
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
@@ -83,11 +118,23 @@ export async function handleGetInputs(
   const processId = req.params.id as string;
   try {
     const process = await getProcess(processId);
-    if (!process) {
+    if (!process && !(await proposalExists(processId))) {
       res.status(404).json({ error: "Process not found" });
       return;
     }
-    const inputs = await getInputsByProcess(processId);
+
+    let inputs = await getInputsByProcess(processId);
+
+    // If this is a vote that was converted from a proposal, merge in
+    // the proposal-phase comments so they carry forward.
+    if (process) {
+      const sourceProposalId = await getSourceProposalId(processId);
+      if (sourceProposalId) {
+        const proposalInputs = await getInputsByProcess(sourceProposalId);
+        inputs = [...inputs, ...proposalInputs];
+      }
+    }
+
     const isAdmin = await callerIsAdmin(req);
     res.json(isAdmin ? inputs : inputs.map(redactForPublic));
   } catch (err) {

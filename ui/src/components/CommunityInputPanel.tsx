@@ -119,11 +119,18 @@ export default function CommunityInputPanel({ processId, config }: Props) {
           {inputs.length} comment{inputs.length !== 1 ? "s" : ""}
         </p>
         {error && <p className="form-error">{error}</p>}
-        {inputs.map((input) => {
+        {inputs.map((input, idx) => {
+          const prevPhase = idx > 0 ? inputs[idx - 1].phase : null;
+          const showPhaseDivider =
+            input.phase === "proposal" &&
+            prevPhase === "vote";
           const hidden = !!input.moderation?.hidden;
           return (
+            <div key={input.id}>
+            {showPhaseDivider && (
+              <p className="input-phase-divider">Carried over from the proposal</p>
+            )}
             <div
-              key={input.id}
               className={`input-item${hidden ? " input-item-hidden" : ""}`}
             >
               {hidden ? (
@@ -180,6 +187,7 @@ export default function CommunityInputPanel({ processId, config }: Props) {
                   </>
                 )}
               </span>
+            </div>
             </div>
           );
         })}

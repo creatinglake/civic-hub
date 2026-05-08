@@ -3,12 +3,15 @@
 // Community input is stored independently from votes.
 // It is not used in vote tallying or lifecycle transitions.
 
+export type CommentPhase = "proposal" | "vote";
+
 export interface CommunityInput {
   id: string;
   process_id: string;
   author_id: string;
   body: string;
   submitted_at: string; // ISO 8601
+  phase: CommentPhase | null;
   /**
    * Slice 11 — moderation state. Null when the comment has never been
    * moderated. When `hidden` is true, public read-models redact `body`

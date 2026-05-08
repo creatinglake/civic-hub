@@ -5,6 +5,8 @@ import { useAuth } from "../context/AuthContext";
 import { useRequireAuth } from "../hooks/useRequireAuth";
 import AuthModal from "../components/AuthModal";
 import ShareButton from "../components/ShareButton";
+import CommunityInputPanel from "../components/CommunityInputPanel";
+import ProposalCommentForm from "../components/ProposalCommentForm";
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString("en-US", {
@@ -42,6 +44,7 @@ export default function ProposalDetail() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [endorsing, setEndorsing] = useState(false);
+  const [commentRefresh, setCommentRefresh] = useState(0);
 
   const currentActor = actorId ?? "anonymous";
 
@@ -203,6 +206,19 @@ export default function ProposalDetail() {
           </ul>
         </div>
       )}
+
+      {/* Comments — form only for active proposals; read-only list always shown */}
+      {(proposal.status === "submitted" || proposal.status === "endorsed") && (
+        <ProposalCommentForm
+          proposalId={proposal.id}
+          onCommentAdded={() => setCommentRefresh((n) => n + 1)}
+        />
+      )}
+      <CommunityInputPanel
+        key={commentRefresh}
+        processId={proposal.id}
+        config={{ label: "Community discussion on this proposal." }}
+      />
     </div>
   );
 }
