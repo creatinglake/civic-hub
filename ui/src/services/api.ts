@@ -142,6 +142,7 @@ export interface VoteState {
   tally: Record<string, number> | null;
   total_votes: number | null;
   has_voted: boolean | null;
+  your_current_vote: string | null;
   has_supported: boolean | null;
   support_count: number;
   support_threshold: number;

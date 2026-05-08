@@ -273,6 +273,14 @@ export async function submitVote(
   }
 
   const previous_vote = state.votes[actor] ?? null;
+
+  // No-op: re-submitting the same choice is treated as a confirmation,
+  // not a state change. Skip the event so the audit log doesn't fill
+  // with redundant entries when residents click their current option.
+  if (previous_vote === option) {
+    return { state, result: { option, previous_vote, unchanged: true } };
+  }
+
   state.votes[actor] = option;
 
   await emitVoteSubmitted(ctx, actor, option, previous_vote);
@@ -355,6 +363,7 @@ export function getReadModel(
   const tally = computeTally(state.votes, state.options);
   const hasVoted = actor ? actor in state.votes : null;
   const hasSupported = actor ? actor in state.supporters : null;
+  const yourCurrentVote = actor ? state.votes[actor] ?? null : null;
 
   // Results visible after voting, when closed, or when finalized
   const showResults =
@@ -372,6 +381,7 @@ export function getReadModel(
     tally: showResults ? tally.tally : null,
     total_votes: showResults ? tally.total_votes : null,
     has_voted: hasVoted,
+    your_current_vote: yourCurrentVote,
     has_supported: hasSupported,
     support_count: state.support_count,
     support_threshold: state.config.support_threshold,

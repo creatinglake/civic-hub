@@ -19,7 +19,10 @@ import {
   getSummary,
   type VoteProcessState,
 } from "../modules/civic.vote/index.js";
-import { recordVote } from "../modules/civic.receipts/index.js";
+import {
+  recordOrUpdateVote,
+  clearActiveVoteKeysForProcess,
+} from "../modules/civic.receipts/index.js";
 import type { VoteResultsProcessState } from "../modules/civic.vote_results/index.js";
 import { emitVoteResultsAggregationCompleted } from "../modules/civic.vote_results/events.js";
 import { getInputsByProcess } from "../modules/civic.input/index.js";
@@ -188,16 +191,35 @@ const voteProcess: ProcessHandler = {
         const outcome = await submitVote(state, action.actor, option, ctx);
         syncStatus(process, outcome.state);
 
-        // Generate anonymous receipt — receipt_id is NOT stored with user_id
-        const receipt = await recordVote(process.id, action.actor, option);
+        // Same-option re-submit short-circuits in the lifecycle module —
+        // no receipt churn needed. Look up the existing receipt so the
+        // UI can echo it back unchanged.
+        if (outcome.result.unchanged) {
+          result = { ...outcome.result };
+          break;
+        }
 
-        result = { ...outcome.result, receipt_id: receipt.receipt_id };
+        // Record (or update) the user's receipt. receipt_id stays stable
+        // across changes so a previously-shown receipt always verifies
+        // to the current choice.
+        const receipt = await recordOrUpdateVote(process.id, action.actor, option);
+
+        result = {
+          ...outcome.result,
+          receipt_id: receipt.receipt_id,
+          vote_updated: receipt.updated,
+        };
         break;
       }
       case "process.close": {
         const outcome = await closeVote(state, action.actor, ctx);
         syncStatus(process, outcome.state);
         result = outcome.result;
+
+        // Drop the user_id ↔ receipt_id bridge so the post-close
+        // snapshot retains the strict separation between
+        // vote_participation and vote_records.
+        await clearActiveVoteKeysForProcess(process.id);
 
         // If civic.vote_results is registered, spawn a vote-results
         // record from the now-closed vote. Hubs that don't register

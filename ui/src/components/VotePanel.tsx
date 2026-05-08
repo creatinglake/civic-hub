@@ -17,6 +17,7 @@ export default function VotePanel({ process, actor, onVoted }: Props) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [justVoted, setJustVoted] = useState<string | null>(null);
+  const [voteWasUpdated, setVoteWasUpdated] = useState(false);
   const [receiptId, setReceiptId] = useState<string | null>(null);
   const [comment, setComment] = useState("");
   const [commentSubmitted, setCommentSubmitted] = useState(false);
@@ -35,8 +36,11 @@ export default function VotePanel({ process, actor, onVoted }: Props) {
     setCommentWarning(null);
     try {
       const result = await submitVote(process.id, actor, option);
-      const receipt = (result.result as Record<string, unknown>)?.receipt_id as string | undefined;
+      const resultPayload = result.result as Record<string, unknown>;
+      const receipt = resultPayload?.receipt_id as string | undefined;
+      const updated = resultPayload?.vote_updated === true;
       setJustVoted(option);
+      setVoteWasUpdated(updated);
       if (receipt) setReceiptId(receipt);
 
       // If the resident also typed a comment, submit it after the vote
@@ -162,12 +166,23 @@ export default function VotePanel({ process, actor, onVoted }: Props) {
       )}
 
       {/* Active voting */}
-      {isActive && (
-        <div className="vote-options">
-          <h4>Cast your vote</h4>
-          <p className="vote-privacy-notice">Votes are private. Only total results are shown.</p>
+      {isActive && (() => {
+        // The user's current choice — local optimistic state takes
+        // precedence so the UI updates immediately on click; falls back
+        // to the server-side read model.
+        const currentVote = justVoted ?? process.your_current_vote;
+        const hasExistingVote = currentVote !== null;
 
-          {!justVoted && (
+        return (
+        <div className="vote-options">
+          <h4>{hasExistingVote ? "Your vote" : "Cast your vote"}</h4>
+          <p className="vote-privacy-notice">
+            {hasExistingVote
+              ? "You can change your vote at any time before voting closes. Votes are private — only totals are shown."
+              : "Votes are private. Only total results are shown."}
+          </p>
+
+          {!hasExistingVote && (
             <div className="vote-comment-field">
               <label className="vote-comment-label" htmlFor="vote-comment">
                 Your comment <span className="vote-comment-optional">(optional)</span>
@@ -192,7 +207,7 @@ export default function VotePanel({ process, actor, onVoted }: Props) {
             {process.options.map((option) => (
               <button
                 key={option}
-                className={`vote-button ${justVoted === option ? "voted" : ""}`}
+                className={`vote-button ${currentVote === option ? "voted" : ""}`}
                 onClick={() => handleVote(option)}
                 disabled={loading}
               >
@@ -205,12 +220,19 @@ export default function VotePanel({ process, actor, onVoted }: Props) {
               Your vote and comment have been submitted.
             </p>
           )}
+          {justVoted && voteWasUpdated && (
+            <p className="vote-confirmation">
+              Your vote has been updated.
+            </p>
+          )}
           {commentWarning && (
             <p className="vote-comment-warning">{commentWarning}</p>
           )}
-          {justVoted && (
+          {hasExistingVote && (
             <div className="vote-receipt">
-              <p className="vote-receipt-title">Your vote has been recorded</p>
+              <p className="vote-receipt-title">
+                {voteWasUpdated ? "Your vote has been updated" : "Your vote has been recorded"}
+              </p>
               <p className="vote-receipt-explanation">
                 This is your anonymous vote receipt. You can use it to verify that
                 your vote was included in the final results. Your identity is not
@@ -231,7 +253,8 @@ export default function VotePanel({ process, actor, onVoted }: Props) {
           )}
           {error && <p className="error">{error}</p>}
         </div>
-      )}
+        );
+      })()}
 
       {/* Closed / finalized voting */}
       {isDone && (

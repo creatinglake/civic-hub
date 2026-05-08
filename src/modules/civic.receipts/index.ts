@@ -1,16 +1,27 @@
 // civic.receipts module — anonymous vote receipt service
 //
-// Strict data separation:
+// Data layout:
 //   vote_records       — receipt_id → { process_id, choice, created_at }
 //                        NO user_id. EVER.
 //   vote_participation — (user_id, process_id) → has_voted
 //                        NO receipt_id. EVER.
+//   active_vote_keys   — (user_id, process_id) → receipt_id
+//                        TRANSIENT. Populated only while a vote is active;
+//                        cleared row-by-row on closeVote so the post-close
+//                        snapshot retains the strict vote_records ↔
+//                        vote_participation separation.
 //
-// The separation is enforced at the database level: the two tables
-// share no join key, and no foreign key links them. See schema migration 001.
+// Trust model:
+//   While a vote is open, active_vote_keys lets the server map a
+//   re-voting user back to their existing receipt so vote-changing is
+//   possible. Once the vote closes, those keys are deleted and no
+//   persisted row links user_id ↔ receipt_id ↔ choice. This matches the
+//   paper-ballot mental model: ballots can be changed before the box
+//   closes; once closed, only counted ballots remain.
 //
-// GUARDRAIL: This module MUST NOT store receipt_id alongside user_id in any
-// table, cache, log, or returned payload.
+// GUARDRAIL: vote_records and vote_participation MUST NOT acquire a
+// shared join key. active_vote_keys is the ONLY bridge, and only during
+// the active window.
 
 import crypto from "crypto";
 import { getDb } from "../../db/client.js";
@@ -25,26 +36,36 @@ function generateReceiptId(): string {
 // --- Public API ------------------------------------------------------------
 
 /**
- * Record a vote with an anonymous receipt.
+ * Record a new vote OR update an existing one, returning the user's
+ * (stable) receipt for this process.
  *
- * Order of operations is chosen to fail closed under DB errors:
- *   1. Insert participation first. The composite primary key (user_id,
- *      process_id) atomically rejects duplicate votes.
- *   2. Insert the vote record with a fresh UUID receipt.
- *   3. If step 2 fails, best-effort roll back step 1 so the user can retry.
+ * Branches:
+ *   First-time vote:
+ *     1. Insert participation (PK = user_id+process_id) — atomic dup
+ *        guard.
+ *     2. Insert vote_record with fresh UUID receipt — no user_id.
+ *     3. Insert active_vote_keys row mapping user → receipt for the
+ *        active window.
+ *     If step 2 or 3 fails, best-effort roll back step 1 (and 2) so the
+ *     user can retry without losing their slot.
  *
- * Worst case (both steps succeed on retry after partial failure): the user
- * loses a vote once. This is strictly better than the alternative ordering,
- * where a DB glitch could allow double-voting.
+ *   Re-vote (participation insert hits 23505):
+ *     1. Look up the existing receipt via active_vote_keys.
+ *     2. UPDATE vote_records.choice — receipt_id stays stable so any
+ *        previously-shown receipt still verifies to the user's current
+ *        choice.
+ *     If active_vote_keys has no row (closed vote, or closed-and-
+ *     reopened legacy data), surface the original "already voted"
+ *     error rather than silently failing.
  */
-export async function recordVote(
+export async function recordOrUpdateVote(
   processId: string,
   userId: string,
   choice: string,
-): Promise<{ receipt_id: string }> {
+): Promise<{ receipt_id: string; updated: boolean }> {
   const db = getDb();
 
-  // 1) Reserve participation. PK collision = already voted.
+  // Try to reserve participation. PK collision = re-vote path.
   const { error: partErr } = await db.from("vote_participation").insert({
     user_id: userId,
     process_id: processId,
@@ -53,13 +74,36 @@ export async function recordVote(
 
   if (partErr) {
     if (partErr.code === "23505") {
-      throw new Error("You have already voted on this process");
+      // Re-vote: look up the user's existing receipt and update its choice.
+      const { data: keyRow, error: keyErr } = await db
+        .from("active_vote_keys")
+        .select("receipt_id")
+        .eq("user_id", userId)
+        .eq("process_id", processId)
+        .maybeSingle();
+
+      if (keyErr) throw new Error(`Receipts: ${keyErr.message}`);
+      if (!keyRow) {
+        // No active key — either the vote closed, or this user voted
+        // before active_vote_keys existed. Either way, refuse the change.
+        throw new Error("You have already voted on this process");
+      }
+
+      const { error: updateErr } = await db
+        .from("vote_records")
+        .update({ choice })
+        .eq("receipt_id", keyRow.receipt_id);
+
+      if (updateErr) throw new Error(`Receipts: ${updateErr.message}`);
+
+      return { receipt_id: keyRow.receipt_id, updated: true };
     }
     throw new Error(`Receipts: ${partErr.message}`);
   }
 
-  // 2) Store the vote record — NO user_id.
+  // First-time vote.
   const receipt_id = generateReceiptId();
+
   const { error: voteErr } = await db.from("vote_records").insert({
     receipt_id,
     process_id: processId,
@@ -67,7 +111,6 @@ export async function recordVote(
   });
 
   if (voteErr) {
-    // Best-effort rollback of participation so the user can retry.
     await db
       .from("vote_participation")
       .delete()
@@ -76,6 +119,52 @@ export async function recordVote(
     throw new Error(`Receipts: ${voteErr.message}`);
   }
 
+  const { error: keyInsertErr } = await db.from("active_vote_keys").insert({
+    user_id: userId,
+    process_id: processId,
+    receipt_id,
+  });
+
+  if (keyInsertErr) {
+    // Roll back both prior writes so the user can retry cleanly.
+    await db.from("vote_records").delete().eq("receipt_id", receipt_id);
+    await db
+      .from("vote_participation")
+      .delete()
+      .eq("user_id", userId)
+      .eq("process_id", processId);
+    throw new Error(`Receipts: ${keyInsertErr.message}`);
+  }
+
+  return { receipt_id, updated: false };
+}
+
+/**
+ * Drop every active_vote_key row for a process. Called by the vote
+ * lifecycle on closeVote so the post-close snapshot retains no
+ * user_id ↔ receipt_id linkage.
+ */
+export async function clearActiveVoteKeysForProcess(
+  processId: string,
+): Promise<void> {
+  const { error } = await getDb()
+    .from("active_vote_keys")
+    .delete()
+    .eq("process_id", processId);
+  if (error) throw new Error(`Receipts: ${error.message}`);
+}
+
+/**
+ * @deprecated Use `recordOrUpdateVote`. Kept as a thin alias so any
+ * external callers still compile during the slice rollout. New code
+ * should use the explicit name.
+ */
+export async function recordVote(
+  processId: string,
+  userId: string,
+  choice: string,
+): Promise<{ receipt_id: string }> {
+  const { receipt_id } = await recordOrUpdateVote(processId, userId, choice);
   return { receipt_id };
 }
 
@@ -155,4 +244,6 @@ export async function clearReceipts(): Promise<void> {
   if (a.error) throw new Error(`Receipts: ${a.error.message}`);
   const b = await db.from("vote_participation").delete().neq("user_id", "");
   if (b.error) throw new Error(`Receipts: ${b.error.message}`);
+  const c = await db.from("active_vote_keys").delete().neq("user_id", "");
+  if (c.error) throw new Error(`Receipts: ${c.error.message}`);
 }
