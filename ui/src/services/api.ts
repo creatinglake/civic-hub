@@ -58,7 +58,7 @@ export interface ContentLink {
 }
 
 export interface CommunityInputConfig {
-  prompt: string;
+  prompt?: string;
   label: string;
 }
 
