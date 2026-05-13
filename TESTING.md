@@ -46,7 +46,7 @@ Hit the Express backend directly via fetch, no browser. Fast, high coverage.
 - **Run:** `npm run test`
 - **Config:** `civic-hub/vitest.config.ts`
 - **Helpers:** `civic-hub/tests/fixtures/helpers.ts`
-- **Covers:** process CRUD, event feed, auth flow, proposals, search, health/discovery
+- **Covers:** process CRUD, event feed, auth flow, proposals, search, health/discovery, cron endpoints
 
 ### E2E User Flow Tests (Playwright)
 Open the real UI in Chromium and simulate resident interactions.
@@ -137,6 +137,12 @@ Each row tracks a user flow, which layer covers it, and which slice introduced i
 | GET /search?q=X returns results | :white_check_mark: | — | search.test.ts |
 | GET /search?q=nonexistent returns empty | :white_check_mark: | — | search.test.ts |
 | Search results include process metadata | :white_check_mark: | — | search.test.ts |
+| Cron: floyd-news-sync accepts GET, rejects POST | :white_check_mark: | — | crons.test.ts |
+| Cron: digest accepts GET, rejects POST | :white_check_mark: | — | crons.test.ts |
+| Cron: meeting-summary accepts GET, rejects POST | :white_check_mark: | — | crons.test.ts |
+| Cron: admin-digest accepts GET, rejects POST | :white_check_mark: | — | crons.test.ts |
+| Cron: missing auth returns 401 | :white_check_mark: | — | crons.test.ts |
+| Cron: wrong auth returns 401 | :white_check_mark: | — | crons.test.ts |
 | Process lifecycle: draft -> active -> closed -> finalized | | — | Needs test |
 | Process registry dispatches to correct handler | | — | Needs test |
 
@@ -164,4 +170,4 @@ The goal: before any push to `main`, every row in this table should have at leas
 
 ---
 
-*Last updated: 2026-05-12*
+*Last updated: 2026-05-13*
