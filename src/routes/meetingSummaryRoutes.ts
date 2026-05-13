@@ -15,7 +15,7 @@ import {
 } from "../controllers/meetingSummaryController.js";
 
 export const meetingSummaryCronRouter = Router();
-meetingSummaryCronRouter.post("/meeting-summary/run", handleRunMeetingSummary);
+meetingSummaryCronRouter.get("/meeting-summary/run", handleRunMeetingSummary);
 
 const publicRouter = Router();
 publicRouter.get("/:id", handleGetPublicMeetingSummary);

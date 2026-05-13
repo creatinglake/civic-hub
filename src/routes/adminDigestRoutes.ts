@@ -9,4 +9,4 @@ import { Router } from "express";
 import { handleRunAdminDigest } from "../controllers/adminDigestController.js";
 
 export const adminDigestCronRouter = Router();
-adminDigestCronRouter.post("/admin-digest/run", handleRunAdminDigest);
+adminDigestCronRouter.get("/admin-digest/run", handleRunAdminDigest);

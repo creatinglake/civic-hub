@@ -16,7 +16,7 @@ import {
 import { requireAuth } from "../middleware/auth.js";
 
 export const digestCronRouter = Router();
-digestCronRouter.post("/digest/run", handleRunDigest);
+digestCronRouter.get("/digest/run", handleRunDigest);
 
 export const digestUnsubscribeRouter = Router();
 digestUnsubscribeRouter.get("/digest", handleUnsubscribeDigest);

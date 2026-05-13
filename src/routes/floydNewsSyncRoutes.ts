@@ -9,7 +9,7 @@ import { Router } from "express";
 import { handleRunFloydNewsSync } from "../controllers/floydNewsSyncController.js";
 
 export const floydNewsSyncCronRouter = Router();
-floydNewsSyncCronRouter.post(
+floydNewsSyncCronRouter.get(
   "/floyd-news-sync/run",
   handleRunFloydNewsSync,
 );
