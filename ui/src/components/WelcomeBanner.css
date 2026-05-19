@@ -1,27 +1,70 @@
+/* WelcomeBanner — card-style CTA matching the suggest-vote-cta pattern.
+   Uses the same color tokens (pill-vote-bg / pill-vote-fg) so both cards
+   feel like siblings even though they live on different pages. */
+
 .welcome-banner {
+  max-width: var(--max-width-shell);
+  margin: 0 auto;
+  padding: var(--space-md) var(--space-md) 0;
+}
+
+.welcome-banner-inner {
+  background: var(--pill-vote-bg, #e3eaf6);
+  border: 1px solid var(--pill-vote-fg, #1e3a5f);
+  border-radius: var(--radius-md, 12px);
+  padding: var(--space-lg);
   display: flex;
-  align-items: center;
-  justify-content: center;
+  align-items: flex-start;
+  gap: var(--space-md);
+}
+
+.welcome-banner-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
   gap: var(--space-sm);
-  padding: var(--space-xs) var(--space-md);
-  background: var(--color-surface-muted, #f3f4f6);
-  border-bottom: 1px solid var(--color-border, #e5e7eb);
+}
+
+.welcome-banner-title {
+  font-family: var(--font-heading);
+  font-size: var(--font-size-xl);
+  margin: 0;
+  color: var(--pill-vote-fg, #1e3a5f);
+  line-height: var(--line-height-tight);
+}
+
+.welcome-banner-body {
+  margin: 0;
   font-size: var(--font-size-sm);
-  color: var(--color-text, #1f2937);
+  color: var(--color-text);
+  line-height: var(--line-height-normal);
 }
 
-.welcome-banner-text {
-  text-align: center;
-}
-
-.welcome-banner-link {
-  color: var(--color-link, #1e3a5f);
-  font-weight: 600;
+.welcome-banner-button {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: var(--space-sm) var(--space-md);
+  border-radius: var(--radius-pill);
+  background: var(--pill-vote-fg, #1e3a5f);
+  color: #ffffff;
   text-decoration: none;
+  font-family: var(--font-body);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  white-space: nowrap;
+  transition: background 0.15s ease, transform 0.05s ease;
 }
-
-.welcome-banner-link:hover {
-  text-decoration: underline;
+.welcome-banner-button:hover {
+  background: var(--color-primary-hover, #14304a);
+}
+.welcome-banner-button:active {
+  transform: translateY(1px);
+}
+.welcome-banner-button:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
 }
 
 .welcome-banner-dismiss {
@@ -29,14 +72,21 @@
   background: none;
   border: none;
   cursor: pointer;
-  font-size: 1.1rem;
+  font-size: 1.25rem;
   line-height: 1;
-  padding: 2px 6px;
-  color: var(--color-text-muted, #6b7280);
+  padding: 4px 8px;
+  color: var(--pill-vote-fg, #1e3a5f);
   border-radius: var(--radius-sm, 4px);
+  opacity: 0.6;
+  transition: opacity 0.15s ease;
+}
+.welcome-banner-dismiss:hover {
+  opacity: 1;
 }
 
-.welcome-banner-dismiss:hover {
-  background: var(--color-border, #e5e7eb);
-  color: var(--color-text, #1f2937);
+@media (max-width: 600px) {
+  .welcome-banner-button {
+    align-self: stretch;
+    justify-content: center;
+  }
 }

@@ -31,21 +31,29 @@ export default function WelcomeBanner() {
   }
 
   return (
-    <div className="welcome-banner">
-      <span className="welcome-banner-text">
-        New to the Floyd Civic Hub?{" "}
-        <Link to="/welcome" className="welcome-banner-link">
-          Read a short introduction &rarr;
-        </Link>
-      </span>
-      <button
-        type="button"
-        className="welcome-banner-dismiss"
-        aria-label="Dismiss welcome banner"
-        onClick={handleDismiss}
-      >
-        &times;
-      </button>
-    </div>
+    <section className="welcome-banner">
+      <div className="welcome-banner-inner">
+        <div className="welcome-banner-content">
+          <h2 className="welcome-banner-title">
+            New to the Floyd Civic Hub?
+          </h2>
+          <p className="welcome-banner-body">
+            Learn what this site is, how it works, and how you can
+            participate in Floyd County civic life.
+          </p>
+          <Link to="/welcome" className="welcome-banner-button">
+            Learn more
+          </Link>
+        </div>
+        <button
+          type="button"
+          className="welcome-banner-dismiss"
+          aria-label="Dismiss welcome banner"
+          onClick={handleDismiss}
+        >
+          &times;
+        </button>
+      </div>
+    </section>
   );
 }
