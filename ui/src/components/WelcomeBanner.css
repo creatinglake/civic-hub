@@ -72,16 +72,17 @@
   background: none;
   border: none;
   cursor: pointer;
-  font-size: 1.25rem;
+  font-family: var(--font-body);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
   line-height: 1;
-  padding: 4px 8px;
-  color: var(--pill-vote-fg, #1e3a5f);
+  padding: 6px 10px;
+  color: var(--color-danger, #dc2626);
   border-radius: var(--radius-sm, 4px);
-  opacity: 0.6;
-  transition: opacity 0.15s ease;
+  transition: background 0.15s ease;
 }
 .welcome-banner-dismiss:hover {
-  opacity: 1;
+  background: rgba(220, 38, 38, 0.08);
 }
 
 @media (max-width: 600px) {

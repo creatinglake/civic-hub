@@ -48,10 +48,9 @@ export default function WelcomeBanner() {
         <button
           type="button"
           className="welcome-banner-dismiss"
-          aria-label="Dismiss welcome banner"
           onClick={handleDismiss}
         >
-          &times;
+          Dismiss &times;
         </button>
       </div>
     </section>
