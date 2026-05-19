@@ -7,7 +7,7 @@
   padding: 0;
   background: transparent;
   max-width: 480px;
-  width: calc(100% - var(--space-lg));
+  width: calc(100% - var(--space-xl) * 2);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-popover);
 }
