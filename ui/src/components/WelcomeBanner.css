@@ -1,0 +1,42 @@
+.welcome-banner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-sm);
+  padding: var(--space-xs) var(--space-md);
+  background: var(--color-surface-muted, #f3f4f6);
+  border-bottom: 1px solid var(--color-border, #e5e7eb);
+  font-size: var(--font-size-sm);
+  color: var(--color-text, #1f2937);
+}
+
+.welcome-banner-text {
+  text-align: center;
+}
+
+.welcome-banner-link {
+  color: var(--color-link, #1e3a5f);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.welcome-banner-link:hover {
+  text-decoration: underline;
+}
+
+.welcome-banner-dismiss {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1.1rem;
+  line-height: 1;
+  padding: 2px 6px;
+  color: var(--color-text-muted, #6b7280);
+  border-radius: var(--radius-sm, 4px);
+}
+
+.welcome-banner-dismiss:hover {
+  background: var(--color-border, #e5e7eb);
+  color: var(--color-text, #1f2937);
+}

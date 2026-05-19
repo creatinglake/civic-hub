@@ -64,7 +64,7 @@ export default function IntroPopup({ onDismiss }: Props) {
 
   function handleLearnMore() {
     handleDismiss();
-    navigate("/about");
+    navigate("/welcome");
   }
 
   // Backdrop click dismisses. Native <dialog> reports the click target

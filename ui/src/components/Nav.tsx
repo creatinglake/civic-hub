@@ -15,6 +15,7 @@ const TOP_LINKS: ReadonlyArray<{ to: string; label: string; end?: boolean }> = [
 const DRAWER_LINKS: ReadonlyArray<{ to: string; label: string; end?: boolean }> = [
   { to: "/", label: "Feed", end: true },
   { to: "/votes", label: "Votes" },
+  { to: "/welcome", label: "Welcome" },
   { to: "/about", label: "About" },
 ];
 

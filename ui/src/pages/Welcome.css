@@ -1,0 +1,31 @@
+.welcome-page .legal-prose h1 {
+  color: var(--color-link, #1e3a5f);
+}
+
+.welcome-utility-top {
+  margin-bottom: var(--space-md);
+}
+
+.welcome-pdf-link {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted, #6b7280);
+  text-decoration: none;
+}
+
+.welcome-pdf-link:hover {
+  color: var(--color-link, #1e3a5f);
+  text-decoration: underline;
+}
+
+.welcome-utility-bottom {
+  margin-top: var(--space-xl);
+  padding-top: var(--space-md);
+  border-top: 1px solid var(--color-border, #e5e7eb);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted, #6b7280);
+}
+
+.welcome-utility-bottom a {
+  color: var(--color-link, #1e3a5f);
+  text-decoration: underline;
+}

@@ -25,6 +25,7 @@ import Privacy from "./pages/Privacy";
 import Terms from "./pages/Terms";
 import CodeOfConduct from "./pages/CodeOfConduct";
 import Feedback from "./pages/Feedback";
+import Welcome from "./pages/Welcome";
 import AdminModeration from "./pages/AdminModeration";
 import IntroPopup, { hasSeenIntro } from "./components/IntroPopup";
 import ReAcceptModal from "./components/ReAcceptModal";
@@ -107,6 +108,7 @@ function AppContent() {
           {/* Slice 14 — operator-facing feedback form. Open to anonymous
               and signed-in users; submissions persist to the
               feedback_submissions table and best-effort email the operator. */}
+          <Route path="/welcome" element={<Welcome />} />
           <Route path="/feedback" element={<Feedback />} />
           {/* Slice 11 — admin moderation log. Read-only list of every
               moderation action, gated server-side via requireAdmin

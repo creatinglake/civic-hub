@@ -1,4 +1,5 @@
 import HubInfo from "../components/HubInfo";
+import WelcomeBanner from "../components/WelcomeBanner";
 import Feed from "../components/Feed";
 import FeedFilter, {
   useFeedFilter,
@@ -13,6 +14,7 @@ export default function Home() {
   return (
     <div className="page page-home">
       <HubInfo />
+      <WelcomeBanner />
       {/* Slice 12.1 — primary tabs between the chronological Feed and
           the action-oriented Votes page. Persistent across both routes
           so the user always knows the toggle is there. The
