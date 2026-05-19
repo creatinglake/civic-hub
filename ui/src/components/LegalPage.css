@@ -7,8 +7,9 @@
 
 .legal-page {
   /* Match the prose width to the standard reading-width recommendation.
-     The .page wrapper already centers and adds horizontal padding. */
+     Horizontal padding matches the detail-page pattern (1.5rem). */
   max-width: 70ch;
+  padding: var(--space-lg) var(--space-md);
 }
 
 .legal-prose {
