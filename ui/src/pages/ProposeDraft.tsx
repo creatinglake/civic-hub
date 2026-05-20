@@ -20,6 +20,16 @@ import "./ProposeDraft.css";
 
 type Step = "category" | "path" | "drafting";
 
+function friendlyError(msg: string): string {
+  if (msg.includes("rate_limit") || msg.includes("429"))
+    return "The assistant is getting too many requests right now. Wait a moment and try again.";
+  if (msg.includes("ANTHROPIC_API_KEY"))
+    return "The assistant isn't configured yet. Please contact the hub admin.";
+  if (msg.includes("timeout") || msg.includes("aborted"))
+    return "The assistant took too long to respond. Try again with a shorter message.";
+  return "Something went wrong with the assistant. Try again in a moment.";
+}
+
 export default function ProposeDraft() {
   const navigate = useNavigate();
   const { canParticipate } = useAuth();
@@ -113,7 +123,11 @@ export default function ProposeDraft() {
           setPhase("free_form");
         }
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to send message");
+        const msg = err instanceof Error ? err.message : "Unknown error";
+        setMessages((prev) => [
+          ...prev,
+          { role: "assistant", content: friendlyError(msg) },
+        ]);
       } finally {
         setLoading(false);
       }
@@ -140,7 +154,11 @@ export default function ProposeDraft() {
         },
       ]);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Review failed");
+      const msg = err instanceof Error ? err.message : "Unknown error";
+      setMessages((prev) => [
+        ...prev,
+        { role: "assistant", content: friendlyError(msg) },
+      ]);
     } finally {
       setLoading(false);
     }
