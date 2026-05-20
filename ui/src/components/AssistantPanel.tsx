@@ -98,7 +98,13 @@ export default function AssistantPanel({
         ))}
         {loading && (
           <div className="assistant-msg msg-assistant">
-            <div className="msg-content msg-loading">Thinking...</div>
+            <div className="msg-content msg-loading">
+              <span className="thinking-dots">
+                <span className="dot" />
+                <span className="dot" />
+                <span className="dot" />
+              </span>
+            </div>
           </div>
         )}
         <div ref={messagesEndRef} />
