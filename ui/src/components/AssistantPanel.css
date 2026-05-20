@@ -119,6 +119,8 @@
   padding: var(--space-sm) var(--space-md);
   font-size: var(--font-size-sm);
   background: var(--color-surface);
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
 
 .suggestion-hard {
