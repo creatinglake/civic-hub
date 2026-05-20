@@ -44,11 +44,27 @@ export async function callAssistant(
   return parseAssistantResponse(result.text);
 }
 
+function cleanMessage(raw: string): string {
+  return raw
+    .replace(/\\n/g, "\n")
+    .replace(/\\"/g, '"')
+    .trim();
+}
+
+function extractFallbackMessage(text: string): string {
+  const msgMatch = text.match(/"message"\s*:\s*"((?:[^"\\]|\\.)*)"/);
+  if (msgMatch) return cleanMessage(msgMatch[1]);
+  return text.replace(/```json\s*/g, "").replace(/```\s*/g, "").replace(/\{[\s\S]*\}/, "").trim()
+    || "I'm here to help — could you rephrase that?";
+}
+
 function parseAssistantResponse(text: string): AssistantResponse {
-  const jsonMatch = text.match(/\{[\s\S]*\}/);
+  const stripped = text.replace(/```json\s*/g, "").replace(/```\s*/g, "").trim();
+
+  const jsonMatch = stripped.match(/\{[\s\S]*\}/);
   if (!jsonMatch) {
     return {
-      message: text,
+      message: stripped,
       suggestions: [],
       draft_proposal: null,
     };
@@ -58,8 +74,8 @@ function parseAssistantResponse(text: string): AssistantResponse {
     const parsed = JSON.parse(jsonMatch[0]);
 
     const message: string = typeof parsed.message === "string"
-      ? parsed.message
-      : text;
+      ? cleanMessage(parsed.message)
+      : extractFallbackMessage(text);
 
     const suggestions: Suggestion[] = Array.isArray(parsed.suggestions)
       ? parsed.suggestions
@@ -88,7 +104,7 @@ function parseAssistantResponse(text: string): AssistantResponse {
     return { message, suggestions, draft_proposal };
   } catch {
     return {
-      message: text,
+      message: extractFallbackMessage(text),
       suggestions: [],
       draft_proposal: null,
     };
