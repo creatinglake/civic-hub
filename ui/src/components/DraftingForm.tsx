@@ -49,25 +49,25 @@ function getStatusText(draft: ProposalDraft): string {
     const missing: string[] = [];
     if (!draft.category) missing.push("category");
     if (!draft.title.trim()) missing.push("title");
-    return `${missing.length} required field${missing.length > 1 ? "s" : ""} missing`;
+    return `Status: ${missing.length} required field${missing.length > 1 ? "s" : ""} missing`;
   }
 
   if (draft.last_review_result === null) {
-    return "Review my draft when you're ready";
+    return "Status: Click Review draft to prepare for submission";
   }
 
   if (draft.draft_modified_since_review) {
-    return "Draft has changed — Review my draft to update status";
+    return "Status: Draft changed — click Review draft before submitting";
   }
 
   const hardBlocks = (draft.last_review_result ?? []).filter(
     (s) => s.severity === "hard",
   );
   if (hardBlocks.length > 0) {
-    return `${hardBlocks.length} Code of Conduct concern${hardBlocks.length > 1 ? "s" : ""} to resolve`;
+    return `Status: ${hardBlocks.length} Code of Conduct concern${hardBlocks.length > 1 ? "s" : ""} to resolve`;
   }
 
-  return "Ready to submit";
+  return "Status: Ready to submit";
 }
 
 function getStatusClass(draft: ProposalDraft): string {

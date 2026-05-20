@@ -175,9 +175,9 @@
 .draft-review-btn {
   flex: 1;
   padding: var(--space-sm) var(--space-md);
-  background: var(--color-surface);
-  color: var(--color-primary);
-  border: 2px solid var(--color-primary);
+  background: var(--color-primary);
+  color: var(--color-primary-text);
+  border: none;
   border-radius: var(--radius-md);
   font-size: var(--font-size-sm);
   font-weight: 600;
@@ -186,7 +186,7 @@
 }
 
 .draft-review-btn:hover:not(:disabled) {
-  background: var(--pill-vote-bg);
+  background: var(--color-primary-hover);
 }
 
 .draft-review-btn:disabled {

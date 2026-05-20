@@ -2,6 +2,7 @@
 
 .propose-draft-page {
   height: calc(100vh - var(--nav-h, 61px));
+  overflow: hidden;
 }
 
 @media (max-width: 768px) {
