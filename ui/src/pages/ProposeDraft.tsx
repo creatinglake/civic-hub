@@ -33,6 +33,7 @@ export default function ProposeDraft() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showMobileAssistant, setShowMobileAssistant] = useState(false);
+  const [phase, setPhase] = useState<"brainstorm" | "free_form" | "review">("brainstorm");
   const [showConfirm, setShowConfirm] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
@@ -53,6 +54,7 @@ export default function ProposeDraft() {
         setStep("drafting");
 
         if (path === "brainstorm") {
+          setPhase("brainstorm");
           const greeting =
             "Want to think through this together first, or do you want to write your own draft and I'll review it?";
           setMessages([
@@ -92,7 +94,7 @@ export default function ProposeDraft() {
       setError(null);
       setMessages((prev) => [...prev, { role: "user", content: text }]);
       try {
-        const result = await sendAssistantMessage(draft.id, "free_form", text);
+        const result = await sendAssistantMessage(draft.id, phase, text);
         setDraft(result.draft);
         setMessages((prev) => [
           ...prev,
@@ -108,6 +110,7 @@ export default function ProposeDraft() {
 
         if (result.response.draft_proposal) {
           setDraft(result.draft);
+          setPhase("free_form");
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to send message");
@@ -115,7 +118,7 @@ export default function ProposeDraft() {
         setLoading(false);
       }
     },
-    [draft],
+    [draft, phase],
   );
 
   const handleReview = useCallback(async () => {
@@ -340,6 +343,7 @@ export default function ProposeDraft() {
       loading={loading}
       draftModifiedSinceReview={draft.draft_modified_since_review}
       hasReviewed={draft.last_review_result !== null}
+      phase={phase}
     />
   );
 

@@ -18,6 +18,7 @@ interface Props {
   loading: boolean;
   draftModifiedSinceReview: boolean;
   hasReviewed: boolean;
+  phase?: "brainstorm" | "free_form" | "review";
 }
 
 export default function AssistantPanel({
@@ -29,6 +30,7 @@ export default function AssistantPanel({
   loading,
   draftModifiedSinceReview,
   hasReviewed,
+  phase,
 }: Props) {
   const [input, setInput] = useState("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -118,8 +120,8 @@ export default function AssistantPanel({
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Ask a question or request a change..."
-            rows={1}
+            placeholder={phase === "brainstorm" ? "Type your answer here..." : "Ask a question or request a change..."}
+            rows={phase === "brainstorm" ? 3 : 1}
             disabled={loading}
           />
           <button
