@@ -129,7 +129,7 @@ export default function Propose() {
           className="propose-submit-button"
           disabled={submitting || !title.trim()}
         >
-          {submitting ? "Submitting..." : "Submit suggestion"}
+          {submitting ? "Submitting..." : "Submit proposal"}
         </button>
       </form>
     </div>

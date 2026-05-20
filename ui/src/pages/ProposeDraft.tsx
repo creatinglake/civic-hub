@@ -525,7 +525,7 @@ export default function ProposeDraft() {
                 onClick={confirmSubmit}
                 disabled={submitting}
               >
-                {submitting ? "Submitting..." : "Submit suggestion"}
+                {submitting ? "Submitting..." : "Submit proposal"}
               </button>
               <button
                 type="button"

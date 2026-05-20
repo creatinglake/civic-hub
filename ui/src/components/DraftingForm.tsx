@@ -216,7 +216,7 @@ export default function DraftingForm({
             onClick={onSubmit}
             disabled={!canSubmit}
           >
-            Submit suggestion
+            Submit proposal
           </button>
           <button
             type="button"
