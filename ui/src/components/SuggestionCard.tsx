@@ -1,3 +1,4 @@
+import { useState } from "react";
 import type { DraftSuggestion } from "../services/api";
 
 interface Props {
@@ -8,9 +9,15 @@ interface Props {
 
 export default function SuggestionCard({ suggestion, onApply, onDismiss }: Props) {
   const isHard = suggestion.severity === "hard";
+  const [applied, setApplied] = useState(false);
+
+  function handleApply() {
+    if (onApply) onApply();
+    setApplied(true);
+  }
 
   return (
-    <div className={`suggestion-card ${isHard ? "suggestion-hard" : "suggestion-soft"}`}>
+    <div className={`suggestion-card ${isHard ? "suggestion-hard" : "suggestion-soft"}${applied ? " suggestion-applied" : ""}`}>
       <div className="suggestion-header">
         <span className={`suggestion-badge ${isHard ? "badge-hard" : "badge-soft"}`}>
           {isHard ? "Must fix" : "Suggestion"}
@@ -39,13 +46,14 @@ export default function SuggestionCard({ suggestion, onApply, onDismiss }: Props
         {suggestion.suggested_revision && onApply && (
           <button
             type="button"
-            className="suggestion-action-btn suggestion-apply"
-            onClick={onApply}
+            className={`suggestion-action-btn ${applied ? "suggestion-applied-btn" : "suggestion-apply"}`}
+            onClick={handleApply}
+            disabled={applied}
           >
-            Apply
+            {applied ? "Applied" : "Apply"}
           </button>
         )}
-        {!isHard && onDismiss && (
+        {!isHard && onDismiss && !applied && (
           <button
             type="button"
             className="suggestion-action-btn suggestion-dismiss"
