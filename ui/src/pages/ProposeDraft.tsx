@@ -142,17 +142,22 @@ export default function ProposeDraft() {
     try {
       const result = await reviewDraft(draft.id);
       setDraft(result.draft);
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: "assistant",
-          content: result.response.message,
-          suggestions:
-            result.response.suggestions.length > 0
-              ? result.response.suggestions
-              : undefined,
-        },
-      ]);
+      setMessages((prev) => {
+        const cleaned = prev.map((msg) =>
+          msg.suggestions ? { ...msg, role: msg.role, content: msg.content } : msg,
+        );
+        return [
+          ...cleaned,
+          {
+            role: "assistant" as const,
+            content: result.response.message,
+            suggestions:
+              result.response.suggestions.length > 0
+                ? result.response.suggestions
+                : undefined,
+          },
+        ];
+      });
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Unknown error";
       setMessages((prev) => [
@@ -419,23 +424,25 @@ export default function ProposeDraft() {
 
       {/* Mobile single-pane */}
       {isMobile && (
-        <div className="propose-draft-mobile">
-          <div className="page detail-page">
-            <Link to="/" className="back-link">
-              &larr; Home
-            </Link>
-            <h1>Suggest a vote</h1>
-            {error && <p className="form-error">{error}</p>}
-            <DraftingForm
-              draft={draft}
-              onFieldChange={handleFieldChange}
-              onCategoryChange={handleCategoryChange}
-              onReview={handleReview}
-              onSubmit={handleSubmit}
-              onDispute={() => {}}
-              disabled={submitting}
-              reviewLoading={loading}
-            />
+        <>
+          <div className="propose-draft-mobile">
+            <div className="page detail-page">
+              <Link to="/" className="back-link">
+                &larr; Home
+              </Link>
+              <h1>Suggest a vote</h1>
+              {error && <p className="form-error">{error}</p>}
+              <DraftingForm
+                draft={draft}
+                onFieldChange={handleFieldChange}
+                onCategoryChange={handleCategoryChange}
+                onReview={handleReview}
+                onSubmit={handleSubmit}
+                onDispute={() => {}}
+                disabled={submitting}
+                reviewLoading={loading}
+              />
+            </div>
           </div>
 
           <button
@@ -463,7 +470,7 @@ export default function ProposeDraft() {
               {assistantPanel}
             </div>
           )}
-        </div>
+        </>
       )}
 
       {/* Submit confirmation modal */}
