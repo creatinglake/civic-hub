@@ -33,7 +33,7 @@ CREATE INDEX idx_proposal_drafts_user_status ON proposal_drafts (user_id, status
 CREATE TRIGGER set_proposal_drafts_updated_at
   BEFORE UPDATE ON proposal_drafts
   FOR EACH ROW
-  EXECUTE FUNCTION update_updated_at();
+  EXECUTE FUNCTION set_updated_at();
 
 -- RLS: service-role only (same pattern as other tables)
 ALTER TABLE proposal_drafts ENABLE ROW LEVEL SECURITY;
