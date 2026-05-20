@@ -49,6 +49,9 @@ export interface CallClaudeResult {
 interface AnthropicContent {
   type: string;
   text?: string;
+  id?: string;
+  name?: string;
+  input?: unknown;
 }
 
 interface AnthropicResponse {
@@ -173,6 +176,7 @@ export interface CallClaudeMultiTurnInput {
   system?: string;
   messages: MultiTurnMessage[];
   maxTokens?: number;
+  tools?: unknown[];
 }
 
 export async function callClaudeMultiTurn(
@@ -197,7 +201,7 @@ async function callClaudeMultiTurnOnce(
   apiKey: string,
   input: CallClaudeMultiTurnInput,
 ): Promise<CallClaudeResult> {
-  const messages = input.messages.map((m) => ({
+  const messages: unknown[] = input.messages.map((m) => ({
     role: m.role,
     content: [{ type: "text", text: m.content }],
   }));
@@ -208,59 +212,114 @@ async function callClaudeMultiTurnOnce(
     messages,
   };
   if (input.system) body.system = input.system;
+  if (input.tools && input.tools.length > 0) body.tools = input.tools;
 
-  const controller = new AbortController();
-  const timeoutHandle = setTimeout(() => controller.abort(), CALL_TIMEOUT_MS);
-  let res: Response;
-  try {
-    res = await fetch(ANTHROPIC_URL, {
-      method: "POST",
-      headers: {
-        "x-api-key": apiKey,
-        "anthropic-version": ANTHROPIC_VERSION,
-        "content-type": "application/json",
-      },
-      body: JSON.stringify(body),
-      signal: controller.signal,
-    });
-  } catch (err) {
-    if (err instanceof Error && err.name === "AbortError") {
+  const MAX_TOOL_ROUNDS = 5;
+  let totalUsage = { input_tokens: 0, output_tokens: 0 };
+
+  for (let round = 0; round <= MAX_TOOL_ROUNDS; round++) {
+    const controller = new AbortController();
+    const timeoutHandle = setTimeout(() => controller.abort(), CALL_TIMEOUT_MS);
+    let res: Response;
+    try {
+      res = await fetch(ANTHROPIC_URL, {
+        method: "POST",
+        headers: {
+          "x-api-key": apiKey,
+          "anthropic-version": ANTHROPIC_VERSION,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify(body),
+        signal: controller.signal,
+      });
+    } catch (err) {
+      if (err instanceof Error && err.name === "AbortError") {
+        throw new Error(
+          `Anthropic API call exceeded ${CALL_TIMEOUT_MS}ms — aborted`,
+        );
+      }
+      throw err;
+    } finally {
+      clearTimeout(timeoutHandle);
+    }
+
+    if (!res.ok) {
+      const errText = await res.text();
+      const isServer = res.status >= 500 && res.status < 600;
+      const err = new Error(
+        `Anthropic API ${res.status}: ${errText.slice(0, 300)}`,
+      );
+      (err as Error & { transient?: boolean }).transient = isServer;
+      throw err;
+    }
+
+    const data = (await res.json()) as AnthropicResponse;
+    if (data.error) {
       throw new Error(
-        `Anthropic API call exceeded ${CALL_TIMEOUT_MS}ms — aborted`,
+        `Anthropic error: ${data.error.type} ${data.error.message}`,
       );
     }
-    throw err;
-  } finally {
-    clearTimeout(timeoutHandle);
-  }
 
-  if (!res.ok) {
-    const errText = await res.text();
-    const isServer = res.status >= 500 && res.status < 600;
-    const err = new Error(
-      `Anthropic API ${res.status}: ${errText.slice(0, 300)}`,
+    if (data.usage) {
+      totalUsage.input_tokens += data.usage.input_tokens ?? 0;
+      totalUsage.output_tokens += data.usage.output_tokens ?? 0;
+    }
+
+    // If stop_reason is "end_turn" or no tool_use blocks, we're done
+    const hasToolUse = (data.content ?? []).some(
+      (c: AnthropicContent) => c.type === "tool_use",
     );
-    (err as Error & { transient?: boolean }).transient = isServer;
-    throw err;
+
+    if (!hasToolUse) {
+      const text = (data.content ?? [])
+        .filter((c) => c.type === "text" && typeof c.text === "string")
+        .map((c) => c.text as string)
+        .join("");
+
+      return { text, model: data.model ?? input.model, usage: totalUsage };
+    }
+
+    // Tool use detected — the API handles server-side tools (web_search)
+    // automatically. For server-side tools, the results come back in the
+    // same response as server_tool_use + server_tool_result blocks. Extract
+    // text from the full content array.
+    const textParts = (data.content ?? [])
+      .filter((c) => c.type === "text" && typeof c.text === "string")
+      .map((c) => c.text as string);
+
+    if (textParts.length > 0) {
+      return {
+        text: textParts.join(""),
+        model: data.model ?? input.model,
+        usage: totalUsage,
+      };
+    }
+
+    // If we got tool_use but no text yet, append assistant response and
+    // tool results to messages for the next round (client-side tool pattern).
+    // For server-side tools this shouldn't happen, but handle gracefully.
+    (messages as Record<string, unknown>[]).push({
+      role: "assistant",
+      content: data.content,
+    });
+
+    const toolResults = (data.content ?? [])
+      .filter((c: AnthropicContent) => c.type === "tool_use")
+      .map((c: AnthropicContent) => ({
+        type: "tool_result",
+        tool_use_id: c.id,
+        content: "Tool executed server-side.",
+      }));
+
+    (messages as Record<string, unknown>[]).push({
+      role: "user",
+      content: toolResults,
+    });
+
+    body.messages = messages;
   }
 
-  const data = (await res.json()) as AnthropicResponse;
-  if (data.error) {
-    throw new Error(
-      `Anthropic error: ${data.error.type} ${data.error.message}`,
-    );
-  }
-
-  const text = (data.content ?? [])
-    .filter((c) => c.type === "text" && typeof c.text === "string")
-    .map((c) => c.text as string)
-    .join("");
-
-  return {
-    text,
-    model: data.model ?? input.model,
-    usage: data.usage,
-  };
+  throw new Error("Tool use loop exceeded maximum rounds");
 }
 
 function isTransient(err: unknown): boolean {

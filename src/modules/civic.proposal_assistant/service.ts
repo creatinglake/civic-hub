@@ -31,7 +31,15 @@ export async function callAssistant(
     { role: "user", content: input.user_message },
   ];
 
-  const result = await claude({ model, system: systemPrompt, messages });
+  const tools = [
+    {
+      type: "web_search_20250305",
+      name: "web_search",
+      max_uses: 3,
+    },
+  ];
+
+  const result = await claude({ model, system: systemPrompt, messages, tools });
 
   return parseAssistantResponse(result.text);
 }
