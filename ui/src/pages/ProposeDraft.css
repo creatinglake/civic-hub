@@ -4,6 +4,29 @@
   height: calc(100vh - var(--nav-h, 61px));
 }
 
+@media (max-width: 768px) {
+  .propose-draft-mobile {
+    display: flex;
+    flex-direction: column;
+    height: calc(100vh - var(--nav-h, 61px));
+    overflow: hidden;
+  }
+
+  .propose-draft-mobile .page {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    padding-bottom: 0;
+  }
+
+  .propose-draft-mobile .drafting-form {
+    flex: 1;
+    min-height: 0;
+  }
+}
+
 .propose-draft-layout {
   display: grid;
   grid-template-columns: 40% 60%;

@@ -419,7 +419,7 @@ export default function ProposeDraft() {
 
       {/* Mobile single-pane */}
       {isMobile && (
-        <>
+        <div className="propose-draft-mobile">
           <div className="page detail-page">
             <Link to="/" className="back-link">
               &larr; Home
@@ -463,7 +463,7 @@ export default function ProposeDraft() {
               {assistantPanel}
             </div>
           )}
-        </>
+        </div>
       )}
 
       {/* Submit confirmation modal */}
