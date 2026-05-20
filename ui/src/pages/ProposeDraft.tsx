@@ -368,11 +368,8 @@ export default function ProposeDraft() {
     <AssistantPanel
       messages={messages}
       onSendMessage={handleSendMessage}
-      onReview={handleReview}
       onApplySuggestion={handleApplySuggestion}
       loading={loading}
-      draftModifiedSinceReview={draft.draft_modified_since_review}
-      hasReviewed={draft.last_review_result !== null}
       phase={phase}
     />
   );
@@ -402,9 +399,11 @@ export default function ProposeDraft() {
               draft={draft}
               onFieldChange={handleFieldChange}
               onCategoryChange={handleCategoryChange}
+              onReview={handleReview}
               onSubmit={handleSubmit}
               onDispute={() => {}}
               disabled={submitting}
+              reviewLoading={loading}
             />
           </div>
         </div>
@@ -423,9 +422,11 @@ export default function ProposeDraft() {
               draft={draft}
               onFieldChange={handleFieldChange}
               onCategoryChange={handleCategoryChange}
+              onReview={handleReview}
               onSubmit={handleSubmit}
               onDispute={() => {}}
               disabled={submitting}
+              reviewLoading={loading}
             />
           </div>
 

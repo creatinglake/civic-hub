@@ -7,9 +7,11 @@ interface Props {
   draft: ProposalDraft;
   onFieldChange: (field: string, value: string) => void;
   onCategoryChange: (category: DraftCategory) => void;
+  onReview: () => void;
   onSubmit: () => void;
   onDispute: () => void;
   disabled: boolean;
+  reviewLoading?: boolean;
 }
 
 const PLACEHOLDERS: Record<string, Record<string, string>> = {
@@ -83,9 +85,11 @@ export default function DraftingForm({
   draft,
   onFieldChange,
   onCategoryChange,
+  onReview,
   onSubmit,
   onDispute,
   disabled,
+  reviewLoading,
 }: Props) {
   const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
@@ -196,6 +200,16 @@ export default function DraftingForm({
         </div>
 
         <div className="draft-actions">
+          {draft.title.trim() && draft.category && (draft.last_review_result === null || draft.draft_modified_since_review) && (
+            <button
+              type="button"
+              className="draft-review-btn"
+              onClick={onReview}
+              disabled={disabled || reviewLoading}
+            >
+              {reviewLoading ? "Reviewing..." : "Review draft"}
+            </button>
+          )}
           <button
             type="button"
             className="draft-submit-btn"

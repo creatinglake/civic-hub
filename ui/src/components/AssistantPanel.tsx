@@ -12,24 +12,18 @@ export interface ChatMessage {
 interface Props {
   messages: ChatMessage[];
   onSendMessage: (message: string) => void;
-  onReview: () => void;
   onApplySuggestion?: (suggestion: DraftSuggestion) => void;
   onDismissSuggestion?: (index: number) => void;
   loading: boolean;
-  draftModifiedSinceReview: boolean;
-  hasReviewed: boolean;
   phase?: "brainstorm" | "free_form" | "review";
 }
 
 export default function AssistantPanel({
   messages,
   onSendMessage,
-  onReview,
   onApplySuggestion,
   onDismissSuggestion,
   loading,
-  draftModifiedSinceReview,
-  hasReviewed,
   phase,
 }: Props) {
   const [input, setInput] = useState("");
@@ -53,8 +47,6 @@ export default function AssistantPanel({
       handleSend();
     }
   }
-
-  const needsReview = draftModifiedSinceReview || !hasReviewed;
 
   return (
     <div className="assistant-panel">
@@ -111,14 +103,6 @@ export default function AssistantPanel({
       </div>
 
       <div className="assistant-footer">
-        <button
-          type="button"
-          className={`assistant-review-btn${needsReview ? " review-emphasis" : ""}`}
-          onClick={onReview}
-          disabled={loading}
-        >
-          Review my draft
-        </button>
         <div className="assistant-input-row">
           <textarea
             ref={inputRef}

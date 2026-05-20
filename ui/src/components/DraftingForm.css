@@ -169,3 +169,27 @@
   opacity: 0.4;
   cursor: not-allowed;
 }
+
+/* --- Review button --- */
+
+.draft-review-btn {
+  flex: 1;
+  padding: var(--space-sm) var(--space-md);
+  background: var(--color-surface);
+  color: var(--color-primary);
+  border: 2px solid var(--color-primary);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.draft-review-btn:hover:not(:disabled) {
+  background: var(--pill-vote-bg);
+}
+
+.draft-review-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
