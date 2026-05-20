@@ -176,15 +176,27 @@ export default function ProposeDraft() {
   const handleApplySuggestion = useCallback(
     (suggestion: DraftSuggestion) => {
       if (!draft || !suggestion.field || !suggestion.suggested_revision) return;
-      handleFieldChange(suggestion.field, suggestion.suggested_revision);
 
-      // Update the input element directly for immediate visual feedback
+      const field = suggestion.field as keyof typeof draft;
+      const current = String(draft[field] ?? "");
+      let newValue: string;
+
+      if (suggestion.quoted_text && current.includes(suggestion.quoted_text)) {
+        newValue = current.replace(suggestion.quoted_text, suggestion.suggested_revision);
+      } else if (current.trim()) {
+        newValue = current.trim() + "\n\n" + suggestion.suggested_revision;
+      } else {
+        newValue = suggestion.suggested_revision;
+      }
+
+      handleFieldChange(suggestion.field, newValue);
+
       const inputId = `draft-${suggestion.field}`;
       const el = document.getElementById(inputId) as
         | HTMLInputElement
         | HTMLTextAreaElement
         | null;
-      if (el) el.value = suggestion.suggested_revision;
+      if (el) el.value = newValue;
     },
     [draft, handleFieldChange],
   );
