@@ -33,8 +33,6 @@ export interface AssistantResponse {
 export interface HubConfig {
   hub_name: string;
   community_description: string;
-  coc_path: string;
-  best_practices_path: string;
 }
 
 export interface CallAssistantInput {

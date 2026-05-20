@@ -1,5 +1,4 @@
 import { Request, Response } from "express";
-import { resolve } from "path";
 import { getAuthUser } from "../middleware/auth.js";
 import { emitEvent } from "../events/eventEmitter.js";
 import {
@@ -29,13 +28,6 @@ function getHubConfig(): HubConfig {
     hub_name: process.env.HUB_NAME ?? "Floyd Civic Hub",
     community_description:
       "residents of Floyd County, Virginia — a small rural community in the Blue Ridge Mountains",
-    coc_path: resolve(
-      process.env.CIVIC_COC_PATH ?? "config/hubs/floyd/code-of-conduct.md",
-    ),
-    best_practices_path: resolve(
-      process.env.CIVIC_BEST_PRACTICES_PATH ??
-        "config/hubs/floyd/proposal-best-practices.md",
-    ),
   };
 }
 

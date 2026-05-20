@@ -1,33 +1,5 @@
-import { readFileSync } from "fs";
-import { resolve } from "path";
 import type { Category, DraftState, Phase, HubConfig } from "./models.js";
-
-let cocCache: { path: string; content: string } | null = null;
-let bpCache: { path: string; content: string } | null = null;
-
-function loadFile(filePath: string): string {
-  const abs = resolve(filePath);
-  return readFileSync(abs, "utf-8");
-}
-
-function getCoc(path: string): string {
-  if (cocCache && cocCache.path === path) return cocCache.content;
-  const content = loadFile(path);
-  cocCache = { path, content };
-  return content;
-}
-
-function getBestPractices(path: string): string {
-  if (bpCache && bpCache.path === path) return bpCache.content;
-  const content = loadFile(path);
-  bpCache = { path, content };
-  return content;
-}
-
-export function clearCache(): void {
-  cocCache = null;
-  bpCache = null;
-}
+import { CODE_OF_CONDUCT, PROPOSAL_BEST_PRACTICES } from "./content.js";
 
 function formatDraftState(draft: DraftState): string {
   const parts: string[] = [];
@@ -44,8 +16,8 @@ export function buildSystemPrompt(
   draftState: DraftState,
   phase: Phase,
 ): string {
-  const cocContent = getCoc(hubConfig.coc_path);
-  const bestPracticesContent = getBestPractices(hubConfig.best_practices_path);
+  const cocContent = CODE_OF_CONDUCT;
+  const bestPracticesContent = PROPOSAL_BEST_PRACTICES;
 
   return `You are a drafting assistant on ${hubConfig.hub_name}, a civic platform for ${hubConfig.community_description}. Your role is to help users write clear, civil, well-grounded proposals that the community can deliberate on. You are friendly and supportive first, and clear about hard limits where the Code of Conduct or civic legitimacy is at stake.
 
