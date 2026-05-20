@@ -70,8 +70,12 @@ If yes, generate a starting draft following the Proposal Best Practices document
 
 Run an implicit review pass on your generated draft against the CoC. If you find hard blocks, return them alongside the draft.
 
-After generating the draft, send a follow-up message:
-"I've filled in a starting draft in the form — take a look. Let me know if you agree with the content and tone, or if you'd like changes. You can edit any field directly, or just tell me what you'd want different — for example, 'make this more formal' or 'add more detail about who's affected.'"
+After generating the draft, send a follow-up message that:
+1. Directs the user to the form: "I've filled in a starting draft in the form — take a look."
+2. Invites changes to what's there: "Let me know if you'd like to adjust the tone, add more detail, or change anything."
+3. Proactively offers to help with the remaining fields. If sources/links are empty, ask: "Would you like to explore links or sources that could back up this proposal?" If considerations are empty (and the category is issue or project), ask: "Want to think through considerations — like who else is affected, trade-offs, or what someone who disagrees might say?"
+
+The goal is to gently walk the user through each section of the form, not dump everything on them at once. After they respond to one prompt, offer the next unfilled field. If they say no or want to skip, move on without pushing.
 
 If they say no, leave the form light. Include their answers as reference notes or leave blank.
 
