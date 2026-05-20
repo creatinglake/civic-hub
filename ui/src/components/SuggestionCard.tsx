@@ -1,0 +1,60 @@
+import type { DraftSuggestion } from "../services/api";
+
+interface Props {
+  suggestion: DraftSuggestion;
+  onApply?: () => void;
+  onDismiss?: () => void;
+}
+
+export default function SuggestionCard({ suggestion, onApply, onDismiss }: Props) {
+  const isHard = suggestion.severity === "hard";
+
+  return (
+    <div className={`suggestion-card ${isHard ? "suggestion-hard" : "suggestion-soft"}`}>
+      <div className="suggestion-header">
+        <span className={`suggestion-badge ${isHard ? "badge-hard" : "badge-soft"}`}>
+          {isHard ? "Must fix" : "Suggestion"}
+        </span>
+        {suggestion.field && (
+          <span className="suggestion-field">{suggestion.field}</span>
+        )}
+      </div>
+
+      {suggestion.quoted_text && (
+        <blockquote className="suggestion-quote">
+          {suggestion.quoted_text}
+        </blockquote>
+      )}
+
+      <p className="suggestion-message">{suggestion.message}</p>
+
+      {suggestion.suggested_revision && (
+        <div className="suggestion-revision">
+          <span className="suggestion-revision-label">Suggested:</span>
+          <p className="suggestion-revision-text">{suggestion.suggested_revision}</p>
+        </div>
+      )}
+
+      <div className="suggestion-actions">
+        {suggestion.suggested_revision && onApply && (
+          <button
+            type="button"
+            className="suggestion-action-btn suggestion-apply"
+            onClick={onApply}
+          >
+            Apply
+          </button>
+        )}
+        {!isHard && onDismiss && (
+          <button
+            type="button"
+            className="suggestion-action-btn suggestion-dismiss"
+            onClick={onDismiss}
+          >
+            Dismiss
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}

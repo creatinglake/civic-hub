@@ -11,6 +11,7 @@ import discoveryRoutes from "./routes/discoveryRoutes.js";
 import debugRoutes from "./routes/debugRoutes.js";
 import inputRoutes from "./routes/inputRoutes.js";
 import proposalRoutes from "./routes/proposalRoutes.js";
+import proposalDraftRoutes from "./routes/proposalDraftRoutes.js";
 import adminRoutes from "./routes/adminRoutes.js";
 import authRoutes from "./routes/authRoutes.js";
 import voteLogRoutes from "./routes/voteLogRoutes.js";
@@ -87,6 +88,16 @@ app.use("/auth", authRoutes);
 // Process endpoints are internal. External systems should use /events.
 app.use("/process", processRoutes);
 app.use("/process", inputRoutes);
+
+// Proposal draft endpoints — AI-augmented drafting (mounted before /proposals
+// so /proposals/drafts doesn't get caught by /proposals/:id).
+// Gated by PROPOSAL_ASSISTANT_ENABLED — returns 404 when off so the feature
+// is invisible to clients that don't have it enabled.
+const assistantEnabled =
+  process.env.PROPOSAL_ASSISTANT_ENABLED?.trim().toLowerCase() === "true";
+if (assistantEnabled) {
+  app.use("/proposals/drafts", proposalDraftRoutes);
+}
 
 // Proposal endpoints — user-facing proposal submission and endorsement
 app.use("/proposals", proposalRoutes);

@@ -111,6 +111,10 @@ export default function ProposalDetail() {
         <span>Submitted {formatDate(proposal.created_at)}</span>
       </div>
 
+      {proposal.assistant_helped && (
+        <p className="assistant-helped-label">Drafted with assistant help</p>
+      )}
+
       {/* Share — visible while the proposal is actively gathering
           (or has gathered) endorsements; the whole reason a user
           wants to share is to push it past the threshold. Suppressed

@@ -18,6 +18,8 @@ export interface Proposal {
   submitted_by: string; // userId or DID
   status: ProposalStatus;
   support_count: number;
+  category: string | null;
+  assistant_helped: boolean;
   created_at: string; // ISO 8601
   updated_at: string;
 }
@@ -36,6 +38,8 @@ export interface CreateProposalInput {
   description?: string;
   optional_links?: string[];
   submitted_by: string;
+  category?: string;
+  assistant_helped?: boolean;
 }
 
 /** Configuration for the proposals module */

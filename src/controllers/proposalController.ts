@@ -21,7 +21,7 @@ export async function handleSubmitProposal(
   req: Request,
   res: Response,
 ): Promise<void> {
-  const { title, description, optional_links } = req.body;
+  const { title, description, optional_links, category, assistant_helped } = req.body;
 
   if (!title) {
     res.status(400).json({ error: "Missing required field: title" });
@@ -31,7 +31,7 @@ export async function handleSubmitProposal(
   try {
     const user = getAuthUser(res);
     const proposal = await createProposal(
-      { title, description, optional_links, submitted_by: user.id },
+      { title, description, optional_links, submitted_by: user.id, category, assistant_helped },
       emitEvent,
     );
     res.status(201).json(proposal);

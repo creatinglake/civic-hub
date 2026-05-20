@@ -236,6 +236,8 @@ export interface CivicProposalSummary {
   status: CivicProposalStatus;
   support_count: number;
   support_threshold: number;
+  category: string | null;
+  assistant_helped: boolean;
   created_at: string;
 }
 
@@ -250,6 +252,8 @@ export interface CivicProposalDetail {
   support_count: number;
   support_threshold: number;
   has_supported: boolean | null;
+  category: string | null;
+  assistant_helped: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -287,6 +291,93 @@ export function supportCivicProposal(
   userId: string
 ): Promise<{ support_count: number; status: string }> {
   return request("POST", `/proposals/${proposalId}/support`, { user_id: userId });
+}
+
+// --- Proposal Drafts (AI-augmented drafting) ---
+
+export type DraftCategory = "issue" | "idea" | "project";
+export type DraftPhase = "brainstorm" | "review" | "free_form";
+
+export interface DraftSuggestion {
+  severity: "soft" | "hard";
+  quoted_text: string | null;
+  field: "title" | "description" | "sources" | "considerations" | null;
+  message: string;
+  suggested_revision: string | null;
+}
+
+export interface ProposalDraft {
+  id: string;
+  user_id: string;
+  category: DraftCategory | null;
+  title: string;
+  description: string;
+  sources: string;
+  considerations: string;
+  conversation_history: Array<{ role: "user" | "assistant"; content: string }>;
+  last_review_result: DraftSuggestion[] | null;
+  draft_modified_since_review: boolean;
+  steward_approved: boolean | null;
+  assistant_helped: boolean;
+  status: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AssistantResponse {
+  message: string;
+  suggestions: DraftSuggestion[];
+  draft_proposal: {
+    title: string;
+    description: string;
+    sources: string;
+    considerations: string;
+  } | null;
+}
+
+export interface DraftAssistantResult {
+  response: AssistantResponse;
+  draft: ProposalDraft;
+}
+
+export function createDraft(category?: DraftCategory): Promise<ProposalDraft> {
+  return request("POST", "/proposals/drafts", { category });
+}
+
+export function listDrafts(): Promise<ProposalDraft[]> {
+  return request("GET", "/proposals/drafts");
+}
+
+export function getDraft(id: string): Promise<ProposalDraft> {
+  return request("GET", `/proposals/drafts/${id}`);
+}
+
+export function updateDraft(
+  id: string,
+  patch: Partial<Pick<ProposalDraft, "title" | "description" | "sources" | "considerations" | "category">>,
+): Promise<ProposalDraft> {
+  return request("PATCH", `/proposals/drafts/${id}`, patch);
+}
+
+export function sendAssistantMessage(
+  draftId: string,
+  phase: DraftPhase,
+  userMessage: string,
+): Promise<DraftAssistantResult> {
+  return request("POST", `/proposals/drafts/${draftId}/assistant`, {
+    phase,
+    user_message: userMessage,
+  });
+}
+
+export function reviewDraft(draftId: string): Promise<DraftAssistantResult> {
+  return request("POST", `/proposals/drafts/${draftId}/review`);
+}
+
+export function submitDraft(
+  draftId: string,
+): Promise<{ proposal: CivicProposalDetail }> {
+  return request("POST", `/proposals/drafts/${draftId}/submit`);
 }
 
 // --- Admin: Proposal Review ---

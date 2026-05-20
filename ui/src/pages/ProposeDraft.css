@@ -1,0 +1,163 @@
+/* --- ProposeDraft page --- */
+
+.propose-draft-page {
+  height: calc(100vh - var(--nav-h, 61px));
+}
+
+.propose-draft-layout {
+  display: grid;
+  grid-template-columns: 40% 60%;
+  height: 100%;
+}
+
+.propose-draft-assistant {
+  height: 100%;
+  overflow: hidden;
+}
+
+.propose-draft-form {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.propose-draft-form-header {
+  padding: var(--space-md) var(--space-lg);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.propose-draft-form-header .back-link {
+  margin-bottom: var(--space-sm);
+}
+
+.propose-draft-title {
+  font-family: var(--font-heading);
+  font-size: var(--font-size-2xl);
+  font-weight: 700;
+  margin: 0;
+  color: var(--color-text);
+}
+
+/* --- Category step --- */
+
+.propose-step-heading {
+  font-family: var(--font-heading);
+  font-size: var(--font-size-lg);
+  font-weight: 600;
+  margin: var(--space-lg) 0 var(--space-sm);
+  color: var(--color-text);
+}
+
+/* --- Path choice step --- */
+
+.path-choice {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-md);
+  margin-top: var(--space-md);
+}
+
+.path-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  padding: var(--space-lg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.15s ease;
+}
+
+.path-card:hover:not(:disabled) {
+  border-color: var(--color-primary);
+  background: var(--color-surface-alt);
+}
+
+.path-card:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.path-card-label {
+  font-family: var(--font-heading);
+  font-weight: 600;
+  font-size: var(--font-size-base);
+  color: var(--color-text);
+}
+
+.path-card-desc {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  line-height: var(--line-height-relaxed);
+}
+
+.path-back-link {
+  display: inline-block;
+  margin-top: var(--space-md);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline;
+}
+
+.path-back-link:hover {
+  color: var(--color-text);
+}
+
+@media (max-width: 600px) {
+  .path-choice {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* --- Confirm modal --- */
+
+.confirm-preview {
+  margin: var(--space-md) 0;
+  padding: var(--space-md);
+  background: var(--color-surface-alt);
+  border-radius: var(--radius-md);
+}
+
+.confirm-title {
+  font-family: var(--font-heading);
+  font-size: var(--font-size-base);
+  font-weight: 600;
+  margin: 0 0 var(--space-sm);
+  color: var(--color-text);
+}
+
+.confirm-desc {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  margin: 0;
+  line-height: var(--line-height-relaxed);
+  white-space: pre-wrap;
+}
+
+.confirm-disclosure {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+  margin: var(--space-md) 0;
+  padding: var(--space-sm) var(--space-md);
+  background: var(--color-warning-bg);
+  border-radius: var(--radius-sm);
+}
+
+.confirm-soft-note {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-subtle);
+  margin: 0 0 var(--space-md);
+}
+
+.confirm-actions {
+  display: flex;
+  gap: var(--space-sm);
+  margin-top: var(--space-md);
+}

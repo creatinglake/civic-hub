@@ -670,6 +670,13 @@
   flex-wrap: wrap;
 }
 
+.assistant-helped-label {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-subtle);
+  margin: calc(-1 * var(--space-md)) 0 var(--space-lg);
+  font-style: italic;
+}
+
 /* Share affordance — sits between the meta row and the interaction
  * panel on votes / proposals that are still gathering attention. */
 .process-share-row {

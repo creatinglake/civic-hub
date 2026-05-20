@@ -2,9 +2,9 @@
 // No SDK dependency; keeps the deployable surface small (same philosophy
 // as utils/email.ts for Resend).
 //
-// Exposes a single function: `callClaude`. Accepts a user text prompt and
-// optionally a base64-encoded PDF document block. Returns the assistant's
-// text output, the model name the API reported, and a basic usage dump.
+// Two entry points:
+//   callClaude          — single-turn (one user message, one response)
+//   callClaudeMultiTurn — multi-turn conversation (messages array)
 //
 // Env vars:
 //   ANTHROPIC_API_KEY  — required. Starts with `sk-ant-…`.
@@ -104,6 +104,108 @@ async function callClaudeOnce(
     model: input.model,
     max_tokens: input.maxTokens ?? 4096,
     messages: [{ role: "user", content: userContent }],
+  };
+  if (input.system) body.system = input.system;
+
+  const controller = new AbortController();
+  const timeoutHandle = setTimeout(() => controller.abort(), CALL_TIMEOUT_MS);
+  let res: Response;
+  try {
+    res = await fetch(ANTHROPIC_URL, {
+      method: "POST",
+      headers: {
+        "x-api-key": apiKey,
+        "anthropic-version": ANTHROPIC_VERSION,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+  } catch (err) {
+    if (err instanceof Error && err.name === "AbortError") {
+      throw new Error(
+        `Anthropic API call exceeded ${CALL_TIMEOUT_MS}ms — aborted`,
+      );
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeoutHandle);
+  }
+
+  if (!res.ok) {
+    const errText = await res.text();
+    const isServer = res.status >= 500 && res.status < 600;
+    const err = new Error(
+      `Anthropic API ${res.status}: ${errText.slice(0, 300)}`,
+    );
+    (err as Error & { transient?: boolean }).transient = isServer;
+    throw err;
+  }
+
+  const data = (await res.json()) as AnthropicResponse;
+  if (data.error) {
+    throw new Error(
+      `Anthropic error: ${data.error.type} ${data.error.message}`,
+    );
+  }
+
+  const text = (data.content ?? [])
+    .filter((c) => c.type === "text" && typeof c.text === "string")
+    .map((c) => c.text as string)
+    .join("");
+
+  return {
+    text,
+    model: data.model ?? input.model,
+    usage: data.usage,
+  };
+}
+
+// --- Multi-turn conversation support ---
+
+export interface MultiTurnMessage {
+  role: "user" | "assistant";
+  content: string;
+}
+
+export interface CallClaudeMultiTurnInput {
+  model: string;
+  system?: string;
+  messages: MultiTurnMessage[];
+  maxTokens?: number;
+}
+
+export async function callClaudeMultiTurn(
+  input: CallClaudeMultiTurnInput,
+): Promise<CallClaudeResult> {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) {
+    throw new Error("ANTHROPIC_API_KEY is not configured");
+  }
+
+  const doCall = () => callClaudeMultiTurnOnce(apiKey, input);
+  try {
+    return await doCall();
+  } catch (err) {
+    if (!isTransient(err)) throw err;
+    await sleep(2000);
+    return doCall();
+  }
+}
+
+async function callClaudeMultiTurnOnce(
+  apiKey: string,
+  input: CallClaudeMultiTurnInput,
+): Promise<CallClaudeResult> {
+  const messages = input.messages.map((m) => ({
+    role: m.role,
+    content: [{ type: "text", text: m.content }],
+  }));
+
+  const body: Record<string, unknown> = {
+    model: input.model,
+    max_tokens: input.maxTokens ?? 4096,
+    messages,
   };
   if (input.system) body.system = input.system;
 

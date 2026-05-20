@@ -60,6 +60,8 @@ interface ProposalRow {
   support_count: number;
   submitted_by: string | null;
   converted_to_process_id: string | null;
+  category?: string | null;
+  assistant_helped?: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -73,6 +75,8 @@ function rowToProposal(row: ProposalRow): Proposal {
     submitted_by: row.submitted_by ?? "",
     status: row.status,
     support_count: row.support_count,
+    category: row.category ?? null,
+    assistant_helped: row.assistant_helped ?? false,
     created_at: row.created_at,
     updated_at: row.updated_at,
   };
@@ -94,17 +98,21 @@ export async function createProposal(
   const id = generateId("prop");
   const links = (input.optional_links ?? []).filter((l) => l.trim().length > 0);
 
+  const row: Record<string, unknown> = {
+    id,
+    title: input.title.trim(),
+    description: (input.description ?? "").trim(),
+    links,
+    status: "submitted" as ProposalStatus,
+    support_count: 0,
+    submitted_by: input.submitted_by,
+  };
+  if (input.category !== undefined) row.category = input.category;
+  if (input.assistant_helped !== undefined) row.assistant_helped = input.assistant_helped;
+
   const { data, error } = await getDb()
     .from("proposals")
-    .insert({
-      id,
-      title: input.title.trim(),
-      description: (input.description ?? "").trim(),
-      links,
-      status: "submitted" as ProposalStatus,
-      support_count: 0,
-      submitted_by: input.submitted_by,
-    })
+    .insert(row)
     .select()
     .single();
 
@@ -386,6 +394,8 @@ export async function getProposalReadModel(
     support_count: proposal.support_count,
     support_threshold: config.proposal_support_threshold,
     has_supported: hasSupported,
+    category: proposal.category,
+    assistant_helped: proposal.assistant_helped,
     created_at: proposal.created_at,
     updated_at: proposal.updated_at,
   };
@@ -403,6 +413,8 @@ export function getProposalSummary(proposal: Proposal): Record<string, unknown> 
     status: proposal.status,
     support_count: proposal.support_count,
     support_threshold: config.proposal_support_threshold,
+    category: proposal.category,
+    assistant_helped: proposal.assistant_helped,
     created_at: proposal.created_at,
   };
 }
