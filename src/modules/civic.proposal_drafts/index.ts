@@ -115,7 +115,9 @@ export async function updateDraft(
   if (patch.considerations !== undefined) updates.considerations = patch.considerations;
   if (patch.category !== undefined) updates.category = patch.category;
 
-  updates.draft_modified_since_review = true;
+  if (!patch.skip_modified_flag) {
+    updates.draft_modified_since_review = true;
+  }
 
   const { data, error } = await getDb()
     .from("proposal_drafts")

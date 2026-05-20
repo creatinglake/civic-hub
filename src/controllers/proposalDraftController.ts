@@ -125,7 +125,7 @@ export async function handleUpdateDraft(
       return;
     }
 
-    const { title, description, sources, considerations, category } = req.body;
+    const { title, description, sources, considerations, category, skip_modified_flag } = req.body;
 
     if (category && !VALID_CATEGORIES.has(category)) {
       res.status(400).json({ error: "Invalid category" });
@@ -138,6 +138,7 @@ export async function handleUpdateDraft(
       sources,
       considerations,
       category: category as Category | undefined,
+      skip_modified_flag: skip_modified_flag === true,
     });
     res.json(updated);
   } catch (err) {

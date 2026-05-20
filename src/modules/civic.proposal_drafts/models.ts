@@ -32,4 +32,5 @@ export interface UpdateDraftInput {
   sources?: string;
   considerations?: string;
   category?: Category;
+  skip_modified_flag?: boolean;
 }

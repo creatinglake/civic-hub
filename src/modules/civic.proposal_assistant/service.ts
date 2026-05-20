@@ -39,7 +39,7 @@ export async function callAssistant(
     },
   ];
 
-  const result = await claude({ model, system: systemPrompt, messages, tools });
+  const result = await claude({ model, system: systemPrompt, messages, tools, maxTokens: 1536 });
 
   return parseAssistantResponse(result.text);
 }

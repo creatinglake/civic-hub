@@ -354,7 +354,7 @@ export function getDraft(id: string): Promise<ProposalDraft> {
 
 export function updateDraft(
   id: string,
-  patch: Partial<Pick<ProposalDraft, "title" | "description" | "sources" | "considerations" | "category">>,
+  patch: Partial<Pick<ProposalDraft, "title" | "description" | "sources" | "considerations" | "category">> & { skip_modified_flag?: boolean },
 ): Promise<ProposalDraft> {
   return request("PATCH", `/proposals/drafts/${id}`, patch);
 }

@@ -192,7 +192,7 @@ export default function ProposeDraft() {
   );
 
   const handleApplySuggestion = useCallback(
-    (suggestion: DraftSuggestion) => {
+    async (suggestion: DraftSuggestion) => {
       if (!draft || !suggestion.field || !suggestion.suggested_revision) return;
 
       const field = suggestion.field as keyof typeof draft;
@@ -207,7 +207,15 @@ export default function ProposeDraft() {
         newValue = suggestion.suggested_revision;
       }
 
-      handleFieldChange(suggestion.field, newValue);
+      try {
+        const updated = await updateDraft(draft.id, {
+          [suggestion.field]: newValue,
+          skip_modified_flag: true,
+        });
+        setDraft(updated);
+      } catch {
+        // silent
+      }
 
       const inputId = `draft-${suggestion.field}`;
       const el = document.getElementById(inputId) as
@@ -216,7 +224,7 @@ export default function ProposeDraft() {
         | null;
       if (el) el.value = newValue;
     },
-    [draft, handleFieldChange],
+    [draft],
   );
 
   async function handleSubmit() {

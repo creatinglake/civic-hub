@@ -211,7 +211,15 @@ async function callClaudeMultiTurnOnce(
     max_tokens: input.maxTokens ?? 4096,
     messages,
   };
-  if (input.system) body.system = input.system;
+  if (input.system) {
+    body.system = [
+      {
+        type: "text",
+        text: input.system,
+        cache_control: { type: "ephemeral" },
+      },
+    ];
+  }
   if (input.tools && input.tools.length > 0) body.tools = input.tools;
 
   const MAX_TOOL_ROUNDS = 5;
