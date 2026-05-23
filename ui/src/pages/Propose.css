@@ -2,7 +2,7 @@
    warm green accent instead of the vote-blue palette. */
 
 .propose-cta {
-  margin-bottom: var(--space-md);
+  padding-bottom: var(--space-lg);
 }
 
 .propose-cta-inner {
