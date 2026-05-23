@@ -57,7 +57,7 @@ export default function AssistantPanel({
       <div className="assistant-messages">
         {messages.length === 0 && (
           <div className="assistant-empty">
-            <p>Your drafting assistant is ready to help.</p>
+            <p>This is your drafting assistant. Ask it to help write, research sources, improve your proposal, or check it before submitting.</p>
           </div>
         )}
         {messages.map((msg, i) => (
@@ -110,7 +110,7 @@ export default function AssistantPanel({
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder={phase === "brainstorm" ? "Type your answer here..." : "Ask a question or request a change..."}
+            placeholder={phase === "brainstorm" ? "Type your answer here..." : "Ask for help with your proposal..."}
             rows={phase === "brainstorm" ? 3 : 1}
             disabled={loading}
           />
