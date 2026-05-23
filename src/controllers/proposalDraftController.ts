@@ -313,10 +313,17 @@ export async function handleSubmitDraft(
       .map((l) => l.trim())
       .filter((l) => l.length > 0);
 
+    let fullDescription = draft.description.trim();
+    if (draft.considerations.trim()) {
+      fullDescription = fullDescription
+        ? `${fullDescription}\n\nConsiderations:\n${draft.considerations.trim()}`
+        : `Considerations:\n${draft.considerations.trim()}`;
+    }
+
     const proposal = await createProposal(
       {
         title: draft.title.trim(),
-        description: draft.description.trim() || undefined,
+        description: fullDescription || undefined,
         optional_links: optionalLinks.length > 0 ? optionalLinks : undefined,
         submitted_by: user.id,
         category: draft.category ?? undefined,

@@ -202,11 +202,20 @@ export default function ProposalDetail() {
         <div className="proposal-links-section">
           <h3>Related Links</h3>
           <ul className="issue-link-list">
-            {proposal.optional_links.map((link, i) => (
-              <li key={i}>
-                <a href={link} target="_blank" rel="noopener noreferrer">{link}</a>
-              </li>
-            ))}
+            {proposal.optional_links.map((link, i) => {
+              const urlMatch = link.match(/(https?:\/\/\S+)/);
+              const url = urlMatch ? urlMatch[1] : link;
+              const label = urlMatch ? link.replace(url, "").replace(/:\s*$/, "").trim() : "";
+              return (
+                <li key={i}>
+                  {label ? (
+                    <>{label}: <a href={url} target="_blank" rel="noopener noreferrer">{url}</a></>
+                  ) : (
+                    <a href={url} target="_blank" rel="noopener noreferrer">{url}</a>
+                  )}
+                </li>
+              );
+            })}
           </ul>
         </div>
       )}
