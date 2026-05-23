@@ -213,17 +213,15 @@ export function eventToPost(
           data.meeting_summary?.meeting_title ??
           data.meeting_title ??
           getProcessTitle(event.process_id);
-        // Title is the meeting itself — date suffix when no title is
-        // available so the post is never just "Meeting".
-        const title = meetingTitle
-          ? meetingTitle
-          : `Meeting summary — ${formatMeetingDate(meetingDate)}`;
-        // Slice 10: summary now carries the meeting date as context;
-        // the engagement line below this carries the topic count +
-        // duration. Splitting them avoids "12 topics covered" appearing
-        // on both lines.
+        // Meeting date is appended to the title so the card reads as a
+        // single line like "Board of Supervisors Regular Meeting — Apr 28,
+        // 2026". This avoids a redundant standalone date line above the
+        // engagement row and the publication timestamp at the bottom.
+        const dateStr = meetingDate ? formatMeetingDate(meetingDate) : "";
+        const baseTitle = meetingTitle || "Meeting summary";
+        const title = dateStr ? `${baseTitle} — ${dateStr}` : baseTitle;
         void blockCount;
-        const summary = meetingDate ? formatMeetingDate(meetingDate) : "";
+        const summary = "";
         return {
           id: event.id,
           title,
