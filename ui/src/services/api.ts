@@ -295,7 +295,7 @@ export function supportCivicProposal(
 
 // --- Proposal Drafts (AI-augmented drafting) ---
 
-export type DraftCategory = "issue" | "idea" | "project";
+export type DraftCategory = "issue" | "idea" | "project" | "concern";
 export type DraftPhase = "brainstorm" | "review" | "free_form";
 
 export interface DraftSuggestion {

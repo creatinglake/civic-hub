@@ -100,7 +100,16 @@ Each row tracks a user flow, which layer covers it, and which slice introduced i
 | Vote drafting: review triggers CoC check | | | A | Needs test |
 | Vote drafting: submit creates + auto-activates vote | | | A | Needs test |
 | Vote drafting: submit redirects to /process/:id | | | A | Needs test |
-| /propose always renders ProposeDraft (no toggle) | | | A | Needs test |
+| /propose listing page shows proposals + CTA | | | B | Needs test |
+| /propose/new renders path choice (brainstorm / write) | | | B | Needs test |
+| Propose drafting: idea/concern toggle switches placeholders | | | B | Needs test |
+| Propose drafting: form shows title, description, sources (no considerations) | | | B | Needs test |
+| Propose drafting: review triggers CoC check | | | B | Needs test |
+| Propose drafting: submit redirects to /propose | | | B | Needs test |
+| Proposal detail: support button increments count, status stays open | | | B | Needs test |
+| Proposal detail: no endorsement progress bar | | | B | Needs test |
+| Proposals removed from Votes page listing | | | B | Needs test |
+| Existing endorsed/converted proposals display with historical status | | | B | Needs test |
 | Feed: generic fallback renders unknown event types | | | A | Needs test |
 
 ### Admin Flows

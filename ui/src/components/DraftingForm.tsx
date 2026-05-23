@@ -1,55 +1,39 @@
 import { useCallback, useRef } from "react";
-import CategorySelector from "./CategorySelector";
 import type { DraftCategory, ProposalDraft } from "../services/api";
 import "./DraftingForm.css";
 
 interface Props {
   draft: ProposalDraft;
   onFieldChange: (field: string, value: string) => void;
-  onCategoryChange: (category: DraftCategory) => void;
   onReview: () => void;
   onSubmit: () => void;
-  onDispute: () => void;
   disabled: boolean;
   reviewLoading?: boolean;
 }
 
 const PLACEHOLDERS: Record<string, Record<string, string>> = {
-  issue: {
-    title: "e.g., Concerns about traffic speed on Route 8 near the high school",
-    description:
-      "Describe the concern — what you've seen, who's affected, and what you'd want the community to consider.",
-    sources: "Link to news articles, official documents, or data that support your concern (one per line)",
-    considerations: "What would someone who disagrees say? Any trade-offs to acknowledge?",
-  },
   idea: {
     title: "e.g., Start a community garden at the old rec center lot",
     description:
       "What would you like to see happen, and why does it matter to you?",
     sources: "Any relevant links (optional, one per line)",
-    considerations: "Who else might want this? Any considerations?",
   },
-  project: {
-    title: "e.g., Upgrade the Floyd County Library Wi-Fi network",
+  concern: {
+    title: "e.g., Traffic speed on Route 8 near the school",
     description:
-      "What do you want to do, who would it serve, and what would it take?",
-    sources: "Links to cost estimates, similar projects, or relevant info (one per line)",
-    considerations:
-      "Who would organize this? What resources would be needed? Any trade-offs?",
+      "Describe the concern — what you've observed, who's affected, and what the community should consider.",
+    sources: "Link to news articles, official documents, or data that support your concern (one per line)",
   },
 };
 
 function getPlaceholder(category: string | null, field: string): string {
   const cat = category ?? "idea";
-  return PLACEHOLDERS[cat]?.[field] ?? "";
+  return PLACEHOLDERS[cat]?.[field] ?? PLACEHOLDERS["idea"]?.[field] ?? "";
 }
 
 function getStatusText(draft: ProposalDraft): string {
-  if (!draft.title.trim() || !draft.category) {
-    const missing: string[] = [];
-    if (!draft.category) missing.push("category");
-    if (!draft.title.trim()) missing.push("title");
-    return `Status: ${missing.length} required field${missing.length > 1 ? "s" : ""} missing`;
+  if (!draft.title.trim()) {
+    return "Status: 1 required field missing";
   }
 
   if (draft.last_review_result === null) {
@@ -71,7 +55,7 @@ function getStatusText(draft: ProposalDraft): string {
 }
 
 function getStatusClass(draft: ProposalDraft): string {
-  if (!draft.title.trim() || !draft.category) return "status-missing";
+  if (!draft.title.trim()) return "status-missing";
   if (draft.last_review_result === null) return "status-pending";
   if (draft.draft_modified_since_review) return "status-modified";
   const hasHard = (draft.last_review_result ?? []).some(
@@ -84,10 +68,8 @@ function getStatusClass(draft: ProposalDraft): string {
 export default function DraftingForm({
   draft,
   onFieldChange,
-  onCategoryChange,
   onReview,
   onSubmit,
-  onDispute,
   disabled,
   reviewLoading,
 }: Props) {
@@ -104,30 +86,43 @@ export default function DraftingForm({
     [onFieldChange],
   );
 
+  const handleSubTypeChange = useCallback(
+    (cat: DraftCategory) => {
+      onFieldChange("category", cat);
+    },
+    [onFieldChange],
+  );
+
+  const subType = draft.category ?? "idea";
+
   const canSubmit =
     draft.title.trim() &&
-    draft.category &&
     draft.last_review_result !== null &&
     !draft.draft_modified_since_review &&
     !(draft.last_review_result ?? []).some((s) => s.severity === "hard") &&
     !disabled;
 
-  const canDispute =
-    draft.title.trim() &&
-    draft.category &&
-    draft.last_review_result !== null &&
-    !draft.draft_modified_since_review &&
-    (draft.last_review_result ?? []).some((s) => s.severity === "hard") &&
-    !disabled;
-
   return (
     <div className="drafting-form">
       <div className="drafting-form-scroll">
-        <CategorySelector
-          value={draft.category}
-          onChange={onCategoryChange}
-          disabled={disabled}
-        />
+        <div className="subtype-toggle">
+          <button
+            type="button"
+            className={`subtype-pill${subType === "idea" ? " subtype-pill-active" : ""}`}
+            onClick={() => handleSubTypeChange("idea")}
+            disabled={disabled}
+          >
+            Idea
+          </button>
+          <button
+            type="button"
+            className={`subtype-pill${subType === "concern" ? " subtype-pill-active" : ""}`}
+            onClick={() => handleSubTypeChange("concern")}
+            disabled={disabled}
+          >
+            Concern
+          </button>
+        </div>
 
         <div className="form-field">
           <label htmlFor="draft-title" className="form-label">
@@ -139,7 +134,7 @@ export default function DraftingForm({
             className="form-input"
             defaultValue={draft.title}
             onChange={handleChange("title")}
-            placeholder={getPlaceholder(draft.category, "title")}
+            placeholder={getPlaceholder(subType, "title")}
             maxLength={200}
             disabled={disabled}
           />
@@ -154,7 +149,7 @@ export default function DraftingForm({
             className="form-textarea"
             defaultValue={draft.description}
             onChange={handleChange("description")}
-            placeholder={getPlaceholder(draft.category, "description")}
+            placeholder={getPlaceholder(subType, "description")}
             rows={5}
             disabled={disabled}
           />
@@ -169,29 +164,12 @@ export default function DraftingForm({
             className="form-textarea form-textarea-small"
             defaultValue={draft.sources}
             onChange={handleChange("sources")}
-            placeholder={getPlaceholder(draft.category, "sources")}
+            placeholder={getPlaceholder(subType, "sources")}
             rows={2}
             disabled={disabled}
           />
           <p className="form-hint">Add relevant links, one per line.</p>
         </div>
-
-        {(draft.category === "issue" || draft.category === "project") && (
-          <div className="form-field">
-            <label htmlFor="draft-considerations" className="form-label">
-              Considerations <span className="optional">(optional)</span>
-            </label>
-            <textarea
-              id="draft-considerations"
-              className="form-textarea"
-              defaultValue={draft.considerations}
-              onChange={handleChange("considerations")}
-              placeholder={getPlaceholder(draft.category, "considerations")}
-              rows={3}
-              disabled={disabled}
-            />
-          </div>
-        )}
       </div>
 
       <div className="drafting-form-footer">
@@ -200,7 +178,7 @@ export default function DraftingForm({
         </div>
 
         <div className="draft-actions">
-          {draft.title.trim() && draft.category && (draft.last_review_result === null || draft.draft_modified_since_review) && (
+          {draft.title.trim() && (draft.last_review_result === null || draft.draft_modified_since_review) && (
             <button
               type="button"
               className="draft-review-btn"
@@ -217,14 +195,6 @@ export default function DraftingForm({
             disabled={!canSubmit}
           >
             Submit proposal
-          </button>
-          <button
-            type="button"
-            className="draft-dispute-btn"
-            onClick={onDispute}
-            disabled={!canDispute}
-          >
-            Dispute &amp; send to steward
           </button>
         </div>
       </div>

@@ -20,7 +20,7 @@ import {
 } from "../modules/civic.proposal_assistant/index.js";
 import { createProposal } from "../modules/civic.proposals/index.js";
 
-const VALID_CATEGORIES = new Set(["issue", "idea", "project"]);
+const VALID_CATEGORIES = new Set(["issue", "idea", "project", "concern"]);
 const VALID_PHASES = new Set(["brainstorm", "review", "free_form"]);
 
 function getHubConfig(): HubConfig {
@@ -295,13 +295,13 @@ export async function handleSubmitDraft(
     const hasHardBlocks = (draft.last_review_result ?? []).some(
       (s) => s.severity === "hard",
     );
-    if (hasHardBlocks && !draft.steward_approved) {
+    if (hasHardBlocks) {
       res.status(400).json({
-        error: "Cannot submit: unresolved Code of Conduct concerns. Review your draft or dispute.",
+        error: "Cannot submit: unresolved Code of Conduct concerns. Please review your draft and address all issues.",
       });
       return;
     }
-    if (draft.draft_modified_since_review && !draft.steward_approved) {
+    if (draft.draft_modified_since_review) {
       res.status(400).json({
         error: "Draft has been modified since last review. Please review again before submitting.",
       });

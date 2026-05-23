@@ -1,0 +1,40 @@
+/* Propose listing page — overrides for the CTA card to use a
+   warm green accent instead of the vote-blue palette. */
+
+.propose-cta-inner {
+  background: #e8f5e9;
+  border-color: #2e7d32;
+}
+
+.propose-cta-title {
+  color: #2e7d32;
+}
+
+.propose-cta-button {
+  background: #2e7d32;
+}
+
+.propose-cta-button:hover {
+  background: #1b5e20;
+}
+
+.proposal-supporters {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  margin: var(--space-xs) 0 0;
+}
+
+.status-open {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+
+.status-converted {
+  background: var(--pill-vote-bg, #e3eaf6);
+  color: var(--pill-vote-fg, #1e3a5f);
+}
+
+.status-archived {
+  background: var(--color-surface-muted, #f3f4f6);
+  color: var(--color-text-muted, #6b7280);
+}

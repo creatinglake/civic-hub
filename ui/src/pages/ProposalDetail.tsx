@@ -18,7 +18,7 @@ function formatDate(iso: string): string {
 
 function statusLabel(status: string): string {
   switch (status) {
-    case "submitted": return "gathering support";
+    case "submitted": return "open";
     case "endorsed": return "endorsed";
     case "converted": return "converted to vote";
     case "archived": return "archived";
@@ -28,7 +28,7 @@ function statusLabel(status: string): string {
 
 function statusClass(status: string): string {
   switch (status) {
-    case "submitted": return "status-gathering";
+    case "submitted": return "status-open";
     case "endorsed": return "admin-status-endorsed";
     case "converted": return "admin-status-converted";
     case "archived": return "admin-status-archived";
@@ -43,7 +43,7 @@ export default function ProposalDetail() {
   const [proposal, setProposal] = useState<CivicProposalDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [endorsing, setEndorsing] = useState(false);
+  const [supporting, setSupporting] = useState(false);
   const [commentRefresh, setCommentRefresh] = useState(0);
 
   const currentActor = actorId ?? "anonymous";
@@ -60,32 +60,27 @@ export default function ProposalDetail() {
     fetchProposal();
   }, [fetchProposal]);
 
-  async function doEndorse() {
+  async function doSupport() {
     if (!id || !actorId) return;
-    setEndorsing(true);
+    setSupporting(true);
     setError(null);
     try {
       await supportCivicProposal(id, actorId);
       fetchProposal();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to endorse");
+      setError(err instanceof Error ? err.message : "Failed to support");
     } finally {
-      setEndorsing(false);
+      setSupporting(false);
     }
   }
 
-  function handleEndorse() {
-    requireAuth(() => doEndorse());
+  function handleSupport() {
+    requireAuth(() => doSupport());
   }
 
   if (loading) return <p className="detail-page">Loading...</p>;
   if (error && !proposal) return <p className="detail-page error">Error: {error}</p>;
   if (!proposal) return <p className="detail-page">Not found.</p>;
-
-  const progress = Math.min(
-    (proposal.support_count / proposal.support_threshold) * 100,
-    100
-  );
 
   return (
     <div className="page detail-page">
@@ -93,7 +88,7 @@ export default function ProposalDetail() {
         <AuthModal onComplete={handleAuthComplete} onDismiss={closeAuthModal} />
       )}
 
-      <Link to="/votes" className="back-link back-link-sticky">&larr; Back to votes</Link>
+      <Link to="/propose" className="back-link back-link-sticky">&larr; Proposals</Link>
 
       <div className="process-header">
         <h1>{proposal.title}</h1>
@@ -115,73 +110,51 @@ export default function ProposalDetail() {
         <p className="assistant-helped-label">Drafted with assistant help</p>
       )}
 
-      {/* Share — visible while the proposal is actively gathering
-          (or has gathered) endorsements; the whole reason a user
-          wants to share is to push it past the threshold. Suppressed
-          for converted / archived where sharing no longer drives
-          action. */}
-      {(proposal.status === "submitted" || proposal.status === "endorsed") && (
+      {/* Share — visible while the proposal is open */}
+      {proposal.status === "submitted" && (
         <div className="process-share-row">
           <ShareButton
             title={proposal.title}
-            shareText={`Endorse this proposal: ${proposal.title}`}
+            shareText={`Support this proposal: ${proposal.title}`}
           />
         </div>
       )}
 
-      {/* Endorsement section */}
+      {/* Support section */}
       {proposal.status === "submitted" && (
         <div className="proposal-endorsement-section">
-          <h3>Community Endorsement</h3>
-          <p className="proposal-endorsement-text">
-            This proposal needs {proposal.support_threshold} endorsements to be
-            reviewed for an official vote.
-          </p>
-
-          <div className="proposal-progress">
-            <div className="proposal-progress-track">
-              <div
-                className="proposal-progress-fill"
-                style={{ width: `${progress}%` }}
-              />
-            </div>
-            <span className="proposal-progress-label">
-              {proposal.support_count} / {proposal.support_threshold}
-            </span>
-          </div>
+          {proposal.support_count > 0 && (
+            <p className="proposal-supporters-detail">
+              {proposal.support_count}{" "}
+              {proposal.support_count === 1 ? "supporter" : "supporters"}
+            </p>
+          )}
 
           <div className="proposal-action">
             {error && <p className="form-error">{error}</p>}
             {proposal.has_supported ? (
-              <p className="endorse-confirmation">You have endorsed this proposal.</p>
+              <p className="endorse-confirmation">You have supported this proposal.</p>
             ) : (
               <button
                 className="endorse-button"
-                onClick={handleEndorse}
-                disabled={endorsing}
+                onClick={handleSupport}
+                disabled={supporting}
               >
-                {endorsing ? "Endorsing..." : "Endorse This Proposal"}
+                {supporting ? "Supporting..." : "Support this proposal"}
               </button>
             )}
           </div>
         </div>
       )}
 
+      {/* Backward compat: endorsed proposals from before Slice B */}
       {proposal.status === "endorsed" && (
         <div className="proposal-endorsed-notice">
           <h3>Endorsed</h3>
           <p>
-            This proposal has received enough community support and is awaiting
-            admin review to become an official vote.
+            This proposal received enough community support and is awaiting
+            admin review.
           </p>
-          <div className="proposal-progress">
-            <div className="proposal-progress-track">
-              <div className="proposal-progress-fill" style={{ width: "100%" }} />
-            </div>
-            <span className="proposal-progress-label">
-              {proposal.support_count} / {proposal.support_threshold}
-            </span>
-          </div>
         </div>
       )}
 

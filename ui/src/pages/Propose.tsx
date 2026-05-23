@@ -1,0 +1,142 @@
+import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
+import {
+  listCivicProposals,
+  type CivicProposalSummary,
+} from "../services/api";
+import HubInfo from "../components/HubInfo";
+import FeedVotesTabs from "../components/FeedVotesTabs";
+import "./Propose.css";
+
+/**
+ * Slice B — Propose listing page. Mirrors the Votes page pattern:
+ * hub banner + tab strip → CTA card → list of proposals.
+ *
+ * Proposals are standalone civic contributions — ideas and concerns
+ * submitted by community members. Unlike the previous pipeline, they
+ * are NOT a stepping stone to votes. They go live immediately after
+ * the AI review gate.
+ */
+export default function Propose() {
+  const [proposals, setProposals] = useState<CivicProposalSummary[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    listCivicProposals()
+      .then((all) => setProposals(all))
+      .catch((err) => setError(err.message))
+      .finally(() => setLoading(false));
+  }, []);
+
+  // Show submitted proposals, sorted by support count descending.
+  // Endorsed/converted/archived proposals from before the Slice B
+  // simplification still show if they exist — just lower in the list.
+  const activeProposals = proposals
+    .filter((p) => p.status === "submitted")
+    .sort((a, b) => b.support_count - a.support_count);
+
+  const archivedProposals = proposals
+    .filter((p) => p.status !== "submitted")
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+  return (
+    <div className="page page-home">
+      <HubInfo />
+      <FeedVotesTabs />
+
+      <section className="suggest-vote-cta propose-cta">
+        <div className="suggest-vote-cta-inner propose-cta-inner">
+          <h2 className="suggest-vote-cta-title propose-cta-title">
+            Got something on your mind?
+          </h2>
+          <p className="suggest-vote-cta-body">
+            Share an idea or raise a concern for the community to
+            consider. Your proposal goes live after a quick review.
+          </p>
+          <Link to="/propose/new" className="suggest-vote-cta-button propose-cta-button">
+            + Propose an idea
+          </Link>
+        </div>
+      </section>
+
+      {loading && <p className="section">Loading...</p>}
+      {error && <p className="section error">Failed to load: {error}</p>}
+
+      {!loading && !error && (
+        <>
+          <section className="section">
+            <h2 className="section-title">Community Proposals</h2>
+            <p className="section-description">
+              Ideas and concerns raised by community members. Support
+              the ones you care about.
+            </p>
+            {activeProposals.length === 0 ? (
+              <p className="empty-state-inline">
+                No proposals yet.{" "}
+                <Link to="/propose/new" className="inline-link">
+                  Be the first to share an idea.
+                </Link>
+              </p>
+            ) : (
+              <ul className="process-list">
+                {activeProposals.map((p) => (
+                  <li key={p.id}>
+                    <Link to={`/proposal/${p.id}`} className="process-link">
+                      <div className="proposal-card">
+                        <div className="proposal-card-header">
+                          <h3>{p.title}</h3>
+                          <span className="status-badge status-open">open</span>
+                        </div>
+                        {p.support_count > 0 && (
+                          <p className="proposal-supporters">
+                            {p.support_count}{" "}
+                            {p.support_count === 1 ? "supporter" : "supporters"}
+                          </p>
+                        )}
+                        <div className="process-card-meta">
+                          <span>by {p.submitted_by}</span>
+                          <span>{new Date(p.created_at).toLocaleDateString()}</span>
+                        </div>
+                      </div>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+
+          {archivedProposals.length > 0 && (
+            <section className="section">
+              <h2 className="section-title">Past Proposals</h2>
+              <ul className="process-list">
+                {archivedProposals.map((p) => (
+                  <li key={p.id}>
+                    <Link to={`/proposal/${p.id}`} className="process-link">
+                      <div className="proposal-card">
+                        <div className="proposal-card-header">
+                          <h3>{p.title}</h3>
+                          <span className={`status-badge ${
+                            p.status === "endorsed" ? "admin-status-endorsed" :
+                            p.status === "converted" ? "status-converted" :
+                            "status-archived"
+                          }`}>
+                            {p.status}
+                          </span>
+                        </div>
+                        <div className="process-card-meta">
+                          <span>by {p.submitted_by}</span>
+                          <span>{new Date(p.created_at).toLocaleDateString()}</span>
+                        </div>
+                      </div>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+        </>
+      )}
+    </div>
+  );
+}

@@ -2105,6 +2105,12 @@
   font-size: 0.9rem;
 }
 
+.proposal-supporters-detail {
+  font-size: 0.95rem;
+  color: var(--muted-text);
+  margin: 0 0 0.75rem;
+}
+
 .proposal-links-section {
   margin-top: 1.5rem;
 }

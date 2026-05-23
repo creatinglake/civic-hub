@@ -2,12 +2,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import {
   listProcesses,
-  listCivicProposals,
   type ProcessSummary,
   type PublishedVoteResultsSummary,
   type VoteSummary,
   type ProposalSummary,
-  type CivicProposalSummary,
 } from "../services/api";
 import HubInfo from "../components/HubInfo";
 import ProcessCard from "../components/ProcessCard";
@@ -39,7 +37,6 @@ function isFilterKey(v: string | null): v is VotesFilterKey {
 
 export default function Votes() {
   const [processes, setProcesses] = useState<ProcessSummary[]>([]);
-  const [civicProposals, setCivicProposals] = useState<CivicProposalSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -74,11 +71,8 @@ export default function Votes() {
   }, [saveScroll]);
 
   useEffect(() => {
-    Promise.all([listProcesses(), listCivicProposals()])
-      .then(([procs, props]) => {
-        setProcesses(procs);
-        setCivicProposals(props);
-      })
+    listProcesses()
+      .then(setProcesses)
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
   }, []);
@@ -133,14 +127,9 @@ export default function Votes() {
     .filter((p): p is ProposalSummary => p.type === "civic.proposal")
     .sort((a, b) => b.support_count - a.support_count);
 
-  const activeCivicProposals = civicProposals
-    .filter((p) => p.status === "submitted" || p.status === "endorsed")
-    .sort((a, b) => b.support_count - a.support_count);
-
   const hasAnyProposals =
     proposedVotes.length > 0 ||
-    legacyProposals.length > 0 ||
-    activeCivicProposals.length > 0;
+    legacyProposals.length > 0;
 
   // Section visibility — derived from the active filter.
   const showActive = activeFilter === "all" || activeFilter === "active";
@@ -256,37 +245,6 @@ export default function Votes() {
                     </li>
                   ))}
 
-                  {activeCivicProposals.map((p) => (
-                    <li key={p.id}>
-                      <Link to={`/proposal/${p.id}`} className="process-link">
-                        <div className="proposal-card">
-                          <div className="proposal-card-header">
-                            <h3>{p.title}</h3>
-                            <span className={`status-badge ${p.status === "endorsed" ? "admin-status-endorsed" : "status-gathering"}`}>
-                              {p.status === "endorsed" ? "endorsed" : "gathering support"}
-                            </span>
-                          </div>
-                          <div className="proposal-progress">
-                            <div className="proposal-progress-track">
-                              <div
-                                className="proposal-progress-fill"
-                                style={{
-                                  width: `${Math.min((p.support_count / p.support_threshold) * 100, 100)}%`,
-                                }}
-                              />
-                            </div>
-                            <span className="proposal-progress-label">
-                              {p.support_count} / {p.support_threshold}
-                            </span>
-                          </div>
-                          <div className="process-card-meta">
-                            <span>by {p.submitted_by}</span>
-                            <span>{new Date(p.created_at).toLocaleDateString()}</span>
-                          </div>
-                        </div>
-                      </Link>
-                    </li>
-                  ))}
                 </ul>
               )}
             </section>

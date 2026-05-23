@@ -5,20 +5,27 @@ import { useRequireAuth } from "../hooks/useRequireAuth";
 import AuthModal from "../components/AuthModal";
 import AssistantPanel, { type ChatMessage } from "../components/AssistantPanel";
 import DraftingForm from "../components/DraftingForm";
-import hub from "../config/hub";
 import {
   createDraft,
   updateDraft,
   sendAssistantMessage,
   reviewDraft,
   submitDraft as apiSubmitDraft,
-  type DraftCategory,
   type ProposalDraft,
   type DraftSuggestion,
 } from "../services/api";
 import "./ProposeDraft.css";
 
-type Step = "category" | "path" | "drafting";
+/**
+ * Slice B — Proposal drafting page. Simplified to 2 steps:
+ *   path     — brainstorm or write-my-own
+ *   drafting — two-pane form + AI assistant
+ *
+ * The old 3-step flow (category → path → drafting) is gone.
+ * The idea/concern sub-type lives inside the DraftingForm as a
+ * lightweight toggle — no separate category selection step.
+ */
+type Step = "path" | "drafting";
 
 function friendlyError(msg: string): string {
   if (msg.includes("rate_limit") || msg.includes("429"))
@@ -36,8 +43,7 @@ export default function ProposeDraft() {
   const { requireAuth, showAuthModal, closeAuthModal, handleAuthComplete } =
     useRequireAuth();
 
-  const [step, setStep] = useState<Step>("category");
-  const [category, setCategory] = useState<DraftCategory | null>(null);
+  const [step, setStep] = useState<Step>("path");
   const [draft, setDraft] = useState<ProposalDraft | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(false);
@@ -49,17 +55,14 @@ export default function ProposeDraft() {
 
   const isMobile = useIsMobile();
 
-  function handleCategorySelect(cat: DraftCategory) {
-    setCategory(cat);
-    setStep("path");
-  }
-
   async function startDraft(path: "brainstorm" | "write") {
     requireAuth(async () => {
       setLoading(true);
       setError(null);
       try {
-        const d = await createDraft(category!);
+        // Create draft with "idea" as the default sub-type. The user
+        // can switch to "concern" inside the form.
+        const d = await createDraft("idea");
         setDraft(d);
         setStep("drafting");
 
@@ -74,7 +77,7 @@ export default function ProposeDraft() {
           const result = await sendAssistantMessage(
             d.id,
             "brainstorm",
-            `I want to brainstorm a proposal. I've selected the "${category}" category.`,
+            "I want to propose something for the community to consider.",
           );
           setDraft(result.draft);
           setMessages((prev) => [
@@ -182,25 +185,12 @@ export default function ProposeDraft() {
     [draft],
   );
 
-  const handleCategoryChange = useCallback(
-    async (cat: DraftCategory) => {
-      if (!draft) return;
-      setCategory(cat);
-      try {
-        const updated = await updateDraft(draft.id, { category: cat });
-        setDraft(updated);
-      } catch {
-        // silent
-      }
-    },
-    [draft],
-  );
-
   const handleApplySuggestion = useCallback(
     async (suggestion: DraftSuggestion) => {
       if (!draft || !suggestion.field || !suggestion.suggested_revision) return;
+      if (suggestion.field === "considerations") return;
 
-      const field = suggestion.field as keyof typeof draft;
+      const field = suggestion.field as keyof Pick<ProposalDraft, "title" | "description" | "sources">;
       const current = String(draft[field] ?? "");
       let newValue: string;
 
@@ -242,7 +232,7 @@ export default function ProposeDraft() {
     setError(null);
     try {
       await apiSubmitDraft(draft.id);
-      navigate("/votes");
+      navigate("/propose");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Submit failed");
     } finally {
@@ -253,68 +243,6 @@ export default function ProposeDraft() {
 
   // --- Render ---
 
-  if (step === "category") {
-    return (
-      <div className="page detail-page">
-        {showAuthModal && (
-          <AuthModal
-            onComplete={handleAuthComplete}
-            onDismiss={closeAuthModal}
-          />
-        )}
-        <Link to="/" className="back-link">
-          &larr; Home
-        </Link>
-        <h1>Suggest a vote</h1>
-        <p className="propose-description">
-          Submit an idea for the community to consider. With enough citizen
-          support — your neighbors endorsing it — your suggestion is reviewed and
-          may become an official {hub.jurisdiction} advisory vote.
-        </p>
-
-        {!canParticipate && (
-          <p className="auth-prompt-inline">
-            You'll need to create an account before submitting.
-          </p>
-        )}
-
-        <h2 className="propose-step-heading">What kind of proposal is this?</h2>
-
-        <fieldset className="category-selector" style={{ border: "none", padding: 0 }}>
-          <div className="category-cards">
-            {([
-              {
-                value: "issue" as const,
-                label: "Issue",
-                desc: "A concern, problem, or factual matter you want the community to consider.",
-              },
-              {
-                value: "idea" as const,
-                label: "Idea",
-                desc: "A preference or aspiration — something you'd like to see happen.",
-              },
-              {
-                value: "project" as const,
-                label: "Project",
-                desc: "A concrete initiative you or someone else could organize.",
-              },
-            ]).map((cat) => (
-              <button
-                key={cat.value}
-                type="button"
-                className={`category-card${category === cat.value ? " selected" : ""}`}
-                onClick={() => handleCategorySelect(cat.value)}
-              >
-                <span className="category-card-label">{cat.label}</span>
-                <span className="category-card-desc">{cat.desc}</span>
-              </button>
-            ))}
-          </div>
-        </fieldset>
-      </div>
-    );
-  }
-
   if (step === "path") {
     return (
       <div className="page detail-page">
@@ -324,14 +252,20 @@ export default function ProposeDraft() {
             onDismiss={closeAuthModal}
           />
         )}
-        <Link to="/" className="back-link">
-          &larr; Home
+        <Link to="/propose" className="back-link">
+          &larr; Proposals
         </Link>
-        <h1>Suggest a vote</h1>
+        <h1>Propose an idea</h1>
         <p className="propose-description">
-          How would you like to start your{" "}
-          <strong>{category}</strong> proposal?
+          Share an idea or raise a concern for the community to consider.
+          Your proposal goes live after a quick review.
         </p>
+
+        {!canParticipate && (
+          <p className="auth-prompt-inline">
+            You'll need to create an account before submitting.
+          </p>
+        )}
 
         {error && <p className="form-error">{error}</p>}
 
@@ -362,14 +296,6 @@ export default function ProposeDraft() {
             </span>
           </button>
         </div>
-
-        <button
-          type="button"
-          className="path-back-link"
-          onClick={() => setStep("category")}
-        >
-          &larr; Change category
-        </button>
       </div>
     );
   }
@@ -402,19 +328,17 @@ export default function ProposeDraft() {
           <div className="propose-draft-assistant">{assistantPanel}</div>
           <div className="propose-draft-form">
             <div className="propose-draft-form-header">
-              <Link to="/" className="back-link">
-                &larr; Home
+              <Link to="/propose" className="back-link">
+                &larr; Proposals
               </Link>
-              <h1 className="propose-draft-title">Suggest a vote</h1>
+              <h1 className="propose-draft-title">Propose an idea</h1>
             </div>
             {error && <p className="form-error" style={{ padding: "0 var(--space-lg)" }}>{error}</p>}
             <DraftingForm
               draft={draft}
               onFieldChange={handleFieldChange}
-              onCategoryChange={handleCategoryChange}
               onReview={handleReview}
               onSubmit={handleSubmit}
-              onDispute={() => {}}
               disabled={submitting}
               reviewLoading={loading}
             />
@@ -427,18 +351,16 @@ export default function ProposeDraft() {
         <>
           <div className="propose-draft-mobile">
             <div className="page detail-page">
-              <Link to="/" className="back-link">
-                &larr; Home
+              <Link to="/propose" className="back-link">
+                &larr; Proposals
               </Link>
-              <h1>Suggest a vote</h1>
+              <h1>Propose an idea</h1>
               {error && <p className="form-error">{error}</p>}
               <DraftingForm
                 draft={draft}
                 onFieldChange={handleFieldChange}
-                onCategoryChange={handleCategoryChange}
                 onReview={handleReview}
                 onSubmit={handleSubmit}
-                onDispute={() => {}}
                 disabled={submitting}
                 reviewLoading={loading}
               />
@@ -501,7 +423,7 @@ export default function ProposeDraft() {
             {draft.assistant_helped && (
               <p className="confirm-disclosure">
                 This proposal was drafted with AI assistant help. You are
-                responsible for the content. Voters will see a small
+                responsible for the content. Readers will see a small
                 "drafted with assistant help" note.
               </p>
             )}

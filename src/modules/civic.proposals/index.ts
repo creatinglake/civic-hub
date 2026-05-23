@@ -24,7 +24,6 @@ import type {
 import {
   emitProposalSubmitted,
   emitProposalSupported,
-  emitProposalEndorsed,
   type EmitEventFn,
 } from "./events.js";
 
@@ -234,15 +233,14 @@ export async function supportProposal(
   if (countErr) throw new Error(`Proposals: ${countErr.message}`);
   const newCount = supportCount ?? 0;
 
-  const thresholdReached = newCount >= config.proposal_support_threshold;
-  const newStatus: ProposalStatus = thresholdReached ? "endorsed" : "submitted";
-
-  // Update the proposal row with the new count (and status, if crossing threshold).
+  // Update the proposal row with the new count. Status stays unchanged —
+  // Slice B removed the auto-promotion to "endorsed" when crossing the
+  // support threshold. Proposals remain in "submitted" status regardless
+  // of support count.
   const { data: updated, error: updErr } = await db
     .from("proposals")
     .update({
       support_count: newCount,
-      status: newStatus,
       updated_at: new Date().toISOString(),
     })
     .eq("id", proposalId)
@@ -260,22 +258,6 @@ export async function supportProposal(
       support_threshold: config.proposal_support_threshold,
     },
   );
-
-  // Emit endorsed event exactly once — when we just crossed the threshold.
-  if (thresholdReached && proposal.status === "submitted") {
-    await emitProposalEndorsed(
-      { proposal_id: proposalId, emit },
-      userId,
-      {
-        support_count: result.support_count,
-        support_threshold: config.proposal_support_threshold,
-      },
-    );
-    console.log(
-      `[proposal] "${result.title}" reached endorsement threshold ` +
-      `(${result.support_count}/${config.proposal_support_threshold})`,
-    );
-  }
 
   return result;
 }

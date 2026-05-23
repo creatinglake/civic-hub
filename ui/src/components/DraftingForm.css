@@ -13,67 +13,40 @@
   gap: var(--space-md);
 }
 
-/* --- Category selector --- */
+/* --- Sub-type toggle (Idea / Concern) --- */
 
-.category-selector {
-  border: none;
-  padding: 0;
-  margin: 0;
-}
-
-.category-cards {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: var(--space-sm);
-  margin-top: var(--space-sm);
-}
-
-.category-card {
+.subtype-toggle {
   display: flex;
-  flex-direction: column;
   gap: var(--space-xs);
-  padding: var(--space-md);
+}
+
+.subtype-pill {
+  padding: var(--space-xs) var(--space-md);
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-full, 999px);
+  background: var(--color-surface);
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  color: var(--color-text-muted);
   cursor: pointer;
   transition: all 0.15s ease;
-  background: var(--color-surface);
 }
 
-.category-card:hover {
+.subtype-pill:hover:not(:disabled) {
   border-color: var(--color-border-hover);
-  background: var(--color-surface-alt);
-}
-
-.category-card.selected {
-  border-color: var(--color-primary);
-  background: var(--pill-vote-bg);
-}
-
-.category-radio {
-  position: absolute;
-  opacity: 0;
-  width: 0;
-  height: 0;
-}
-
-.category-card-label {
-  font-family: var(--font-heading);
-  font-weight: 600;
-  font-size: var(--font-size-sm);
   color: var(--color-text);
 }
 
-.category-card-desc {
-  font-size: var(--font-size-xs);
-  color: var(--color-text-muted);
-  line-height: var(--line-height-normal);
+.subtype-pill-active {
+  border-color: #2e7d32;
+  background: #e8f5e9;
+  color: #2e7d32;
+  font-weight: 600;
 }
 
-@media (max-width: 600px) {
-  .category-cards {
-    grid-template-columns: 1fr;
-  }
+.subtype-pill:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 /* --- Footer --- */
@@ -149,26 +122,6 @@
   cursor: not-allowed;
 }
 
-.draft-dispute-btn {
-  padding: var(--space-sm) var(--space-md);
-  background: var(--color-surface);
-  color: var(--color-text-muted);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  font-size: var(--font-size-sm);
-  cursor: pointer;
-  transition: all 0.15s ease;
-}
-
-.draft-dispute-btn:hover:not(:disabled) {
-  border-color: var(--color-border-hover);
-  color: var(--color-text);
-}
-
-.draft-dispute-btn:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
 
 /* --- Review button --- */
 
