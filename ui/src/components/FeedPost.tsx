@@ -70,7 +70,8 @@ type FeedProcessKind =
   | "civic.vote_results"
   | "civic.brief" // legacy alias — normalize to "civic.vote_results"
   | "civic.announcement"
-  | "civic.meeting_summary";
+  | "civic.meeting_summary"
+  | "generic";
 
 export function eventToPost(
   event: CivicEvent,
