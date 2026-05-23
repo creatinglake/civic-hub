@@ -255,10 +255,11 @@ export default function ProposeDraft() {
         <Link to="/propose" className="back-link">
           &larr; Proposals
         </Link>
-        <h1>Propose an idea</h1>
+        <h1>Propose something</h1>
         <p className="propose-description">
-          Share an idea or raise a concern for the community to consider.
-          Your proposal goes live after a quick review.
+          Share an <span className="keyword-idea">idea</span> or raise a{" "}
+          <span className="keyword-concern">concern</span> for the community
+          to consider. Your proposal goes live after a quick review.
         </p>
 
         {!canParticipate && (
@@ -331,7 +332,7 @@ export default function ProposeDraft() {
               <Link to="/propose" className="back-link">
                 &larr; Proposals
               </Link>
-              <h1 className="propose-draft-title">Propose an idea</h1>
+              <h1 className="propose-draft-title">Propose something</h1>
             </div>
             {error && <p className="form-error" style={{ padding: "0 var(--space-lg)" }}>{error}</p>}
             <DraftingForm
@@ -354,7 +355,7 @@ export default function ProposeDraft() {
               <Link to="/propose" className="back-link">
                 &larr; Proposals
               </Link>
-              <h1>Propose an idea</h1>
+              <h1>Propose something</h1>
               {error && <p className="form-error">{error}</p>}
               <DraftingForm
                 draft={draft}
