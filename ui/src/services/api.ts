@@ -380,6 +380,65 @@ export function submitDraft(
   return request("POST", `/proposals/drafts/${draftId}/submit`);
 }
 
+// --- Vote Drafts (AI-augmented vote drafting) ---
+
+export interface VoteDraft {
+  id: string;
+  user_id: string;
+  title: string;
+  description: string;
+  sources: string;
+  voting_duration_ms: number;
+  conversation_history: Array<{ role: "user" | "assistant"; content: string }>;
+  last_review_result: DraftSuggestion[] | null;
+  draft_modified_since_review: boolean;
+  assistant_helped: boolean;
+  status: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface VoteDraftAssistantResult {
+  response: AssistantResponse;
+  draft: VoteDraft;
+}
+
+export function createVoteDraft(): Promise<VoteDraft> {
+  return request("POST", "/votes/drafts");
+}
+
+export function getVoteDraft(id: string): Promise<VoteDraft> {
+  return request("GET", `/votes/drafts/${id}`);
+}
+
+export function updateVoteDraft(
+  id: string,
+  patch: Partial<Pick<VoteDraft, "title" | "description" | "sources" | "voting_duration_ms">> & { skip_modified_flag?: boolean },
+): Promise<VoteDraft> {
+  return request("PATCH", `/votes/drafts/${id}`, patch);
+}
+
+export function sendVoteAssistantMessage(
+  draftId: string,
+  phase: DraftPhase,
+  userMessage: string,
+): Promise<VoteDraftAssistantResult> {
+  return request("POST", `/votes/drafts/${draftId}/assistant`, {
+    phase,
+    user_message: userMessage,
+  });
+}
+
+export function reviewVoteDraft(draftId: string): Promise<VoteDraftAssistantResult> {
+  return request("POST", `/votes/drafts/${draftId}/review`);
+}
+
+export function submitVoteDraft(
+  draftId: string,
+): Promise<{ process_id: string }> {
+  return request("POST", `/votes/drafts/${draftId}/submit`);
+}
+
 // --- Admin: Proposal Review ---
 
 /** List proposals for admin review */

@@ -40,7 +40,8 @@ type ProcessKind =
   | "civic.vote"
   | "civic.vote_results"
   | "civic.announcement"
-  | "civic.meeting_summary";
+  | "civic.meeting_summary"
+  | "generic";
 
 interface ProcessMeta {
   type?: ProcessKind;
@@ -109,8 +110,24 @@ function kindFromEvent(event: CivicEvent): ProcessKind | null {
     // brief_id) — INTENTIONALLY EXCLUDED from the feed. See FeedPost
     // for the matching filter on the rendering side.
     if (data?.result !== undefined) return null;
+
+    return "generic";
   }
-  return null;
+  // Known lifecycle events that don't produce feed cards — keep excluded.
+  const EXCLUDED_TYPES = new Set([
+    "civic.process.created",
+    "civic.process.updated",
+    "civic.process.ended",
+    "civic.process.aggregation_completed",
+    "civic.process.proposed",
+    "civic.process.threshold_met",
+    "civic.process.vote_submitted",
+    "civic.process.action_taken",
+    "civic.process.comment_added",
+    "civic.process.proposal_created",
+  ]);
+  if (EXCLUDED_TYPES.has(event.event_type)) return null;
+  return "generic";
 }
 
 export default function Feed({ filter, emptyFilteredAction }: Props) {
@@ -231,6 +248,12 @@ export default function Feed({ filter, emptyFilteredAction }: Props) {
             maxStartSeconds: maxStart,
           };
         });
+      } else if (kind === "generic") {
+        lookup = getProcessState(id).then((state) => ({
+          type: "generic" as const,
+          title: state.title as string | undefined,
+          description: state.description as string | undefined,
+        }));
       } else {
         // civic.announcement — body serves as the feed summary.
         // Slice 11: when an admin has removed the announcement, push
@@ -430,6 +453,8 @@ function buildEngagement(
       if (dur) parts.push(dur);
       return parts.join(" · ");
     }
+    case "generic":
+      return null;
   }
 }
 

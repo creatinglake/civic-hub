@@ -90,14 +90,6 @@ const hub = {
    */
   demo_mode: import.meta.env.VITE_DEMO_MODE === "true",
   demo_bypass_code: import.meta.env.VITE_DEMO_BYPASS_CODE ?? "",
-  /**
-   * When true, /propose uses the AI-augmented drafting assistant
-   * (brainstorm flow, structured review, CoC enforcement). When
-   * false, /propose shows the original simple form. Requires
-   * ANTHROPIC_API_KEY on the backend and the proposal_drafts
-   * migration applied. Default: off.
-   */
-  proposal_assistant: import.meta.env.VITE_PROPOSAL_ASSISTANT_ENABLED === "true",
 };
 
 export default hub;

@@ -118,6 +118,7 @@
 .feed-post--announcement        { border-top-color: var(--pill-announcement-bg); }
 .feed-post--announcement-author { border-top-color: var(--pill-announcement-author-bg); }
 .feed-post--meeting             { border-top-color: var(--pill-meeting-bg); }
+.feed-post--generic             { border-top-color: #6b7280; }
 
 .feed-post-link:focus-visible {
   outline: 2px solid var(--color-focus);
@@ -217,6 +218,7 @@
 .feed-pill--announcement        { background: var(--pill-announcement-bg);        color: var(--pill-announcement-fg); }
 .feed-pill--announcement-author { background: var(--pill-announcement-author-bg); color: var(--pill-announcement-author-fg); }
 .feed-pill--meeting             { background: var(--pill-meeting-bg);             color: var(--pill-meeting-fg); }
+.feed-pill--generic             { background: #6b7280;                            color: #fff; }
 
 /* --- Load more --- */
 

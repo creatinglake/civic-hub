@@ -3,6 +3,7 @@ export type { CallClaudeMultiTurnFn } from "./service.js";
 export type {
   Phase,
   Category,
+  ProcessType,
   Suggestion,
   DraftState,
   DraftProposal,

@@ -19,7 +19,8 @@ export type FeedPillKind =
   | "vote-results"
   | "announcement"          // admin-authored announcements (default)
   | "announcement-author"   // non-admin author (Board, committees, etc.)
-  | "meeting";
+  | "meeting"
+  | "generic";
 
 /**
  * Display model for a feed post. Constructed from a CivicEvent by the Feed
@@ -278,15 +279,32 @@ export function eventToPost(
         return null;
       }
 
-      // Unknown shape — defensive fallback. A new process type emitting
-      // result_published without updating this discrimination ladder
-      // ends up here. Surface a minimal post rather than a crash, but
-      // it's worth following up to add a proper kind.
-      return null;
+      // Unknown shape — a new process type emitting result_published
+      // without updating this discrimination ladder. Surface a generic
+      // card so future process types render automatically.
+      return {
+        id: event.id,
+        title: getProcessTitle(event.process_id) ?? "Activity",
+        pillLabel: "Activity",
+        pillKind: "generic",
+        summary: summaryFromDescription(getProcessDescription(event.process_id)),
+        timestamp: event.timestamp,
+        href: event.action_url,
+      };
     }
 
-    default:
-      return null;
+    default: {
+      const title = getProcessTitle(event.process_id) ?? "Activity";
+      return {
+        id: event.id,
+        title,
+        pillLabel: "Activity",
+        pillKind: "generic",
+        summary: summaryFromDescription(getProcessDescription(event.process_id)),
+        timestamp: event.timestamp,
+        href: event.action_url,
+      };
+    }
   }
 }
 

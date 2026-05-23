@@ -1,0 +1,8 @@
+/* ProposeDraftVote — reuses ProposeDraft.css layout classes.
+   Only vote-specific additions here. */
+
+.confirm-duration {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  margin: var(--space-sm) 0 0;
+}

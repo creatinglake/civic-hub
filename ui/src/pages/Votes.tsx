@@ -170,7 +170,7 @@ export default function Votes() {
             citizen support, your suggestion becomes an official Floyd
             County advisory vote.
           </p>
-          <Link to="/propose" className="suggest-vote-cta-button">
+          <Link to="/votes/new" className="suggest-vote-cta-button">
             + Suggest a vote
           </Link>
         </div>
@@ -236,7 +236,7 @@ export default function Votes() {
               {!hasAnyProposals ? (
                 <p className="empty-state-inline">
                   No proposals yet.{" "}
-                  <Link to="/propose" className="inline-link">Be the first to suggest a vote.</Link>
+                  <Link to="/votes/new" className="inline-link">Be the first to suggest a vote.</Link>
                 </p>
               ) : (
                 <ul className="process-list">

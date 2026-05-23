@@ -24,6 +24,7 @@ export async function callAssistant(
     input.category,
     input.draft_state,
     input.phase,
+    input.process_type,
   );
 
   const messages: MultiTurnMessage[] = [

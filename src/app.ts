@@ -14,6 +14,7 @@ import proposalRoutes from "./routes/proposalRoutes.js";
 import proposalDraftRoutes from "./routes/proposalDraftRoutes.js";
 import adminRoutes from "./routes/adminRoutes.js";
 import authRoutes from "./routes/authRoutes.js";
+import voteDraftRoutes from "./routes/voteDraftRoutes.js";
 import voteLogRoutes from "./routes/voteLogRoutes.js";
 import voteResultsRoutes from "./routes/voteResultsRoutes.js";
 import announcementRoutes from "./routes/announcementRoutes.js";
@@ -91,13 +92,11 @@ app.use("/process", inputRoutes);
 
 // Proposal draft endpoints — AI-augmented drafting (mounted before /proposals
 // so /proposals/drafts doesn't get caught by /proposals/:id).
-// Gated by PROPOSAL_ASSISTANT_ENABLED — returns 404 when off so the feature
-// is invisible to clients that don't have it enabled.
-const assistantEnabled =
-  process.env.PROPOSAL_ASSISTANT_ENABLED?.trim().toLowerCase() === "true";
-if (assistantEnabled) {
-  app.use("/proposals/drafts", proposalDraftRoutes);
-}
+app.use("/proposals/drafts", proposalDraftRoutes);
+
+// Vote draft endpoints — AI-augmented vote drafting (mounted before /votes
+// so /votes/drafts doesn't get caught by /votes/:id).
+app.use("/votes/drafts", voteDraftRoutes);
 
 // Proposal endpoints — user-facing proposal submission and endorsement
 app.use("/proposals", proposalRoutes);

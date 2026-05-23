@@ -2,6 +2,8 @@ export type Phase = "brainstorm" | "review" | "free_form";
 
 export type Category = "issue" | "idea" | "project";
 
+export type ProcessType = "proposal" | "vote";
+
 export interface DraftState {
   title: string;
   description: string;
@@ -37,7 +39,8 @@ export interface HubConfig {
 
 export interface CallAssistantInput {
   phase: Phase;
-  category: Category;
+  category?: Category;
+  process_type?: ProcessType;
   draft_state: DraftState;
   conversation_history: Array<{ role: "user" | "assistant"; content: string }>;
   user_message: string;

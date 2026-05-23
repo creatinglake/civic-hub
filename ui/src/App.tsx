@@ -9,8 +9,8 @@ import Votes from "./pages/Votes";
 import Process from "./pages/Process";
 import About from "./pages/About";
 import SearchPage from "./pages/Search";
-import Propose from "./pages/Propose";
 import ProposeDraft from "./pages/ProposeDraft";
+import ProposeDraftVote from "./pages/ProposeDraftVote";
 import ProposalDetail from "./pages/ProposalDetail";
 import AdminProposals from "./pages/AdminProposals";
 import AdminVoteResults from "./pages/AdminVoteResults";
@@ -64,7 +64,8 @@ function AppContent() {
           <Route path="/" element={<Home />} />
           <Route path="/votes" element={<Votes />} />
           <Route path="/process/:id" element={<Process />} />
-          <Route path="/propose" element={hub.proposal_assistant ? <ProposeDraft /> : <Propose />} />
+          <Route path="/propose" element={<ProposeDraft />} />
+          <Route path="/votes/new" element={<ProposeDraftVote />} />
           <Route path="/proposal/:id" element={<ProposalDetail />} />
           <Route path="/votes/:id/log" element={<VoteLog />} />
           <Route path="/admin/proposals" element={<AdminProposals />} />

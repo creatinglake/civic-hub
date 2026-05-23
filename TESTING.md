@@ -93,6 +93,15 @@ Each row tracks a user flow, which layer covers it, and which slice introduced i
 | Wordmark links to home | | :white_check_mark: | — | navigation.spec.ts |
 | Mobile: sticky chrome (nav + tabs + pills) | | | 12.3 | Needs test (mobile viewport) |
 | Mobile: image thumbnail layout | | | 12.3 | Needs test (mobile viewport) |
+| Vote drafting: /votes/new renders path choice | | | A | Needs test |
+| Vote drafting: brainstorm flow sends assistant message | | | A | Needs test |
+| Vote drafting: form shows title, description, sources, duration | | | A | Needs test |
+| Vote drafting: duration picker changes voting window | | | A | Needs test |
+| Vote drafting: review triggers CoC check | | | A | Needs test |
+| Vote drafting: submit creates + auto-activates vote | | | A | Needs test |
+| Vote drafting: submit redirects to /process/:id | | | A | Needs test |
+| /propose always renders ProposeDraft (no toggle) | | | A | Needs test |
+| Feed: generic fallback renders unknown event types | | | A | Needs test |
 
 ### Admin Flows
 
@@ -145,6 +154,12 @@ Each row tracks a user flow, which layer covers it, and which slice introduced i
 | Cron: wrong auth returns 401 | :white_check_mark: | — | crons.test.ts |
 | Process lifecycle: draft -> active -> closed -> finalized | | — | Needs test |
 | Process registry dispatches to correct handler | | — | Needs test |
+| POST /votes/drafts creates vote draft | | A | Needs test |
+| GET /votes/drafts/:id returns draft with ownership check | | A | Needs test |
+| PATCH /votes/drafts/:id validates duration range | | A | Needs test |
+| POST /votes/drafts/:id/assistant returns vote-specific guidance | | A | Needs test |
+| POST /votes/drafts/:id/review checks CoC for votes | | A | Needs test |
+| POST /votes/drafts/:id/submit creates active vote process | | A | Needs test |
 
 ---
 
@@ -170,4 +185,4 @@ The goal: before any push to `main`, every row in this table should have at leas
 
 ---
 
-*Last updated: 2026-05-13*
+*Last updated: 2026-05-23*
