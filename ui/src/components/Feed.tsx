@@ -114,17 +114,25 @@ function kindFromEvent(event: CivicEvent): ProcessKind | null {
     return "generic";
   }
   // Known lifecycle events that don't produce feed cards — keep excluded.
+  // MUST STAY IN SYNC with the digest filter in
+  // civic-hub/src/modules/civic.digest/filter.ts.
   const EXCLUDED_TYPES = new Set([
     "civic.process.created",
     "civic.process.updated",
     "civic.process.ended",
     "civic.process.aggregation_completed",
+    "civic.process.outcome_recorded",
     "civic.process.proposed",
     "civic.process.threshold_met",
     "civic.process.vote_submitted",
     "civic.process.action_taken",
     "civic.process.comment_added",
     "civic.process.proposal_created",
+    // Legacy proposal events — internal lifecycle, not feed-worthy.
+    "civic.proposal.submitted",
+    "civic.proposal.supported",
+    "civic.proposal.endorsed",
+    "civic.proposal.converted",
   ]);
   if (EXCLUDED_TYPES.has(event.event_type)) return null;
   return "generic";
