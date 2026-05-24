@@ -380,6 +380,7 @@ export default function ProposeDraft() {
               <DraftingForm
                 draft={draft}
                 onFieldChange={handleFieldChange}
+                onDurationChange={handleDurationChange}
                 onReview={handleReview}
                 onSubmit={handleSubmit}
                 disabled={submitting}
