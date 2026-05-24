@@ -320,6 +320,9 @@ export default function Feed({ filter, emptyFilteredAction }: Props) {
       // removed by a moderator. The lookup loop above populates
       // removedProcessIds; this is the second half of the filter.
       if (ev.process_id && removedProcessIds.has(ev.process_id)) continue;
+      // Wait for metadata before rendering — prevents "Untitled vote"
+      // flash while process title is still loading.
+      if (ev.process_id && !(ev.process_id in processMeta)) continue;
       const post = eventToPost(ev, getDescription, getTitle, getType);
       if (!post) continue;
       const meta = processMeta[ev.process_id];
