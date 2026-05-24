@@ -1,0 +1,244 @@
+.project-detail-header {
+  margin-bottom: var(--space-lg);
+}
+
+.project-detail-header h1 {
+  margin: 0 0 var(--space-xs);
+  font-size: 1.5rem;
+}
+
+.project-detail-meta {
+  display: flex;
+  gap: var(--space-sm);
+  align-items: center;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+.project-detail-back {
+  display: inline-block;
+  margin-bottom: var(--space-md);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  text-decoration: none;
+}
+
+.project-detail-back:hover {
+  color: var(--color-text);
+}
+
+/* --- Sentiment --- */
+
+.project-sentiment {
+  display: flex;
+  gap: var(--space-sm);
+  align-items: center;
+  margin-bottom: var(--space-lg);
+  flex-wrap: wrap;
+}
+
+.sentiment-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border: 2px solid var(--color-border, #d1d5db);
+  border-radius: 8px;
+  background: var(--color-surface, #fff);
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.sentiment-btn:hover {
+  border-color: var(--color-text-muted);
+}
+
+.sentiment-btn.is-active-support {
+  background: #e8f5e9;
+  border-color: #2e7d32;
+  color: #2e7d32;
+}
+
+.sentiment-btn.is-active-oppose {
+  background: #ffebee;
+  border-color: #c62828;
+  color: #c62828;
+}
+
+.sentiment-counts {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+/* --- Description --- */
+
+.project-description {
+  white-space: pre-wrap;
+  line-height: 1.6;
+  margin-bottom: var(--space-lg);
+}
+
+.project-sources {
+  margin-bottom: var(--space-lg);
+}
+
+.project-sources h3 {
+  font-size: var(--font-size-sm);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-muted);
+  margin: 0 0 var(--space-xs);
+}
+
+.project-sources ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.project-sources li {
+  margin-bottom: var(--space-xs);
+}
+
+.project-sources a {
+  font-size: var(--font-size-sm);
+  word-break: break-all;
+}
+
+/* --- Updates --- */
+
+.project-updates {
+  margin-bottom: var(--space-lg);
+}
+
+.project-updates h2 {
+  font-size: 1.1rem;
+  margin: 0 0 var(--space-md);
+}
+
+.project-update-item {
+  padding: var(--space-sm) 0;
+  border-bottom: 1px solid var(--color-border, #e5e7eb);
+}
+
+.project-update-item:last-child {
+  border-bottom: none;
+}
+
+.project-update-content {
+  white-space: pre-wrap;
+  line-height: 1.5;
+  margin-bottom: var(--space-xs);
+}
+
+.project-update-time {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+.project-update-form {
+  margin-bottom: var(--space-md);
+}
+
+.project-update-form textarea {
+  width: 100%;
+  min-height: 80px;
+  padding: var(--space-sm);
+  border: 1px solid var(--color-border, #d1d5db);
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: var(--font-size-base);
+  resize: vertical;
+  box-sizing: border-box;
+}
+
+.project-update-form button {
+  margin-top: var(--space-xs);
+  padding: 8px 16px;
+  background: #1565c0;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+}
+
+.project-update-form button:hover {
+  background: #0d47a1;
+}
+
+.project-update-form button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* --- Comments --- */
+
+.project-comments {
+  margin-bottom: var(--space-lg);
+}
+
+.project-comments h2 {
+  font-size: 1.1rem;
+  margin: 0 0 var(--space-md);
+}
+
+.project-comment-item {
+  padding: var(--space-sm) 0;
+  border-bottom: 1px solid var(--color-border, #e5e7eb);
+}
+
+.project-comment-item:last-child {
+  border-bottom: none;
+}
+
+.project-comment-content {
+  white-space: pre-wrap;
+  line-height: 1.5;
+  margin-bottom: var(--space-xs);
+}
+
+.project-comment-meta {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  display: flex;
+  gap: var(--space-sm);
+}
+
+.project-comment-form {
+  margin-bottom: var(--space-md);
+}
+
+.project-comment-form textarea {
+  width: 100%;
+  min-height: 60px;
+  padding: var(--space-sm);
+  border: 1px solid var(--color-border, #d1d5db);
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: var(--font-size-base);
+  resize: vertical;
+  box-sizing: border-box;
+}
+
+.project-comment-form button {
+  margin-top: var(--space-xs);
+  padding: 8px 16px;
+  background: #1565c0;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+}
+
+.project-comment-form button:hover {
+  background: #0d47a1;
+}
+
+.project-comment-form button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

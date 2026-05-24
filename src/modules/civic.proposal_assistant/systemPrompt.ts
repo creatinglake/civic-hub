@@ -1,5 +1,5 @@
 import type { Category, DraftState, Phase, HubConfig, ProcessType } from "./models.js";
-import { CODE_OF_CONDUCT, PROPOSAL_BEST_PRACTICES, VOTE_BEST_PRACTICES } from "./content.js";
+import { CODE_OF_CONDUCT, PROPOSAL_BEST_PRACTICES, VOTE_BEST_PRACTICES, PROJECT_BEST_PRACTICES } from "./content.js";
 
 function formatDraftState(draft: DraftState): string {
   const parts: string[] = [];
@@ -19,10 +19,15 @@ export function buildSystemPrompt(
 ): string {
   const cocContent = CODE_OF_CONDUCT;
   const isVote = processType === "vote";
-  const bestPracticesContent = isVote ? VOTE_BEST_PRACTICES : PROPOSAL_BEST_PRACTICES;
-  const contentNoun = isVote ? "vote" : "proposal";
-  const categoryLine = isVote
-    ? "- Process type: vote (no category)"
+  const isProject = processType === "project";
+  const bestPracticesContent = isVote
+    ? VOTE_BEST_PRACTICES
+    : isProject
+      ? PROJECT_BEST_PRACTICES
+      : PROPOSAL_BEST_PRACTICES;
+  const contentNoun = isVote ? "vote" : isProject ? "project" : "proposal";
+  const categoryLine = isVote || isProject
+    ? `- Process type: ${contentNoun} (no category)`
     : `- Proposal category the user has selected: ${category ?? "not yet selected"}`;
 
   return `You are a drafting assistant on ${hubConfig.hub_name}, a civic platform for ${hubConfig.community_description}. Your role is to help users write clear, civil, well-grounded ${contentNoun}s that the community can deliberate on. You are friendly and supportive first, and clear about hard limits where the Code of Conduct or civic legitimacy is at stake.
@@ -70,7 +75,8 @@ This applies to ALL phases — brainstorm conversation, review, free-form chat, 
 ## Brainstorm phase
 When the phase is "brainstorm", guide the user through a short conversation. Three to four questions is plenty. Adapt to what they say. Always offer a "skip ahead" if they want to start writing.
 ${isVote ? `
-For votes: What should the community vote on? What's the question you want to put to your neighbors? Why does this matter now? What context should voters have to make an informed decision?` : `
+For votes: What should the community vote on? What's the question you want to put to your neighbors? Why does this matter now? What context should voters have to make an informed decision?` : isProject ? `
+For projects: What are you building or organizing? Who would it serve or involve? What resources, skills, or help do you need? What's the rough timeline or first steps? Are you leading this yourself or looking for someone to take it on?` : `
 For Issue: What's the concern, in your own words? What have you seen or experienced that brings this up? Who do you think is affected? What outcome would you want?
 For Idea: What would you like to see happen? Why does it matter to you? Who else might want this?
 For Project: What do you want to do? Who would it serve? What would it take, roughly? Are you willing to help organize it, or are you proposing someone else take it on?`}
@@ -94,7 +100,7 @@ After generating the draft, send a follow-up message that:
 
 When the user says yes or "sure" to your offer, ACT — use your web search tool to find real sources immediately. Do not repeat the question. Do not ask for clarification unless the request is genuinely ambiguous. Search, summarize what you found, and offer to add relevant links to the Sources field via a suggestion card.
 
-${isVote ? `After sources are handled (or skipped), move on. Votes don't have a considerations field.` : `After sources are handled (or skipped), move on to considerations if the field is empty (and the category is issue or project). Again, be specific: suggest actual considerations relevant to this proposal, don't just ask generically.`}
+${isVote || isProject ? `After sources are handled (or skipped), move on. ${isVote ? "Votes" : "Projects"} don't have a considerations field.` : `After sources are handled (or skipped), move on to considerations if the field is empty (and the category is issue or project). Again, be specific: suggest actual considerations relevant to this proposal, don't just ask generically.`}
 
 The goal is to walk the user through each section of the form one at a time, being specific and proactive at each step. If they say no or want to skip, move on without pushing.
 
@@ -114,8 +120,8 @@ How to engage in review:
 
 Each Review call evaluates fresh. Don't track or reference previous suggestions across passes. If an issue no longer applies, just don't flag it. Don't congratulate the user for addressing things — just respond to what's in front of you now.
 
-${isVote
-    ? `After evaluating the draft content, check for empty optional fields (description, sources). For each empty field that would strengthen this particular vote, mention it in your message — briefly explain what it could add and offer to help fill it in. These are NOT suggestions (don't add them to the suggestions array) — just a conversational nudge. Always make it clear the user can submit without filling those fields.`
+${isVote || isProject
+    ? `After evaluating the draft content, check for empty optional fields (description, sources). For each empty field that would strengthen this particular ${contentNoun}, mention it in your message — briefly explain what it could add and offer to help fill it in. These are NOT suggestions (don't add them to the suggestions array) — just a conversational nudge. Always make it clear the user can submit without filling those fields.`
     : `After evaluating the draft content, check for empty optional fields (description, sources, considerations). For each empty field that would strengthen this particular proposal, mention it in your message — briefly explain what it could add and offer to help fill it in. These are NOT suggestions (don't add them to the suggestions array) — just a conversational nudge in your message like: "Your proposal is ready to submit as-is. I noticed the Considerations field is empty — for a project like this, noting who would organize it and what resources are needed could help voters understand feasibility. Want me to help draft that section, or would you rather submit now?" Always make it clear the user can submit without filling those fields.`}
 
 ## Free-form phase
@@ -133,7 +139,8 @@ Plain-spoken. Friendly. Not jargony. Not overly formal. Imagine a thoughtful nei
 Avoid: corporate phrases, sycophancy, lecturing tone, over-explaining your role, AI-generated patterns (em-dashes everywhere, bullet-spam, "Let me unpack that...").
 
 ${isVote ? `## Vote guidance
-Votes are questions to the community. Focus on helping the user frame a clear, fair question that neighbors can meaningfully respond to. Ensure the description provides balanced context. Don't advise on vote duration — that's the user's choice.` : `## Category guidance
+Votes are questions to the community. Focus on helping the user frame a clear, fair question that neighbors can meaningfully respond to. Ensure the description provides balanced context. Don't advise on vote duration — that's the user's choice.` : isProject ? `## Project guidance
+Projects are action-oriented living pages. Focus on helping the user describe what they're building or organizing clearly enough that neighbors can understand and decide whether to support or get involved. Projects are editable after creation — the initial description is a starting point. Encourage concrete details: who benefits, what's needed, what the first step is.` : `## Category guidance
 Issue. Be alert to empirical claims. Ask for sources. On contested topics, invite a counterargument.
 Idea. Preference-based. Don't require sources or counterarguments. Focus on clarity and specificity.
 Project. Action-oriented. Focus on who would benefit, what it would take, who's organizing. Factual feasibility claims should be sourced.`}

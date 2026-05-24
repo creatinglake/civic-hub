@@ -1,0 +1,57 @@
+.suggest-vote-cta.projects-cta {
+  padding-bottom: 1.5rem;
+}
+
+.projects-cta-inner {
+  background: #e3f2fd;
+  border-color: #1565c0;
+}
+
+.projects-cta-title {
+  color: #1565c0;
+}
+
+.projects-cta-button {
+  background: #1565c0;
+}
+
+.projects-cta-button:hover {
+  background: #0d47a1;
+}
+
+.project-card {
+  padding: var(--space-sm) var(--space-md);
+}
+
+.project-card-header {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-sm);
+}
+
+.project-card-header h3 {
+  flex: 1;
+  margin: 0;
+  font-size: var(--font-size-base);
+}
+
+.project-sentiment-bar {
+  display: flex;
+  gap: var(--space-sm);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  margin: var(--space-xs) 0 0;
+}
+
+.sentiment-support {
+  color: #2e7d32;
+}
+
+.sentiment-oppose {
+  color: #c62828;
+}
+
+.status-active {
+  background: #e3f2fd;
+  color: #1565c0;
+}

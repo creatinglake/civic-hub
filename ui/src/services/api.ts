@@ -442,6 +442,141 @@ export function submitVoteDraft(
   return request("POST", `/votes/drafts/${draftId}/submit`);
 }
 
+// --- Projects (community project pages) ---
+
+export type ProjectStatus = "active" | "archived";
+export type SentimentValue = "support" | "oppose";
+
+export interface ProjectSummary {
+  id: string;
+  title: string;
+  description: string;
+  user_id: string;
+  status: ProjectStatus;
+  support_count: number;
+  oppose_count: number;
+  assistant_helped: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ProjectUpdateEntry {
+  id: string;
+  project_id: string;
+  content: string;
+  media_urls: string[];
+  created_at: string;
+}
+
+export interface ProjectComment {
+  id: string;
+  project_id: string;
+  user_id: string;
+  content: string;
+  created_at: string;
+}
+
+export interface ProjectDetail extends ProjectSummary {
+  sources: string[];
+  updates: ProjectUpdateEntry[];
+  user_sentiment: SentimentValue | null;
+  comment_count: number;
+}
+
+export function listProjects(status?: ProjectStatus): Promise<ProjectSummary[]> {
+  const params = status ? `?status=${encodeURIComponent(status)}` : "";
+  return request("GET", `/projects${params}`);
+}
+
+export function getProjectDetail(id: string, actor?: string): Promise<ProjectDetail> {
+  const params = actor ? `?actor=${encodeURIComponent(actor)}` : "";
+  return request("GET", `/projects/${id}${params}`);
+}
+
+export function addProjectUpdate(
+  id: string,
+  content: string,
+  mediaUrls: string[] = [],
+): Promise<ProjectUpdateEntry> {
+  return request("POST", `/projects/${id}/updates`, { content, media_urls: mediaUrls });
+}
+
+export function setProjectSentiment(
+  id: string,
+  sentiment: SentimentValue | "neutral",
+): Promise<{ support_count: number; oppose_count: number; user_sentiment: SentimentValue | null }> {
+  return request("POST", `/projects/${id}/sentiment`, { sentiment });
+}
+
+export function listProjectComments(id: string): Promise<ProjectComment[]> {
+  return request("GET", `/projects/${id}/comments`);
+}
+
+export function addProjectComment(
+  id: string,
+  content: string,
+): Promise<ProjectComment> {
+  return request("POST", `/projects/${id}/comments`, { content });
+}
+
+// --- Project Drafts (AI-augmented project drafting) ---
+
+export interface ProjectDraft {
+  id: string;
+  user_id: string;
+  title: string;
+  description: string;
+  sources: string;
+  conversation_history: Array<{ role: "user" | "assistant"; content: string }>;
+  last_review_result: DraftSuggestion[] | null;
+  draft_modified_since_review: boolean;
+  assistant_helped: boolean;
+  status: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ProjectDraftAssistantResult {
+  response: AssistantResponse;
+  draft: ProjectDraft;
+}
+
+export function createProjectDraft(): Promise<ProjectDraft> {
+  return request("POST", "/projects/drafts");
+}
+
+export function getProjectDraft(id: string): Promise<ProjectDraft> {
+  return request("GET", `/projects/drafts/${id}`);
+}
+
+export function updateProjectDraft(
+  id: string,
+  patch: Partial<Pick<ProjectDraft, "title" | "description" | "sources">> & { skip_modified_flag?: boolean },
+): Promise<ProjectDraft> {
+  return request("PATCH", `/projects/drafts/${id}`, patch);
+}
+
+export function sendProjectAssistantMessage(
+  draftId: string,
+  phase: DraftPhase,
+  userMessage: string,
+): Promise<ProjectDraftAssistantResult> {
+  return request("POST", `/projects/drafts/${draftId}/assistant`, {
+    phase,
+    user_message: userMessage,
+  });
+}
+
+export function reviewProjectDraft(draftId: string): Promise<ProjectDraftAssistantResult> {
+  return request("POST", `/projects/drafts/${draftId}/review`);
+}
+
+export function submitProjectDraft(
+  draftId: string,
+): Promise<{ project_id: string }> {
+  return request("POST", `/projects/drafts/${draftId}/submit`);
+}
+
 // --- Admin: Proposal Review ---
 
 /** List proposals for admin review */

@@ -111,6 +111,21 @@ Each row tracks a user flow, which layer covers it, and which slice introduced i
 | Proposals removed from Votes page listing | | | B | Needs test |
 | Existing endorsed/converted proposals display with historical status | | | B | Needs test |
 | Feed: generic fallback renders unknown event types | | | A | Needs test |
+| /projects listing page shows projects + CTA | | | C | Needs test |
+| /projects/new renders path choice (brainstorm / write) | | | C | Needs test |
+| Project drafting: form shows title, description, sources | | | C | Needs test |
+| Project drafting: brainstorm flow sends assistant message | | | C | Needs test |
+| Project drafting: review triggers CoC check | | | C | Needs test |
+| Project drafting: submit creates project + redirects | | | C | Needs test |
+| /project/:id detail page: description, sentiment, updates, comments | | | C | Needs test |
+| Sentiment: support/oppose toggles, changeable | | | C | Needs test |
+| Sentiment: neutral resets user's selection | | | C | Needs test |
+| Comments: add comment (resident only) | | | C | Needs test |
+| Updates: creator posts update, shows in timeline | | | C | Needs test |
+| Updates: non-creator cannot post updates | | | C | Needs test |
+| Feed: project events render with correct pills | | | C | Needs test |
+| Projects tab visible in FeedVotesTabs | | | C | Needs test |
+| Projects link visible in nav drawer | | | C | Needs test |
 
 ### Admin Flows
 
@@ -169,6 +184,19 @@ Each row tracks a user flow, which layer covers it, and which slice introduced i
 | POST /votes/drafts/:id/assistant returns vote-specific guidance | | A | Needs test |
 | POST /votes/drafts/:id/review checks CoC for votes | | A | Needs test |
 | POST /votes/drafts/:id/submit creates active vote process | | A | Needs test |
+| GET /projects returns project list | | C | Needs test |
+| GET /projects/:id returns project detail with sentiment | | C | Needs test |
+| POST /projects requires auth + residency | | C | Needs test |
+| POST /projects/:id/sentiment changes user sentiment | | C | Needs test |
+| POST /projects/:id/sentiment neutral removes sentiment | | C | Needs test |
+| POST /projects/:id/updates requires ownership | | C | Needs test |
+| POST /projects/:id/comments requires auth | | C | Needs test |
+| GET /projects/:id/comments returns comment list | | C | Needs test |
+| POST /projects/drafts creates project draft | | C | Needs test |
+| GET /projects/drafts/:id returns draft with ownership check | | C | Needs test |
+| POST /projects/drafts/:id/assistant returns project-specific guidance | | C | Needs test |
+| POST /projects/drafts/:id/review checks CoC for projects | | C | Needs test |
+| POST /projects/drafts/:id/submit creates project | | C | Needs test |
 
 ---
 
@@ -194,4 +222,4 @@ The goal: before any push to `main`, every row in this table should have at leas
 
 ---
 
-*Last updated: 2026-05-23*
+*Last updated: 2026-05-24*

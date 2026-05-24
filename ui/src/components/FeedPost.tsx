@@ -20,6 +20,8 @@ export type FeedPillKind =
   | "announcement"          // admin-authored announcements (default)
   | "announcement-author"   // non-admin author (Board, committees, etc.)
   | "meeting"
+  | "project-created"
+  | "project-updated"
   | "generic";
 
 /**
@@ -71,6 +73,7 @@ type FeedProcessKind =
   | "civic.brief" // legacy alias — normalize to "civic.vote_results"
   | "civic.announcement"
   | "civic.meeting_summary"
+  | "civic.project"
   | "generic";
 
 export function eventToPost(
@@ -287,6 +290,33 @@ export function eventToPost(
         pillLabel: "Activity",
         pillKind: "generic",
         summary: summaryFromDescription(getProcessDescription(event.process_id)),
+        timestamp: event.timestamp,
+        href: event.action_url,
+      };
+    }
+
+    case "civic.project.created": {
+      const data = event.data as { project?: { title?: string } };
+      const title = data.project?.title ?? getProcessTitle(event.process_id) ?? "New project";
+      return {
+        id: event.id,
+        title,
+        pillLabel: "New project",
+        pillKind: "project-created",
+        summary: summaryFromDescription(getProcessDescription(event.process_id)),
+        timestamp: event.timestamp,
+        href: event.action_url,
+      };
+    }
+
+    case "civic.project.updated": {
+      const title = getProcessTitle(event.process_id) ?? "Project update";
+      return {
+        id: event.id,
+        title,
+        pillLabel: "Project update",
+        pillKind: "project-updated",
+        summary: "",
         timestamp: event.timestamp,
         href: event.action_url,
       };

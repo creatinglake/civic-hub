@@ -2,7 +2,7 @@ export type Phase = "brainstorm" | "review" | "free_form";
 
 export type Category = "issue" | "idea" | "project" | "concern";
 
-export type ProcessType = "proposal" | "vote";
+export type ProcessType = "proposal" | "vote" | "project";
 
 export interface DraftState {
   title: string;

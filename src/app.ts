@@ -26,6 +26,8 @@ import meetingSummaryRoutes, {
 } from "./routes/meetingSummaryRoutes.js";
 import { floydNewsSyncCronRouter } from "./routes/floydNewsSyncRoutes.js";
 import { adminDigestCronRouter } from "./routes/adminDigestRoutes.js";
+import projectRoutes from "./routes/projectRoutes.js";
+import projectDraftRoutes from "./routes/projectDraftRoutes.js";
 import feedbackRoutes from "./routes/feedbackRoutes.js";
 import {
   digestCronRouter,
@@ -97,6 +99,13 @@ app.use("/proposals/drafts", proposalDraftRoutes);
 // Vote draft endpoints — AI-augmented vote drafting (mounted before /votes
 // so /votes/drafts doesn't get caught by /votes/:id).
 app.use("/votes/drafts", voteDraftRoutes);
+
+// Project draft endpoints — AI-augmented project drafting (mounted before
+// /projects so /projects/drafts doesn't get caught by /projects/:id).
+app.use("/projects/drafts", projectDraftRoutes);
+
+// Project endpoints — community project pages with sentiment + comments
+app.use("/projects", projectRoutes);
 
 // Proposal endpoints — user-facing proposal submission and endorsement
 app.use("/proposals", proposalRoutes);

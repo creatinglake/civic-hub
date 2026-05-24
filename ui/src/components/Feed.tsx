@@ -464,6 +464,8 @@ function buildEngagement(
       if (dur) parts.push(dur);
       return parts.join(" · ");
     }
+    case "project-created":
+    case "project-updated":
     case "generic":
       return null;
   }
