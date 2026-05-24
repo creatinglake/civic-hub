@@ -51,11 +51,12 @@ export default function Propose() {
             Got something on your mind?
           </h2>
           <p className="suggest-vote-cta-body">
-            Share an idea or raise a concern for the community to
-            consider. Your proposal goes live after a quick review.
+            Share an <span className="keyword-idea">idea</span> or raise a{" "}
+            <span className="keyword-concern">concern</span> for the community
+            to consider. Your proposal goes live after a quick review.
           </p>
           <Link to="/propose/new" className="suggest-vote-cta-button propose-cta-button">
-            + Propose an idea
+            + Propose something
           </Link>
         </div>
       </section>

@@ -22,6 +22,26 @@
   background: #1b5e20;
 }
 
+/* --- Keyword emphasis (shared with ProposeDraft.css) --- */
+
+.keyword-idea {
+  font-weight: 600;
+  color: #2e7d32;
+  text-decoration: underline;
+  text-decoration-color: #a5d6a7;
+  text-underline-offset: 2px;
+  text-decoration-thickness: 2px;
+}
+
+.keyword-concern {
+  font-weight: 600;
+  color: #e65100;
+  text-decoration: underline;
+  text-decoration-color: #ffcc80;
+  text-underline-offset: 2px;
+  text-decoration-thickness: 2px;
+}
+
 .proposal-supporters {
   font-size: var(--font-size-sm);
   color: var(--color-text-muted);
