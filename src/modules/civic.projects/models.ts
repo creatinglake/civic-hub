@@ -12,6 +12,8 @@ export interface Project {
   support_count: number;
   oppose_count: number;
   assistant_helped: boolean;
+  banner_image_url: string | null;
+  banner_image_alt: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -46,4 +48,6 @@ export interface CreateProjectInput {
   sources?: string[];
   user_id: string;
   assistant_helped?: boolean;
+  banner_image_url?: string | null;
+  banner_image_alt?: string | null;
 }

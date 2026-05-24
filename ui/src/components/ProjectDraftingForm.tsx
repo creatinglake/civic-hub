@@ -1,10 +1,13 @@
 import { useCallback, useRef } from "react";
 import type { ProjectDraft, DraftSuggestion } from "../services/api";
+import { uploadProjectImage } from "../services/api";
+import PostImagePicker from "./PostImagePicker";
 import "./VoteDraftingForm.css";
 
 interface Props {
   draft: ProjectDraft;
   onFieldChange: (field: string, value: string) => void;
+  onImageChange: (next: { image_url: string | null; image_alt: string | null }) => void;
   onReview: () => void;
   onSubmit: () => void;
   disabled: boolean;
@@ -55,6 +58,7 @@ function getStatusClass(draft: ProjectDraft): string {
 export default function ProjectDraftingForm({
   draft,
   onFieldChange,
+  onImageChange,
   onReview,
   onSubmit,
   disabled,
@@ -111,6 +115,22 @@ export default function ProjectDraftingForm({
             placeholder={PLACEHOLDERS.description}
             rows={6}
             disabled={disabled}
+          />
+        </div>
+
+        <div className="form-field">
+          <label className="form-label">
+            Banner image <span className="optional">(optional)</span>
+          </label>
+          <p className="form-hint" style={{ marginBottom: "var(--space-sm)" }}>
+            Adding a banner image helps your project stand out in the listing.
+          </p>
+          <PostImagePicker
+            imageUrl={draft.banner_image_url}
+            imageAlt={draft.banner_image_alt}
+            onChange={onImageChange}
+            disabled={disabled}
+            uploadFn={uploadProjectImage}
           />
         </div>
 

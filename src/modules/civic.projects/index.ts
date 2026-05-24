@@ -37,6 +37,8 @@ interface ProjectRow {
   support_count: number;
   oppose_count: number;
   assistant_helped: boolean;
+  banner_image_url: string | null;
+  banner_image_alt: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -52,6 +54,8 @@ function rowToProject(row: ProjectRow): Project {
     support_count: row.support_count,
     oppose_count: row.oppose_count,
     assistant_helped: row.assistant_helped,
+    banner_image_url: row.banner_image_url,
+    banner_image_alt: row.banner_image_alt,
     created_at: row.created_at,
     updated_at: row.updated_at,
   };
@@ -82,6 +86,8 @@ export async function createProject(
       support_count: 0,
       oppose_count: 0,
       assistant_helped: input.assistant_helped ?? false,
+      banner_image_url: input.banner_image_url ?? null,
+      banner_image_alt: input.banner_image_alt ?? null,
     })
     .select()
     .single();

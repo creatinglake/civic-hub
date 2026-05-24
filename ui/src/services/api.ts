@@ -456,6 +456,8 @@ export interface ProjectSummary {
   support_count: number;
   oppose_count: number;
   assistant_helped: boolean;
+  banner_image_url: string | null;
+  banner_image_alt: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -527,6 +529,8 @@ export interface ProjectDraft {
   title: string;
   description: string;
   sources: string;
+  banner_image_url: string | null;
+  banner_image_alt: string | null;
   conversation_history: Array<{ role: "user" | "assistant"; content: string }>;
   last_review_result: DraftSuggestion[] | null;
   draft_modified_since_review: boolean;
@@ -551,7 +555,7 @@ export function getProjectDraft(id: string): Promise<ProjectDraft> {
 
 export function updateProjectDraft(
   id: string,
-  patch: Partial<Pick<ProjectDraft, "title" | "description" | "sources">> & { skip_modified_flag?: boolean },
+  patch: Partial<Pick<ProjectDraft, "title" | "description" | "sources" | "banner_image_url" | "banner_image_alt">> & { skip_modified_flag?: boolean },
 ): Promise<ProjectDraft> {
   return request("PATCH", `/projects/drafts/${id}`, patch);
 }
@@ -1107,6 +1111,24 @@ export async function uploadPostImage(file: Blob): Promise<UploadedImage> {
   const form = new FormData();
   form.append("file", file);
   const res = await fetch(`${API_BASE}/upload/post-image`, {
+    method: "POST",
+    headers,
+    body: form,
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(err.error ?? `Upload failed: ${res.status}`);
+  }
+  return res.json();
+}
+
+export async function uploadProjectImage(file: Blob): Promise<UploadedImage> {
+  const headers: Record<string, string> = {};
+  const token = getStoredToken();
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+  const form = new FormData();
+  form.append("file", file);
+  const res = await fetch(`${API_BASE}/upload/project-image`, {
     method: "POST",
     headers,
     body: form,

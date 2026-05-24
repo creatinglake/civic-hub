@@ -8,6 +8,8 @@ export interface ProjectDraft {
   title: string;
   description: string;
   sources: string;
+  banner_image_url: string | null;
+  banner_image_alt: string | null;
   conversation_history: Array<{ role: "user" | "assistant"; content: string }>;
   last_review_result: Suggestion[] | null;
   draft_modified_since_review: boolean;
@@ -25,5 +27,7 @@ export interface UpdateProjectDraftInput {
   title?: string;
   description?: string;
   sources?: string;
+  banner_image_url?: string | null;
+  banner_image_alt?: string | null;
   skip_modified_flag?: boolean;
 }

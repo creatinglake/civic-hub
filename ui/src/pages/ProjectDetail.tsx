@@ -117,6 +117,16 @@ export default function ProjectDetail() {
         &larr; Back to Projects
       </Link>
 
+      {project.banner_image_url && (
+        <div className="project-banner">
+          <img
+            src={project.banner_image_url}
+            alt={project.banner_image_alt ?? ""}
+            className="project-banner-img"
+          />
+        </div>
+      )}
+
       <div className="project-detail-header">
         <h1>{project.title}</h1>
         <div className="project-detail-meta">

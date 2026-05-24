@@ -114,12 +114,14 @@ export async function handleUpdateProjectDraft(
       return;
     }
 
-    const { title, description, sources, skip_modified_flag } = req.body;
+    const { title, description, sources, banner_image_url, banner_image_alt, skip_modified_flag } = req.body;
 
     const updated = await updateProjectDraft(id, {
       title,
       description,
       sources,
+      banner_image_url,
+      banner_image_alt,
       skip_modified_flag: skip_modified_flag === true,
     });
     res.json(updated);
@@ -299,6 +301,8 @@ export async function handleSubmitProjectDraft(
         sources,
         user_id: user.id,
         assistant_helped: draft.assistant_helped,
+        banner_image_url: draft.banner_image_url,
+        banner_image_alt: draft.banner_image_alt,
       },
       emitEvent,
     );

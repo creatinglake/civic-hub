@@ -174,6 +174,23 @@ export default function ProjectDraft() {
     [draft],
   );
 
+  const handleImageChange = useCallback(
+    async (next: { image_url: string | null; image_alt: string | null }) => {
+      if (!draft) return;
+      try {
+        const updated = await updateProjectDraft(draft.id, {
+          banner_image_url: next.image_url,
+          banner_image_alt: next.image_alt,
+          skip_modified_flag: true,
+        });
+        setDraft(updated);
+      } catch {
+        // silent — image saves are best-effort
+      }
+    },
+    [draft],
+  );
+
   const handleApplySuggestion = useCallback(
     async (suggestion: DraftSuggestion) => {
       if (!draft || !suggestion.field || !suggestion.suggested_revision) return;
@@ -327,6 +344,7 @@ export default function ProjectDraft() {
             <ProjectDraftingForm
               draft={draft}
               onFieldChange={handleFieldChange}
+              onImageChange={handleImageChange}
               onReview={handleReview}
               onSubmit={handleSubmit}
               disabled={submitting}

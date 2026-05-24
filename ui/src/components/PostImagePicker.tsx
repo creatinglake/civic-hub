@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { uploadPostImage } from "../services/api";
+import { uploadPostImage, type UploadedImage } from "../services/api";
 import "./PostImagePicker.css";
 
 /**
@@ -30,6 +30,7 @@ interface Props {
   imageAlt: string | null;
   onChange: (next: { image_url: string | null; image_alt: string | null }) => void;
   disabled?: boolean;
+  uploadFn?: (file: Blob) => Promise<UploadedImage>;
 }
 
 type Status =
@@ -42,6 +43,7 @@ export default function PostImagePicker({
   imageAlt,
   onChange,
   disabled,
+  uploadFn = uploadPostImage,
 }: Props) {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [status, setStatus] = useState<Status>({ kind: "idle" });
@@ -62,7 +64,7 @@ export default function PostImagePicker({
     setStatus({ kind: "uploading", progress: null });
     try {
       const blob = await resizeAndEncode(file);
-      const result = await uploadPostImage(blob);
+      const result = await uploadFn(blob);
       onChange({ image_url: result.url, image_alt: imageAlt ?? "" });
       setStatus({ kind: "idle" });
     } catch (err) {

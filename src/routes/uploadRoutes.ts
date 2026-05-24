@@ -6,7 +6,7 @@
 // no router-level disabling is required.
 
 import { Router } from "express";
-import { requireAnnouncementPoster } from "../middleware/auth.js";
+import { requireAnnouncementPoster, requireResident } from "../middleware/auth.js";
 import { handlePostImageUpload } from "../controllers/uploadController.js";
 
 const router = Router();
@@ -14,6 +14,12 @@ const router = Router();
 router.post(
   "/post-image",
   requireAnnouncementPoster,
+  handlePostImageUpload,
+);
+
+router.post(
+  "/project-image",
+  requireResident,
   handlePostImageUpload,
 );
 

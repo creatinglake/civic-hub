@@ -16,6 +16,8 @@ interface DraftRow {
   title: string;
   description: string;
   sources: string;
+  banner_image_url: string | null;
+  banner_image_alt: string | null;
   conversation_history: unknown;
   last_review_result: unknown;
   draft_modified_since_review: boolean;
@@ -32,6 +34,8 @@ function rowToDraft(row: DraftRow): ProjectDraft {
     title: row.title,
     description: row.description,
     sources: row.sources,
+    banner_image_url: row.banner_image_url,
+    banner_image_alt: row.banner_image_alt,
     conversation_history: Array.isArray(row.conversation_history)
       ? row.conversation_history
       : [],
@@ -98,6 +102,8 @@ export async function updateProjectDraft(
   if (patch.title !== undefined) updates.title = patch.title;
   if (patch.description !== undefined) updates.description = patch.description;
   if (patch.sources !== undefined) updates.sources = patch.sources;
+  if (patch.banner_image_url !== undefined) updates.banner_image_url = patch.banner_image_url;
+  if (patch.banner_image_alt !== undefined) updates.banner_image_alt = patch.banner_image_alt;
 
   if (!patch.skip_modified_flag) {
     updates.draft_modified_since_review = true;
