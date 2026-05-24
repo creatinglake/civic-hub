@@ -1,8 +1,8 @@
 /* Propose listing page — overrides for the CTA card to use a
    warm green accent instead of the vote-blue palette. */
 
-.propose-cta {
-  padding-bottom: var(--space-lg);
+.suggest-vote-cta.propose-cta {
+  padding-bottom: 1.5rem;
 }
 
 .propose-cta-inner {
