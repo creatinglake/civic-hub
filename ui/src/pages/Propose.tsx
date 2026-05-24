@@ -76,7 +76,7 @@ export default function Propose() {
               <p className="empty-state-inline">
                 No proposals yet.{" "}
                 <Link to="/propose/new" className="inline-link">
-                  Be the first to share an idea.
+                  Be the first to propose something.
                 </Link>
               </p>
             ) : (
