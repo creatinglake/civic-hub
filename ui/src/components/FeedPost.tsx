@@ -309,6 +309,10 @@ export function eventToPost(
       };
     }
 
+    case "civic.project.comment_added":
+    case "civic.project.sentiment_changed":
+      return null;
+
     case "civic.project.updated": {
       const title = getProcessTitle(event.process_id) ?? "Project update";
       return {
