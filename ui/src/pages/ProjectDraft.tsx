@@ -367,6 +367,7 @@ export default function ProjectDraft() {
               <ProjectDraftingForm
                 draft={draft}
                 onFieldChange={handleFieldChange}
+                onImageChange={handleImageChange}
                 onReview={handleReview}
                 onSubmit={handleSubmit}
                 disabled={submitting}
