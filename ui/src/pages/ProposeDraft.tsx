@@ -37,6 +37,12 @@ function friendlyError(msg: string): string {
   return "Something went wrong with the assistant. Try again in a moment.";
 }
 
+const DURATION_LABELS: Record<number, string> = {
+  [30 * 24 * 60 * 60 * 1000]: "1 month",
+  [90 * 24 * 60 * 60 * 1000]: "3 months",
+  [180 * 24 * 60 * 60 * 1000]: "6 months",
+};
+
 export default function ProposeDraft() {
   const navigate = useNavigate();
   const { canParticipate } = useAuth();
@@ -180,6 +186,19 @@ export default function ProposeDraft() {
         setDraft(updated);
       } catch {
         // silent — field saves are best-effort
+      }
+    },
+    [draft],
+  );
+
+  const handleDurationChange = useCallback(
+    async (ms: number) => {
+      if (!draft) return;
+      try {
+        const updated = await updateDraft(draft.id, { proposal_duration_ms: ms });
+        setDraft(updated);
+      } catch {
+        // silent
       }
     },
     [draft],
@@ -338,6 +357,7 @@ export default function ProposeDraft() {
             <DraftingForm
               draft={draft}
               onFieldChange={handleFieldChange}
+              onDurationChange={handleDurationChange}
               onReview={handleReview}
               onSubmit={handleSubmit}
               disabled={submitting}
@@ -420,6 +440,12 @@ export default function ProposeDraft() {
                 <p className="confirm-desc">{draft.description}</p>
               )}
             </div>
+
+            <p className="confirm-duration">
+              This proposal will stay open for{" "}
+              {DURATION_LABELS[draft.proposal_duration_ms] ??
+                `${Math.round(draft.proposal_duration_ms / (24 * 60 * 60 * 1000))} days`}.
+            </p>
 
             {draft.assistant_helped && (
               <p className="confirm-disclosure">

@@ -5,11 +5,18 @@ import "./DraftingForm.css";
 interface Props {
   draft: ProposalDraft;
   onFieldChange: (field: string, value: string) => void;
+  onDurationChange: (ms: number) => void;
   onReview: () => void;
   onSubmit: () => void;
   disabled: boolean;
   reviewLoading?: boolean;
 }
+
+const DURATION_OPTIONS = [
+  { label: "1 month", ms: 30 * 24 * 60 * 60 * 1000 },
+  { label: "3 months", ms: 90 * 24 * 60 * 60 * 1000 },
+  { label: "6 months", ms: 180 * 24 * 60 * 60 * 1000 },
+];
 
 const PLACEHOLDERS: Record<string, Record<string, string>> = {
   idea: {
@@ -68,6 +75,7 @@ function getStatusClass(draft: ProposalDraft): string {
 export default function DraftingForm({
   draft,
   onFieldChange,
+  onDurationChange,
   onReview,
   onSubmit,
   disabled,
@@ -169,6 +177,25 @@ export default function DraftingForm({
             disabled={disabled}
           />
           <p className="form-hint">Add relevant links, one per line.</p>
+        </div>
+
+        <div className="form-field">
+          <label htmlFor="draft-duration" className="form-label">
+            How long should this proposal stay open?
+          </label>
+          <select
+            id="draft-duration"
+            className="form-select"
+            value={draft.proposal_duration_ms}
+            onChange={(e) => onDurationChange(Number(e.target.value))}
+            disabled={disabled}
+          >
+            {DURATION_OPTIONS.map((opt) => (
+              <option key={opt.ms} value={opt.ms}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
         </div>
       </div>
 

@@ -3,6 +3,9 @@ import type { Suggestion } from "../civic.proposal_assistant/models.js";
 
 export type DraftStatus = "drafting" | "submitted" | "abandoned";
 
+/** Default proposal duration: 90 days (3 months) in milliseconds */
+export const DEFAULT_PROPOSAL_DURATION_MS = 90 * 24 * 60 * 60 * 1000;
+
 export interface ProposalDraft {
   id: string;
   user_id: string;
@@ -11,6 +14,7 @@ export interface ProposalDraft {
   description: string;
   sources: string;
   considerations: string;
+  proposal_duration_ms: number;
   conversation_history: Array<{ role: "user" | "assistant"; content: string }>;
   last_review_result: Suggestion[] | null;
   draft_modified_since_review: boolean;
@@ -32,5 +36,6 @@ export interface UpdateDraftInput {
   sources?: string;
   considerations?: string;
   category?: Category;
+  proposal_duration_ms?: number;
   skip_modified_flag?: boolean;
 }

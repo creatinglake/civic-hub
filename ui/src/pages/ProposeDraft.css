@@ -185,6 +185,12 @@
   white-space: pre-wrap;
 }
 
+.confirm-duration {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  margin: var(--space-sm) 0;
+}
+
 .confirm-disclosure {
   font-size: var(--font-size-xs);
   color: var(--color-text-muted);

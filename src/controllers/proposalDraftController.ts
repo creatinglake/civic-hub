@@ -125,11 +125,21 @@ export async function handleUpdateDraft(
       return;
     }
 
-    const { title, description, sources, considerations, category, skip_modified_flag } = req.body;
+    const { title, description, sources, considerations, category, proposal_duration_ms, skip_modified_flag } = req.body;
 
     if (category && !VALID_CATEGORIES.has(category)) {
       res.status(400).json({ error: "Invalid category" });
       return;
+    }
+
+    if (proposal_duration_ms !== undefined) {
+      const dur = Number(proposal_duration_ms);
+      const MIN_DURATION = 14 * 24 * 60 * 60 * 1000;   // 2 weeks
+      const MAX_DURATION = 180 * 24 * 60 * 60 * 1000;   // 6 months
+      if (isNaN(dur) || dur < MIN_DURATION || dur > MAX_DURATION) {
+        res.status(400).json({ error: "Duration must be between 2 weeks and 6 months" });
+        return;
+      }
     }
 
     const updated = await updateDraft(id, {
@@ -138,6 +148,7 @@ export async function handleUpdateDraft(
       sources,
       considerations,
       category: category as Category | undefined,
+      proposal_duration_ms: proposal_duration_ms !== undefined ? Number(proposal_duration_ms) : undefined,
       skip_modified_flag: skip_modified_flag === true,
     });
     res.json(updated);
@@ -320,6 +331,8 @@ export async function handleSubmitDraft(
         : `Considerations:\n${draft.considerations.trim()}`;
     }
 
+    const closesAt = new Date(Date.now() + draft.proposal_duration_ms).toISOString();
+
     const proposal = await createProposal(
       {
         title: draft.title.trim(),
@@ -328,6 +341,7 @@ export async function handleSubmitDraft(
         submitted_by: user.id,
         category: draft.category ?? undefined,
         assistant_helped: draft.assistant_helped,
+        closes_at: closesAt,
       },
       emitEvent,
     );

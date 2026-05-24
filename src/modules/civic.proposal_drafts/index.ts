@@ -20,6 +20,7 @@ interface DraftRow {
   description: string;
   sources: string;
   considerations: string;
+  proposal_duration_ms: number;
   conversation_history: unknown;
   last_review_result: unknown;
   draft_modified_since_review: boolean;
@@ -39,6 +40,7 @@ function rowToDraft(row: DraftRow): ProposalDraft {
     description: row.description,
     sources: row.sources,
     considerations: row.considerations,
+    proposal_duration_ms: row.proposal_duration_ms,
     conversation_history: Array.isArray(row.conversation_history)
       ? row.conversation_history
       : [],
@@ -114,6 +116,7 @@ export async function updateDraft(
   if (patch.sources !== undefined) updates.sources = patch.sources;
   if (patch.considerations !== undefined) updates.considerations = patch.considerations;
   if (patch.category !== undefined) updates.category = patch.category;
+  if (patch.proposal_duration_ms !== undefined) updates.proposal_duration_ms = patch.proposal_duration_ms;
 
   if (!patch.skip_modified_flag) {
     updates.draft_modified_since_review = true;

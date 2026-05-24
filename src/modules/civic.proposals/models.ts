@@ -20,6 +20,7 @@ export interface Proposal {
   support_count: number;
   category: string | null;
   assistant_helped: boolean;
+  closes_at: string | null; // ISO 8601
   created_at: string; // ISO 8601
   updated_at: string;
 }
@@ -40,6 +41,7 @@ export interface CreateProposalInput {
   submitted_by: string;
   category?: string;
   assistant_helped?: boolean;
+  closes_at?: string; // ISO 8601
 }
 
 /** Configuration for the proposals module */

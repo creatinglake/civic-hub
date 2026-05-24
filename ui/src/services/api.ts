@@ -238,6 +238,7 @@ export interface CivicProposalSummary {
   support_threshold: number;
   category: string | null;
   assistant_helped: boolean;
+  closes_at: string | null;
   created_at: string;
 }
 
@@ -254,6 +255,7 @@ export interface CivicProposalDetail {
   has_supported: boolean | null;
   category: string | null;
   assistant_helped: boolean;
+  closes_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -314,6 +316,7 @@ export interface ProposalDraft {
   description: string;
   sources: string;
   considerations: string;
+  proposal_duration_ms: number;
   conversation_history: Array<{ role: "user" | "assistant"; content: string }>;
   last_review_result: DraftSuggestion[] | null;
   draft_modified_since_review: boolean;
@@ -354,7 +357,7 @@ export function getDraft(id: string): Promise<ProposalDraft> {
 
 export function updateDraft(
   id: string,
-  patch: Partial<Pick<ProposalDraft, "title" | "description" | "sources" | "considerations" | "category">> & { skip_modified_flag?: boolean },
+  patch: Partial<Pick<ProposalDraft, "title" | "description" | "sources" | "considerations" | "category" | "proposal_duration_ms">> & { skip_modified_flag?: boolean },
 ): Promise<ProposalDraft> {
   return request("PATCH", `/proposals/drafts/${id}`, patch);
 }

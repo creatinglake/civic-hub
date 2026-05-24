@@ -61,6 +61,7 @@ interface ProposalRow {
   converted_to_process_id: string | null;
   category?: string | null;
   assistant_helped?: boolean;
+  closes_at?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -76,6 +77,7 @@ function rowToProposal(row: ProposalRow): Proposal {
     support_count: row.support_count,
     category: row.category ?? null,
     assistant_helped: row.assistant_helped ?? false,
+    closes_at: row.closes_at ?? null,
     created_at: row.created_at,
     updated_at: row.updated_at,
   };
@@ -108,6 +110,7 @@ export async function createProposal(
   };
   if (input.category !== undefined) row.category = input.category;
   if (input.assistant_helped !== undefined) row.assistant_helped = input.assistant_helped;
+  if (input.closes_at !== undefined) row.closes_at = input.closes_at;
 
   const { data, error } = await getDb()
     .from("proposals")
@@ -378,6 +381,7 @@ export async function getProposalReadModel(
     has_supported: hasSupported,
     category: proposal.category,
     assistant_helped: proposal.assistant_helped,
+    closes_at: proposal.closes_at,
     created_at: proposal.created_at,
     updated_at: proposal.updated_at,
   };
@@ -397,6 +401,7 @@ export function getProposalSummary(proposal: Proposal): Record<string, unknown> 
     support_threshold: config.proposal_support_threshold,
     category: proposal.category,
     assistant_helped: proposal.assistant_helped,
+    closes_at: proposal.closes_at,
     created_at: proposal.created_at,
   };
 }

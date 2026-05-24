@@ -104,6 +104,9 @@ export default function ProposalDetail() {
       <div className="process-meta">
         <span>Proposed by {proposal.submitted_by}</span>
         <span>Submitted {formatDate(proposal.created_at)}</span>
+        {proposal.closes_at && (
+          <span>Open until {formatDate(proposal.closes_at)}</span>
+        )}
       </div>
 
       {proposal.assistant_helped && (
