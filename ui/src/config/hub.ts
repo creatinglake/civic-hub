@@ -43,7 +43,7 @@ const hub = {
    */
   tagline:
     import.meta.env.VITE_HUB_TAGLINE ??
-    "Stay informed on Floyd County government, raise the issues that matter, and see where our community stands.",
+    "Stay informed on Floyd County government, raise the issues that matter, work on projects together, and see where our community stands.",
   /**
    * Banner image path. Relative to the deployment root — drop new
    * banner files into `civic-hub/ui/public/` and point this var at
