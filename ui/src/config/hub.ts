@@ -90,6 +90,7 @@ const hub = {
    */
   demo_mode: import.meta.env.VITE_DEMO_MODE === "true",
   demo_bypass_code: import.meta.env.VITE_DEMO_BYPASS_CODE ?? "",
+  beta_mode: import.meta.env.VITE_BETA_MODE === "true",
 };
 
 export default hub;

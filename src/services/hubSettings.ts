@@ -18,6 +18,7 @@ import { getDb } from "../db/client.js";
 export const SETTING_KEYS = {
   VOTE_RESULTS_RECIPIENT_EMAILS: "brief_recipient_emails",
   ANNOUNCEMENT_AUTHORS: "announcement_authors",
+  BETA_ALLOWLIST: "beta_allowlist",
 } as const;
 
 export type SettingKey = (typeof SETTING_KEYS)[keyof typeof SETTING_KEYS];
@@ -180,6 +181,64 @@ function normalizeAuthors(raw: unknown[]): AnnouncementAuthor[] {
   }
   return out;
 }
+
+// --- Beta allowlist ---
+
+export interface WaitlistEntry {
+  email: string;
+  created_at: string;
+  notes: string | null;
+}
+
+export async function getBetaAllowlist(): Promise<string[]> {
+  const stored = await getSetting(SETTING_KEYS.BETA_ALLOWLIST);
+  const raw = stored ?? "";
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const part of raw.split(",")) {
+    const trimmed = part.trim().toLowerCase();
+    if (!trimmed) continue;
+    if (seen.has(trimmed)) continue;
+    seen.add(trimmed);
+    out.push(trimmed);
+  }
+  return out;
+}
+
+export async function setBetaAllowlist(
+  emails: string[],
+  updatedBy: string | null,
+): Promise<string[]> {
+  const seen = new Set<string>();
+  const cleaned: string[] = [];
+  for (const raw of emails) {
+    const trimmed = typeof raw === "string" ? raw.trim().toLowerCase() : "";
+    if (!trimmed) continue;
+    if (seen.has(trimmed)) continue;
+    seen.add(trimmed);
+    cleaned.push(trimmed);
+  }
+  await setSetting(SETTING_KEYS.BETA_ALLOWLIST, cleaned.join(","), updatedBy);
+  return cleaned;
+}
+
+export async function isEmailOnBetaAllowlist(
+  email: string,
+): Promise<boolean> {
+  const list = await getBetaAllowlist();
+  return list.includes(email.trim().toLowerCase());
+}
+
+export async function getWaitlist(): Promise<WaitlistEntry[]> {
+  const { data, error } = await getDb()
+    .from("waitlist")
+    .select("email, created_at, notes")
+    .order("created_at", { ascending: false });
+  if (error) throw new Error(`hubSettings.getWaitlist: ${error.message}`);
+  return (data ?? []) as WaitlistEntry[];
+}
+
+// --- Announcement authors ---
 
 /**
  * Look up an email in the announcement author list. Returns the label to

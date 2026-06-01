@@ -34,11 +34,11 @@ export interface AuthUser {
   is_resident: boolean;
   created_at: string;
   /**
-   * Slice 5 — subscription to the daily email digest. Opt-out: defaults
-   * to true on account creation. Flipped via the Settings page or the
-   * unsubscribe link in every digest email.
+   * Digest delivery frequency in days. null = unsubscribed, 1 = daily,
+   * 3 = every 3 days, 7 = weekly, 14 = biweekly, 30 = monthly.
+   * Defaults to 1 (daily) on account creation.
    */
-  digest_subscribed: boolean;
+  digest_frequency_days: number | null;
   /**
    * Slice 11 — most recent legal-document version this user accepted
    * (e.g. "1.0"). null means the user has never accepted; the UI shows

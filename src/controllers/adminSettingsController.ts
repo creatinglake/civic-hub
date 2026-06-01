@@ -15,22 +15,30 @@
 import { Request, Response } from "express";
 import {
   type AnnouncementAuthor,
+  type WaitlistEntry,
   getAnnouncementAuthors,
   getVoteResultsRecipients,
   setAnnouncementAuthors,
   setVoteResultsRecipients,
+  getBetaAllowlist,
+  setBetaAllowlist,
+  getWaitlist,
 } from "../services/hubSettings.js";
 import { getAuthUser } from "../middleware/auth.js";
 
 interface SettingsResponse {
   brief_recipient_emails: string[];
   announcement_authors: AnnouncementAuthor[];
+  beta_allowlist: string[];
+  waitlist: WaitlistEntry[];
 }
 
 async function loadSettings(): Promise<SettingsResponse> {
   return {
     brief_recipient_emails: await getVoteResultsRecipients(),
     announcement_authors: await getAnnouncementAuthors(),
+    beta_allowlist: await getBetaAllowlist(),
+    waitlist: await getWaitlist(),
   };
 }
 
@@ -55,6 +63,7 @@ export async function handlePatchSettings(
     const body = (req.body ?? {}) as {
       brief_recipient_emails?: unknown;
       announcement_authors?: unknown;
+      beta_allowlist?: unknown;
     };
 
     if (body.brief_recipient_emails !== undefined) {
@@ -87,6 +96,19 @@ export async function handlePatchSettings(
         }
       }
       await setAnnouncementAuthors(input, actor);
+    }
+
+    if (body.beta_allowlist !== undefined) {
+      if (!Array.isArray(body.beta_allowlist)) {
+        res.status(400).json({
+          error: "beta_allowlist must be an array of email strings.",
+        });
+        return;
+      }
+      const input = body.beta_allowlist.filter(
+        (e): e is string => typeof e === "string",
+      );
+      await setBetaAllowlist(input, actor);
     }
 
     res.json(await loadSettings());

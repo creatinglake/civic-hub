@@ -9,7 +9,7 @@
 //
 //   GET /unsubscribe/digest?token=…
 //     No auth. Verifies the HMAC-signed token, flips
-//     digest_subscribed to false, returns a simple HTML confirmation.
+//     digest_frequency_days to null, returns a simple HTML confirmation.
 //
 //   PATCH /user/settings/digest
 //     Authed (requireAuth). Flips the subscription flag for the
@@ -31,7 +31,7 @@ import {
 import {
   listSubscribedUsers,
   markDigestSent,
-  setDigestSubscription,
+  setDigestFrequency,
   getUser,
 } from "../modules/civic.auth/index.js";
 import { sendEmail } from "../utils/email.js";
@@ -225,9 +225,23 @@ export async function handleRunDigest(
       }
     }
 
+    const now = Date.now();
+
     for (const user of users) {
       processed += 1;
       try {
+        // Frequency-aware skip: if the user has a frequency > 1 day and
+        // their last digest was sent less than frequency_days ago, skip.
+        const freqDays = user.digest_frequency_days ?? 1;
+        if (user.last_digest_sent_at) {
+          const lastSent = new Date(user.last_digest_sent_at).getTime();
+          const nextDue = lastSent + freqDays * 24 * 60 * 60 * 1000;
+          if (now < nextDue) {
+            skipped += 1;
+            continue;
+          }
+        }
+
         const since = clampSince(user);
         const windowEvents: DigestEvent[] = [];
         for (const e of allRecent) {
@@ -416,7 +430,7 @@ export async function handleUnsubscribeDigest(
       return;
     }
 
-    await setDigestSubscription(userId, false);
+    await setDigestFrequency(userId, null);
     console.log(`[digest] unsubscribed user=${userId}`);
 
     res.status(200).type("html").send(
@@ -424,8 +438,8 @@ export async function handleUnsubscribeDigest(
         title: "Unsubscribed",
         heading: "You've been unsubscribed",
         body:
-          `You will no longer receive the daily email digest from ${escapeHtml(hubName())}. ` +
-          `You can re-subscribe any time from the <a href="${escapeHtml(uiBaseUrl())}/settings">Settings</a> page.`,
+          `You will no longer receive the email digest from ${escapeHtml(hubName())}. ` +
+          `You can re-subscribe or change your digest frequency any time from the <a href="${escapeHtml(uiBaseUrl())}/settings">Settings</a> page.`,
       }),
     );
   } catch (err) {
@@ -445,22 +459,60 @@ export async function handleUnsubscribeDigest(
 
 // --- PATCH /user/settings/digest -------------------------------------------
 
+/**
+ * PATCH /user/settings/digest
+ *
+ * Accepts either the legacy boolean format or the new frequency format:
+ *   { subscribed: boolean }              → maps to frequency 1 or null
+ *   { digest_frequency_days: number|null } → direct frequency set
+ *
+ * Returns { digest_frequency_days: number|null }.
+ */
 export async function handlePatchDigestSubscription(
   req: Request,
   res: Response,
 ): Promise<void> {
   try {
     const user = getAuthUser(res);
-    const body = (req.body ?? {}) as { subscribed?: unknown };
-    if (typeof body.subscribed !== "boolean") {
+    const body = (req.body ?? {}) as {
+      subscribed?: unknown;
+      digest_frequency_days?: unknown;
+    };
+
+    let frequencyDays: number | null;
+
+    if (body.digest_frequency_days !== undefined) {
+      // New format: explicit frequency
+      if (body.digest_frequency_days === null) {
+        frequencyDays = null;
+      } else if (
+        typeof body.digest_frequency_days === "number" &&
+        Number.isInteger(body.digest_frequency_days) &&
+        body.digest_frequency_days >= 1 &&
+        body.digest_frequency_days <= 30
+      ) {
+        frequencyDays = body.digest_frequency_days;
+      } else {
+        res.status(400).json({
+          error:
+            "digest_frequency_days must be null (unsubscribe) or an integer 1-30.",
+        });
+        return;
+      }
+    } else if (typeof body.subscribed === "boolean") {
+      // Legacy boolean format for backwards compatibility
+      frequencyDays = body.subscribed ? 1 : null;
+    } else {
       res.status(400).json({
-        error: "Body must include { subscribed: boolean }",
+        error:
+          "Body must include { digest_frequency_days: number|null } or { subscribed: boolean }",
       });
       return;
     }
-    const updated = await setDigestSubscription(user.id, body.subscribed);
+
+    const updated = await setDigestFrequency(user.id, frequencyDays);
     res.json({
-      digest_subscribed: updated.digest_subscribed,
+      digest_frequency_days: updated.digest_frequency_days,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";

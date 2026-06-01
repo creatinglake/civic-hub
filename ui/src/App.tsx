@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { BrowserRouter, Routes, Route, Navigate, useLocation, useParams, Link } from "react-router-dom";
-import { AuthProvider } from "./context/AuthContext";
+import { AuthProvider, useAuth } from "./context/AuthContext";
 import hub from "./config/hub";
 import Nav from "./components/Nav";
+import BetaLanding from "./pages/BetaLanding";
 import HubBanner from "./components/HubBanner";
 import Home from "./pages/Home";
 import Votes from "./pages/Votes";
@@ -49,17 +50,30 @@ function BannerSlot() {
 
 function AppContent() {
   const [showIntro, setShowIntro] = useState(() => !hasSeenIntro());
+  const { user, loading } = useAuth();
+
+  if (hub.beta_mode && !user && !loading) {
+    return (
+      <div className="app">
+        <Nav />
+        <main className="page-shell">
+          <Routes>
+            <Route path="/privacy" element={<Privacy />} />
+            <Route path="/terms" element={<Terms />} />
+            <Route path="/code-of-conduct" element={<CodeOfConduct />} />
+            <Route path="/feedback" element={<Feedback />} />
+            <Route path="*" element={<BetaLanding />} />
+          </Routes>
+        </main>
+        <SiteFooter />
+      </div>
+    );
+  }
 
   return (
     <div className="app">
       {showIntro && <IntroPopup onDismiss={() => setShowIntro(false)} />}
 
-      {/* Slice 11 follow-up: Nav above the banner. On mobile this fills
-          what would otherwise be a gap between iOS Chrome's URL bar
-          and the banner image; on desktop the banner still leads on
-          banner-eligible routes, but the nav is now the first thing
-          painted everywhere. The Nav is `position: sticky; top: 0`
-          so it stays pinned regardless of scroll position. */}
       <Nav />
       <BannerSlot />
 

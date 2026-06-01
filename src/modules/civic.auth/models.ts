@@ -14,11 +14,12 @@ export interface User {
   is_resident: boolean;
   created_at: string; // ISO 8601
   /**
-   * Opt-out flag for the daily email digest. Defaults to true on account
-   * creation; flipped off via an unsubscribe link in every digest email
-   * or via the UI settings page. Slice 5.
+   * Digest delivery frequency in days. null means unsubscribed. Defaults
+   * to 1 (daily) on account creation. Common values: 1, 3, 7, 14, 30.
+   * The cron job sends a digest when
+   * `last_digest_sent_at + frequency_days <= now`.
    */
-  digest_subscribed: boolean;
+  digest_frequency_days: number | null;
   /**
    * Cursor for the next digest's "since" window. null means "never
    * sent" — the cron uses the user's created_at as the since anchor,

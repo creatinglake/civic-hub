@@ -10,6 +10,7 @@ import {
   adminGetSettings,
   adminPatchSettings,
   type AnnouncementAuthor,
+  type WaitlistEntry,
 } from "../services/api";
 import AdminTabs from "../components/AdminTabs";
 import "./AdminSettings.css";
@@ -28,11 +29,22 @@ export default function AdminSettings() {
   const [savingAuthors, setSavingAuthors] = useState(false);
   const [authorsMessage, setAuthorsMessage] = useState<string | null>(null);
 
+  // --- Beta allowlist ---
+  const [allowlistText, setAllowlistText] = useState("");
+  const [savingAllowlist, setSavingAllowlist] = useState(false);
+  const [allowlistMessage, setAllowlistMessage] = useState<string | null>(null);
+
+  // --- Waitlist ---
+  const [waitlist, setWaitlist] = useState<WaitlistEntry[]>([]);
+  const [copiedWaitlist, setCopiedWaitlist] = useState(false);
+
   useEffect(() => {
     adminGetSettings()
       .then((s) => {
         setRecipientsText(s.brief_recipient_emails.join(", "));
         setAuthors(s.announcement_authors);
+        setAllowlistText(s.beta_allowlist.join(", "));
+        setWaitlist(s.waitlist);
         setLoaded(true);
       })
       .catch((err: Error) => {
@@ -74,6 +86,38 @@ export default function AdminSettings() {
 
   function removeAuthor(i: number) {
     setAuthors((cur) => cur.filter((_, idx) => idx !== i));
+  }
+
+  async function saveAllowlist() {
+    setSavingAllowlist(true);
+    setAllowlistMessage(null);
+    try {
+      const input = allowlistText
+        .split(/[,\n]/)
+        .map((s) => s.trim())
+        .filter((s) => s.length > 0);
+      const saved = await adminPatchSettings({ beta_allowlist: input });
+      setAllowlistText(saved.beta_allowlist.join(", "));
+      setAllowlistMessage(
+        saved.beta_allowlist.length === 0
+          ? "Cleared — no one can sign in during beta (except admins)."
+          : `Saved. ${saved.beta_allowlist.length} email(s) on the allowlist.`,
+      );
+    } catch (err) {
+      setAllowlistMessage(
+        err instanceof Error ? err.message : "Failed to save allowlist",
+      );
+    } finally {
+      setSavingAllowlist(false);
+    }
+  }
+
+  function copyWaitlistEmails() {
+    const emails = waitlist.map((w) => w.email).join(", ");
+    navigator.clipboard.writeText(emails).then(() => {
+      setCopiedWaitlist(true);
+      setTimeout(() => setCopiedWaitlist(false), 2000);
+    });
   }
 
   async function saveAuthors() {
@@ -220,6 +264,91 @@ export default function AdminSettings() {
               <span className="admin-settings-message">{authorsMessage}</span>
             )}
           </div>
+        </section>
+
+        {/* --- Beta allowlist --- */}
+        <section className="admin-settings-panel">
+          <h3>Beta allowlist</h3>
+          <label className="form-label" htmlFor="beta-allowlist">
+            Allowed emails
+          </label>
+          <p className="form-hint">
+            Comma- or newline-separated list of emails allowed to sign in
+            during beta. Admin emails are always allowed regardless of this
+            list. Only takes effect when CIVIC_BETA_MODE is enabled.
+          </p>
+          <textarea
+            id="beta-allowlist"
+            className="form-textarea"
+            rows={3}
+            value={allowlistText}
+            onChange={(e) => setAllowlistText(e.target.value)}
+            disabled={!loaded || savingAllowlist}
+            placeholder="friend@example.com, tester@example.com"
+          />
+          <div className="admin-settings-actions">
+            <button
+              type="button"
+              className="admin-convert-button"
+              onClick={saveAllowlist}
+              disabled={!loaded || savingAllowlist}
+            >
+              {savingAllowlist ? "Saving…" : "Save allowlist"}
+            </button>
+            {allowlistMessage && (
+              <span className="admin-settings-message">{allowlistMessage}</span>
+            )}
+          </div>
+        </section>
+
+        {/* --- Waitlist --- */}
+        <section className="admin-settings-panel">
+          <h3>Waitlist</h3>
+          <p className="form-hint">
+            People who signed up for access on the beta landing page.
+          </p>
+
+          {waitlist.length === 0 ? (
+            <p className="empty-state-inline" style={{ margin: "var(--space-sm) 0" }}>
+              No one on the waitlist yet.
+            </p>
+          ) : (
+            <>
+              <p className="form-hint" style={{ margin: "0 0 var(--space-sm)" }}>
+                {waitlist.length} {waitlist.length === 1 ? "person" : "people"} on the waitlist.
+              </p>
+              <div className="admin-waitlist-table-wrap">
+                <table className="admin-waitlist-table">
+                  <thead>
+                    <tr>
+                      <th>Email</th>
+                      <th>Signed up</th>
+                      <th>Notes</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {waitlist.map((w) => (
+                      <tr key={w.email}>
+                        <td>{w.email}</td>
+                        <td>{new Date(w.created_at).toLocaleDateString()}</td>
+                        <td>{w.notes ?? "—"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div className="admin-settings-actions" style={{ marginTop: "var(--space-sm)" }}>
+                <button
+                  type="button"
+                  className="admin-convert-button"
+                  onClick={copyWaitlistEmails}
+                  disabled={waitlist.length === 0}
+                >
+                  {copiedWaitlist ? "Copied!" : "Copy all emails"}
+                </button>
+              </div>
+            </>
+          )}
         </section>
       </div>
     </div>

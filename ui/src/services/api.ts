@@ -1061,9 +1061,17 @@ export interface AnnouncementAuthor {
   label: string;
 }
 
+export interface WaitlistEntry {
+  email: string;
+  created_at: string;
+  notes: string | null;
+}
+
 export interface AdminSettings {
   brief_recipient_emails: string[];
   announcement_authors: AnnouncementAuthor[];
+  beta_allowlist: string[];
+  waitlist: WaitlistEntry[];
 }
 
 export function adminGetSettings(): Promise<AdminSettings> {
@@ -1079,14 +1087,16 @@ export function adminPatchSettings(
 // --- User settings (Slice 5) ---
 
 /**
- * Toggle the user's daily digest subscription. Returns the new value.
- * Requires a valid session token (forwarded via the shared Bearer header
- * in request()). Server always returns the canonical value.
+ * Set the user's digest frequency. null = unsubscribe, 1-30 = days
+ * between digests. Returns the new value. Requires a valid session token
+ * (forwarded via the shared Bearer header in request()).
  */
-export function setDigestSubscription(
-  subscribed: boolean,
-): Promise<{ digest_subscribed: boolean }> {
-  return request("PATCH", "/user/settings/digest", { subscribed });
+export function setDigestFrequency(
+  frequencyDays: number | null,
+): Promise<{ digest_frequency_days: number | null }> {
+  return request("PATCH", "/user/settings/digest", {
+    digest_frequency_days: frequencyDays,
+  });
 }
 
 // --- Slice 9: image upload + link previews ---

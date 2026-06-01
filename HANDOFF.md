@@ -1,0 +1,3601 @@
+# HANDOFF.md — Civic Hub Build Log
+
+Updated after every Claude Code session. Records what was built, what's incomplete, and open questions.
+
+---
+
+## Deployment Summary
+
+- **Live at:** https://demo-hub.civic.social
+- **GitHub:** creatinglake/civic-hub
+- **Vercel:** auto-deploy on push to main
+- **Storage:** Supabase-backed persistent storage
+
+---
+
+## Beta Gating + Digest Frequency — 2026-06-01
+
+**Status:** Complete. Not yet deployed — requires DB migrations and env var activation.
+
+### What was built
+
+**Slice 1: Beta Gating (Invite-Only Access with Waitlist)**
+
+Restricts floyd.civic.social to admin-managed email allowlist during private beta. Non-allowlisted visitors see a beta landing page with waitlist signup.
+
+- `supabase/migrations/20260530000000_waitlist.sql` — `waitlist` table (email PK, created_at, notes) with RLS
+- `src/services/hubSettings.ts` — Added `getBetaAllowlist()`, `setBetaAllowlist()`, `isEmailOnBetaAllowlist()`, `getWaitlist()` using existing hub_settings table
+- `src/modules/civic.auth/index.ts` — Beta gate in `requestVerification()`: if `CIVIC_BETA_MODE=true`, non-allowlisted/non-admin emails rejected before OTP sent
+- `src/controllers/waitlistController.ts` + `src/routes/waitlistRoutes.ts` — `POST /waitlist` with honeypot spam protection
+- `src/controllers/adminSettingsController.ts` — Extended to serve/save `beta_allowlist` and `waitlist`
+- `src/app.ts` — Mounted `/waitlist` route
+- `ui/src/config/hub.ts` — Added `beta_mode` flag from `VITE_BETA_MODE`
+- `ui/src/pages/BetaLanding.tsx` + `BetaLanding.css` — Landing page with banner, beta messaging, sign-in button, waitlist form
+- `ui/src/services/waitlist.ts` — `joinWaitlist()` API helper
+- `ui/src/App.tsx` — Beta gate: unauthenticated users see only landing page + legal pages
+- `ui/src/pages/AdminSettings.tsx` + `AdminSettings.css` — Beta allowlist editor + waitlist viewer in admin panel
+- `ui/src/services/api.ts` — Extended `AdminSettings` interface
+
+**Activation:** Set `CIVIC_BETA_MODE=true` (backend) + `VITE_BETA_MODE=true` (frontend). Remove both to exit beta.
+
+**Slice 2: Digest Frequency**
+
+Replaced boolean digest toggle with configurable frequency dropdown (Daily, Every 3 days, Weekly, Every 2 weeks, Monthly, Unsubscribed).
+
+- `supabase/migrations/20260601000000_digest_frequency.sql` — Adds `digest_frequency_days INTEGER` column, migrates from `digest_subscribed`, drops old column, adds partial index
+- `src/modules/civic.auth/models.ts` — `digest_subscribed: boolean` → `digest_frequency_days: number | null`
+- `src/modules/civic.auth/index.ts` — `setDigestSubscription()` → `setDigestFrequency()`, `listSubscribedUsers()` now queries `digest_frequency_days IS NOT NULL`, `rowToUser()` updated, new user default = 1
+- `src/controllers/digestController.ts` — Cron job skips users whose frequency window hasn't elapsed; PATCH endpoint accepts `{ digest_frequency_days: number|null }` (with legacy `{ subscribed: boolean }` compat); unsubscribe handler uses `setDigestFrequency(null)`
+- `src/modules/civic.digest/service.ts` — Email footer: "Change digest frequency" link + "Unsubscribe" link
+- `ui/src/services/auth.ts` — `AuthUser.digest_subscribed` → `digest_frequency_days`
+- `ui/src/services/api.ts` — `setDigestSubscription()` → `setDigestFrequency()`
+- `ui/src/pages/Settings.tsx` — Toggle replaced with dropdown (Daily / Every 3 days / Weekly / Every 2 weeks / Monthly / Unsubscribed)
+- `ui/src/pages/Settings.css` — Added `.form-select` styles for settings panel
+
+### Deployment steps
+
+1. Apply migrations to Supabase (waitlist table + digest frequency column)
+2. Set env vars: `CIVIC_BETA_MODE=true`, `VITE_BETA_MODE=true` (when ready for beta gating)
+3. Add beta tester emails to allowlist via admin panel at `/admin/settings`
+4. Deploy backend + frontend
+
+### Open questions
+
+- Should waitlisted users receive an automatic email when added to the allowlist? (Not implemented — admin manually notifies for now)
+- Future: digest frequency change via signed email link (like current unsubscribe) vs. requiring sign-in to settings page
+
+---
+
+## Slice C: Projects Module — Full Stack + Banner Image — 2026-05-24
+
+**Status:** Complete. Deployed to production. All migrations applied to both dev and prod Supabase.
+
+### What was built
+
+**Phase 1 — Database Migration:**
+- `supabase/migrations/20260524100000_projects.sql` — Five tables: `projects`, `project_updates`, `project_sentiments` (composite PK, upsert-friendly), `project_comments`, `project_drafts`. Indexes, RLS, updated_at triggers.
+
+**Phase 2 — Backend Module `civic.projects`:**
+- `src/modules/civic.projects/models.ts` — Types: Project, ProjectUpdate, ProjectSentiment, ProjectComment, CreateProjectInput, ProjectStatus, SentimentValue.
+- `src/modules/civic.projects/events.ts` — Event emission: emitProjectCreated, emitProjectUpdated, emitProjectCommented, emitProjectSentimentChanged. All use `action_url_path: /project/:id`.
+- `src/modules/civic.projects/index.ts` — Full CRUD + updates timeline + changeable sentiment (upsert with recount) + flat comments + read model + dev utilities.
+
+**Phase 3 — Backend Module `civic.project_drafts`:**
+- `src/modules/civic.project_drafts/models.ts` — ProjectDraft, CreateProjectDraftInput, UpdateProjectDraftInput types.
+- `src/modules/civic.project_drafts/index.ts` — Draft CRUD, conversation history, review results, apply AI proposal, status transitions. Mirrors vote_drafts pattern.
+
+**Phase 4 — Assistant Integration:**
+- `src/modules/civic.proposal_assistant/models.ts` — Extended ProcessType to include "project".
+- `src/modules/civic.proposal_assistant/systemPrompt.ts` — Project-specific brainstorm questions, review guidance, category guidance. Projects have no considerations field.
+- `src/modules/civic.proposal_assistant/content.ts` — Added PROJECT_BEST_PRACTICES document.
+
+**Phase 5 — Controllers + Routes:**
+- `src/controllers/projectController.ts` — CRUD + updates + sentiment + comments handlers.
+- `src/controllers/projectDraftController.ts` — Draft CRUD + assistant + review + submit handlers. Submit creates project via createProject (not process handler).
+- `src/routes/projectRoutes.ts` — 7 endpoints (POST /, GET /, GET /:id, POST /:id/updates, POST /:id/sentiment, POST /:id/comments, GET /:id/comments).
+- `src/routes/projectDraftRoutes.ts` — 6 endpoints (POST /, GET /:id, PATCH /:id, POST /:id/assistant, POST /:id/review, POST /:id/submit).
+- `src/app.ts` — Mounted /projects/drafts (before /projects) and /projects.
+
+**Phase 6 — Frontend API Types + Functions:**
+- `ui/src/services/api.ts` — Added ProjectSummary, ProjectDetail, ProjectUpdateEntry, ProjectComment, ProjectDraft, ProjectDraftAssistantResult types. Added 12 API functions for projects and project drafts.
+
+**Phase 7 — Nav + Routing:**
+- `ui/src/components/FeedVotesTabs.tsx` — Added "Projects" as fourth tab.
+- `ui/src/components/Nav.tsx` — Added "Projects" to drawer links.
+- `ui/src/App.tsx` — Added /projects, /projects/new, /project/:id routes. Added "/projects" to BANNER_ROUTES.
+
+**Phase 8 — Projects Listing Page:**
+- `ui/src/pages/Projects.tsx` — Listing page with blue-themed CTA, active projects with sentiment bars, archived section.
+- `ui/src/pages/Projects.css` — Blue accent CTA styles, project card and sentiment styles.
+
+**Phase 9 — Project Detail + Drafting Pages:**
+- `ui/src/pages/ProjectDetail.tsx` — Full detail page: sentiment buttons (changeable), description, sources, updates timeline (creator can post), flat comments.
+- `ui/src/pages/ProjectDetail.css` — Sentiment, updates, comments styles.
+- `ui/src/pages/ProjectDraft.tsx` — AI-assisted drafting page mirroring ProposeDraftVote: two-path entry (brainstorm/write), desktop two-pane, mobile FAB, submit confirmation modal.
+- `ui/src/components/ProjectDraftingForm.tsx` — Simplified form (title, description, sources — no duration, no category). Shares VoteDraftingForm.css.
+- `ui/src/pages/ProjectDraft.css` — Minimal (reuses ProposeDraft.css layout classes).
+
+**Phase 10 — Feed Integration:**
+- `ui/src/components/FeedPost.tsx` — Added "civic.project" to FeedProcessKind. Added civic.project.created and civic.project.updated event cases with blue pills.
+- `ui/src/components/Feed.css` — Added pill and border styles for project-created and project-updated.
+
+### Files created (17)
+- `supabase/migrations/20260524100000_projects.sql`
+- `src/modules/civic.projects/models.ts`
+- `src/modules/civic.projects/events.ts`
+- `src/modules/civic.projects/index.ts`
+- `src/modules/civic.project_drafts/models.ts`
+- `src/modules/civic.project_drafts/index.ts`
+- `src/controllers/projectController.ts`
+- `src/controllers/projectDraftController.ts`
+- `src/routes/projectRoutes.ts`
+- `src/routes/projectDraftRoutes.ts`
+- `ui/src/pages/Projects.tsx`
+- `ui/src/pages/Projects.css`
+- `ui/src/pages/ProjectDetail.tsx`
+- `ui/src/pages/ProjectDetail.css`
+- `ui/src/pages/ProjectDraft.tsx`
+- `ui/src/pages/ProjectDraft.css`
+- `ui/src/components/ProjectDraftingForm.tsx`
+
+### Files modified (9)
+- `src/modules/civic.proposal_assistant/models.ts` — ProcessType extended
+- `src/modules/civic.proposal_assistant/systemPrompt.ts` — Project-specific prompts
+- `src/modules/civic.proposal_assistant/content.ts` — PROJECT_BEST_PRACTICES
+- `src/app.ts` — Project route mounting
+- `ui/src/services/api.ts` — Project types + API functions
+- `ui/src/components/FeedVotesTabs.tsx` — Projects tab
+- `ui/src/components/Nav.tsx` — Projects drawer link
+- `ui/src/App.tsx` — Project routes + banner
+- `ui/src/components/FeedPost.tsx` — Project event rendering
+- `ui/src/components/Feed.css` — Project pill styles
+
+### Design decisions
+- **Standalone CRUD, not process handler** — Projects bypass the process registry entirely. They have their own table, their own CRUD, and manual event emission via emitEvent(). The process handler lifecycle (draft→scheduled→active→closed→finalized) is too rigid for editable living documents.
+- **Changeable sentiment** — Support/oppose uses upsert on composite PK (project_id, user_id). "Neutral" deletes the row. Counts are recounted from the authoritative sentiments table (same pattern as proposal support counting).
+- **AI-assisted drafting** — Full brainstorm/write path with the shared proposal_assistant module. ProcessType extended to "project". Projects have no considerations field — the assistant skips it.
+- **No category/duration** — Projects are simpler than votes (no duration picker) and proposals (no idea/concern toggle). Just title, description, sources.
+
+### Post-Slice C additions (same session)
+
+**Feed filter fix:**
+- `ui/src/components/FeedPost.tsx` — Added `return null` for `civic.project.comment_added` and `civic.project.sentiment_changed` events to suppress spurious "Activity" cards (same pattern used for vote/proposal events).
+
+**Banner image upload:**
+- `supabase/migrations/20260524200000_project_banner_image.sql` — Added nullable `banner_image_url` and `banner_image_alt` columns to `projects` and `project_drafts`.
+- `src/routes/uploadRoutes.ts` — Added `POST /upload/project-image` with `requireResident` auth, reusing `handlePostImageUpload`.
+- `src/modules/civic.projects/models.ts` — Added banner fields to `Project` and `CreateProjectInput`.
+- `src/modules/civic.projects/index.ts` — Updated `ProjectRow`, `rowToProject`, and `createProject` insert.
+- `src/modules/civic.project_drafts/models.ts` — Added banner fields to `ProjectDraft` and `UpdateProjectDraftInput`.
+- `src/modules/civic.project_drafts/index.ts` — Updated `DraftRow`, `rowToDraft`, and `updateProjectDraft`.
+- `src/controllers/projectDraftController.ts` — Passes banner fields through update and submit flows.
+- `ui/src/services/api.ts` — Added banner fields to `ProjectSummary`, `ProjectDraft`; added `uploadProjectImage()` function; updated `updateProjectDraft` signature.
+- `ui/src/components/PostImagePicker.tsx` — Added optional `uploadFn` prop for endpoint flexibility.
+- `ui/src/components/ProjectDraftingForm.tsx` — Added `PostImagePicker` with suggestion note between description and sources.
+- `ui/src/pages/ProjectDraft.tsx` — Added `handleImageChange` callback with `skip_modified_flag: true`.
+- `ui/src/pages/ProjectDetail.tsx` — Displays banner image above title when present.
+- `ui/src/pages/ProjectDetail.css` — Banner image styles (rounded corners, cover-fit, max-height 320px).
+
+### Commits
+- `1856c1b` — Slice C: Projects module — full stack
+- `bf08849` — Filter project comment/sentiment events from feed
+- `d5fbd9a` — Add banner image upload to project drafting + detail pages
+- `75ef154` — Fix missing onImageChange prop on mobile ProjectDraftingForm
+
+### What's next
+- Slice D: Navigation polish + cross-module feed integration
+- Slice E: Assistant module rename (civic.drafting_assistant)
+
+---
+
+## Slice B: Propose Module Rebrand + Simplification — 2026-05-23
+
+**Status:** Complete. All 7 phases implemented, builds pass. Not yet committed or deployed.
+
+### What was built
+
+**Phase 1 — Nav + Routing:**
+- `ui/src/components/FeedVotesTabs.tsx` — Added "Propose" tab to TABS array.
+- `ui/src/components/Nav.tsx` — Added "Propose" to drawer links.
+- `ui/src/App.tsx` — `/propose` route now renders `<Propose />` (listing page). Added `/propose/new` route for the drafting flow. Added `"/propose"` to BANNER_ROUTES.
+
+**Phase 2 — Backend: Remove Endorsement Auto-Promotion:**
+- `src/modules/civic.proposals/index.ts` — `supportProposal()` no longer changes status or triggers endorsement events. Support count increments but status stays as-is.
+- `src/controllers/proposalDraftController.ts` — Removed `steward_approved` bypasses from hard-block and modified-since-review checks. Added `"concern"` to VALID_CATEGORIES.
+- `src/modules/civic.proposal_assistant/models.ts` — Added `"concern"` to Category type.
+
+**Phase 3 — Propose Listing Page:**
+- `ui/src/pages/Propose.tsx` — New listing page at `/propose`. Shows HubInfo, FeedVotesTabs, green-themed CTA ("Got something on your mind?"), active proposals sorted by support_count, past proposals section.
+- `ui/src/pages/Propose.css` — Green accent overrides for CTA, status badge styles.
+
+**Phase 4 — Simplify Drafting Flow:**
+- `ui/src/pages/ProposeDraft.tsx` — Removed category selection step (3-step → 2-step). Rebranded to "Propose an idea". Back links point to `/propose`. Submit navigates to `/propose`. Removed `onCategoryChange` and `onDispute` props.
+- `ui/src/components/DraftingForm.tsx` — Removed CategorySelector import. Added inline Idea/Concern pill toggle. Removed considerations field. Removed dispute button and `onDispute`/`onCategoryChange` props. Updated PLACEHOLDERS for idea/concern only. Simplified `canSubmit` (no category requirement).
+- `ui/src/components/DraftingForm.css` — Replaced category selector styles with subtype toggle pill styles. Removed dispute button styles.
+- `ui/src/services/api.ts` — Extended `DraftCategory` type with `"concern"`.
+
+**Phase 5 — Simplify ProposalDetail:**
+- `ui/src/pages/ProposalDetail.tsx` — Back link to `/propose`. Status label "submitted" → "open". Removed endorsement progress bar. Replaced "Endorse This Proposal" → "Support this proposal". Simple "X supporters" text instead of progress bar. Backward compat: endorsed/converted/archived still display.
+- `ui/src/App.css` — Added `.proposal-supporters-detail` style.
+
+**Phase 6 — Clean Up Votes Page:**
+- `ui/src/pages/Votes.tsx` — Removed `listCivicProposals` import, `civicProposals` state, `activeCivicProposals` derivation, and civic proposals rendering block. Simplified data fetching to just `listProcesses()`.
+
+### Files created (2)
+- `ui/src/pages/Propose.tsx`
+- `ui/src/pages/Propose.css`
+
+### Files modified (12)
+- `ui/src/components/FeedVotesTabs.tsx` — Propose tab
+- `ui/src/components/Nav.tsx` — Propose drawer link
+- `ui/src/App.tsx` — route changes, banner route
+- `ui/src/pages/ProposeDraft.tsx` — 2-step flow, rebrand
+- `ui/src/components/DraftingForm.tsx` — idea/concern toggle, simplified
+- `ui/src/components/DraftingForm.css` — subtype pill styles
+- `ui/src/services/api.ts` — DraftCategory extended
+- `ui/src/pages/ProposalDetail.tsx` — support rebrand
+- `ui/src/pages/Votes.tsx` — civic proposals removed
+- `ui/src/App.css` — supporters detail style
+- `src/modules/civic.proposals/index.ts` — remove auto-promotion
+- `src/controllers/proposalDraftController.ts` — remove steward bypass, add concern
+- `src/modules/civic.proposal_assistant/models.ts` — add concern category
+
+### What's next
+- Verify in browser: listing page, drafting flow, support button, Votes page clean
+- Commit and push to staging for preview verification
+- Slice C: Projects module
+- Slice D: Navigation + feed integration for all three types
+- Slice E: Assistant module rename (civic.drafting_assistant)
+
+---
+
+## Slice A: Vote Module + Generic Feed Fallback — 2026-05-23
+
+**Status:** Complete. All 8 phases implemented, builds pass, verified in browser. Not yet committed or deployed.
+
+### What was built
+
+**Phase 1 — Database Migration:**
+- `supabase/migrations/20260524000000_vote_drafts.sql` — `vote_drafts` table with title, description, sources, `voting_duration_ms` (default 30 days), conversation_history (JSONB), last_review_result, status. No category or considerations columns (vote-specific). Index on `(user_id, status)`.
+
+**Phase 2 — Backend Module `civic.vote_drafts`:**
+- `src/modules/civic.vote_drafts/models.ts` — VoteDraft, CreateVoteDraftInput, UpdateVoteDraftInput types.
+- `src/modules/civic.vote_drafts/index.ts` — Full CRUD: createVoteDraft (`vdraft_<hex>` IDs), getVoteDraft, listUserVoteDrafts, updateVoteDraft (validates duration 2 weeks–3 months), appendVoteConversation, saveVoteReviewResult, applyVoteDraftProposal, setVoteDraftStatus.
+
+**Phase 3 — Assistant Module Vote Support:**
+- Added `ProcessType = "proposal" | "vote"` to models, threaded through service.ts → buildSystemPrompt.
+- Added `VOTE_BEST_PRACTICES` content constant (title-as-question guidance, balanced framing, duration awareness).
+- System prompt conditionally adapts brainstorm questions, category handling, review phase, and best-practices document based on processType.
+
+**Phase 4 — Controller + Routes:**
+- `src/controllers/voteDraftController.ts` — 7 handlers: create, list, get, update, assistant message, review, submit. Submit handler: creates `civic.vote` process with `activation_mode: "direct"` + chosen `voting_duration_ms`, then `executeAction("process.activate")` to auto-activate, sets draft status to "submitted", returns `process_id`.
+- `src/routes/voteDraftRoutes.ts` — Express router at `/votes/drafts`.
+- `src/app.ts` — Mounted vote draft routes before vote log routes. Removed `PROPOSAL_ASSISTANT_ENABLED` toggle — proposal drafts now mount unconditionally.
+
+**Phase 5 — Frontend Vote Drafting:**
+- `ui/src/components/VoteDraftingForm.tsx` + `.css` — Slimmed form: title ("Vote question"), description ("Context for voters"), sources, duration `<select>` (2 weeks / 1 month / 2 months / 3 months). No category selector, no considerations field, no dispute button.
+- `ui/src/pages/ProposeDraftVote.tsx` + `.css` — Two-step flow (path → drafting). Two-pane layout (assistant left, form right), mobile FAB pattern. Submit confirmation modal shows chosen duration. On submit navigates to `/process/<id>`.
+- `ui/src/services/api.ts` — Added VoteDraft interface and 6 API functions (create, get, update, sendVoteAssistantMessage, reviewVoteDraft, submitVoteDraft).
+
+**Phase 6 — Routing + Toggle Cleanup:**
+- `ui/src/App.tsx` — Added `/votes/new` route → ProposeDraftVote. Changed `/propose` from conditional `hub.proposal_assistant ? ProposeDraft : Propose` to unconditional `ProposeDraft`. Removed Propose import.
+- `ui/src/pages/Votes.tsx` — CTA links now point to `/votes/new` instead of `/propose`.
+- `ui/src/config/hub.ts` — Removed `proposal_assistant` field.
+- Deleted `ui/src/pages/Propose.tsx`.
+
+**Phase 7 — Generic Feed Fallback:**
+- `ui/src/components/FeedPost.tsx` — Added `"generic"` to FeedPillKind. Unknown `result_published` shapes and unknown event types render as generic "Activity" cards instead of being silently dropped.
+- `ui/src/components/Feed.tsx` — Added `"generic"` to ProcessKind. `kindFromEvent` returns `"generic"` for unknown `result_published` shapes and truly unknown event types, but keeps returning `null` for known lifecycle events (created, updated, ended, etc.) that shouldn't render in the feed. Generic metadata fetch calls `getProcessState()` for title/description.
+- `ui/src/components/Feed.css` — Added `.feed-post--generic` (gray border) and `.feed-pill--generic` (gray pill) styles.
+
+### Files created (7)
+- `supabase/migrations/20260524000000_vote_drafts.sql`
+- `src/modules/civic.vote_drafts/models.ts`
+- `src/modules/civic.vote_drafts/index.ts`
+- `src/controllers/voteDraftController.ts`
+- `src/routes/voteDraftRoutes.ts`
+- `ui/src/components/VoteDraftingForm.tsx` + `.css`
+- `ui/src/pages/ProposeDraftVote.tsx` + `.css`
+
+### Files modified (10)
+- `src/modules/civic.proposal_assistant/models.ts` — ProcessType
+- `src/modules/civic.proposal_assistant/content.ts` — VOTE_BEST_PRACTICES
+- `src/modules/civic.proposal_assistant/systemPrompt.ts` — processType branching
+- `src/modules/civic.proposal_assistant/service.ts` — thread process_type
+- `src/modules/civic.proposal_assistant/index.ts` — re-export ProcessType
+- `src/app.ts` — mount vote draft routes, remove toggle
+- `ui/src/services/api.ts` — vote draft API functions
+- `ui/src/App.tsx` — route, remove toggle
+- `ui/src/pages/Votes.tsx` — CTA link → /votes/new
+- `ui/src/config/hub.ts` — remove proposal_assistant field
+- `ui/src/components/FeedPost.tsx` — generic fallback
+- `ui/src/components/Feed.tsx` — generic kind handling + CSS
+
+### Files deleted (1)
+- `ui/src/pages/Propose.tsx`
+
+### What's next (Slice B+)
+- Apply migration to dev Supabase (`supabase db push`)
+- End-to-end test: sign in, brainstorm a vote, submit, verify auto-activation and voting_closes_at
+- Slice B: Propose module rebrand (rename from "suggest a vote" proposal flow to dedicated proposal drafting)
+- Slice C: Projects module
+- Slice D: Navigation + feed integration for all three types
+- Slice E: Assistant module rename (civic.proposal_assistant → civic.drafting_assistant)
+- Slice F: Cleanup + migration of existing data
+
+### Future enhancement: Cross-process-type routing in AI assistant
+When all three process types (Vote, Propose, Projects) are live, the AI assistant should detect when a user's idea would be better suited for a different process type and suggest switching. For example: a user starts in the vote drafting flow but describes a community garden initiative — the assistant could say "This sounds more like a project than a vote. Would you like to start a project instead?" and link them to `/projects/new`. This requires all three process types to exist first, so target Slice E (assistant modularity) or later. See `~/Documents/vote-propose-project-process-prompt.md` for the full design context.
+
+---
+
+## AI Assistant Polish + Three Process Types Design — 2026-05-22
+
+**Status:** AI drafting assistant is beta-complete and deployed to production (floyd.civic.social). Comprehensive design document created for the next phase: splitting civic engagement into three independent modules (Votes, Propose, Projects). Design doc saved outside repo at `~/Documents/vote-propose-project-process-prompt.md`.
+
+### What was built / changed
+
+**AI Assistant Bug Fixes & Polish:**
+
+- **Prompt caching** — added Anthropic `cache_control: { type: "ephemeral" }` on system prompt blocks in `callClaudeMultiTurn` to reduce token costs on multi-turn conversations.
+- **Lowered maxTokens** — reduced from 4096 to 1536 for assistant responses (responses are short).
+- **Raw JSON in chat fix** — assistant sometimes returned markdown code fences or raw JSON. Added `cleanMessage()` to fix escaped newlines/quotes, code fence stripping before JSON parse, and `extractFallbackMessage()` regex-based extraction when JSON parse fails entirely.
+- **Suggestion card overflow** — added `overflow-wrap: break-word` and `word-break: break-word` to `.suggestion-card` CSS.
+- **Mobile FAB hidden** — floating action button was inside an `overflow: hidden` container. Moved FAB and overlay outside the scroll container using a fragment.
+- **Mobile footer bleed** — wrapped in viewport-height flex container with overflow handling.
+- **Desktop footer visible** — added `overflow: hidden` to `.propose-draft-page`.
+- **Old suggestions piling up on re-review** — review now strips `suggestions` from previous messages before appending new results.
+- **Apply suggestion invalidating review** — added `skip_modified_flag` parameter to `updateDraft`. When applying AI suggestions, the `draft_modified_since_review` flag is not set, so users don't need to re-review after clicking Apply.
+- **Considerations dropped on submit** — `handleSubmitDraft` now appends considerations to description under a "Considerations:" heading.
+- **Link display fix** — proposal detail page now parses URLs from labeled text (e.g., "Label: https://...") and renders label + clickable URL separately.
+
+**Review Button Consolidation:**
+- Removed review button from AssistantPanel (left pane)
+- Added review button to DraftingForm (right pane) — blue background, white text, more pronounced
+- Status bar text improved with "Status:" prefix and clearer messaging about draft state
+
+**System Prompt Updates:**
+- Review phase now requires `suggested_revision` on ALL suggestions including hard blocks
+- Added empty field nudge: after review, assistant mentions empty optional fields and offers to help fill them, while making clear user can submit without them
+
+**Rename "Submit suggestion" → "Submit proposal"** throughout UI (DraftingForm, ProposeDraft confirmation modal, Propose page).
+
+### Three Process Types — Design Document
+
+Created comprehensive session prompt at `~/Documents/vote-propose-project-process-prompt.md` (intentionally outside repo). Key design decisions:
+
+1. **Three independent modules:** Votes (modify existing), Propose (rebrand existing pipeline), Projects (new build). Each independently toggleable by hub operator.
+2. **Remove steward review gate** — AI assistant's CoC hard blocks replace the manual steward review. Content goes live on submit after passing AI review.
+3. **Remove endorsement pipeline** — no more 5-supporter threshold, "gathering support" status, or steward conversion step.
+4. **User-selectable vote duration** — 2 weeks to 3 months, default 1 month.
+5. **Changeable votes/sentiments** — citizens can change their vote or project sentiment before closing.
+6. **Projects as living pages** — creator-editable, with updates, media, comments, support/oppose sentiment.
+7. **Separate drafting pages per process type** — each gets its own page component, sharing lower-level components (AssistantPanel, SuggestionCard) but distinct orchestration.
+8. **Shared AI assistant module** — one engine (`civic.assistant/`) with per-process best practices documents.
+9. **Admin digest notifications** — new posts included in admin email digest (no approval gate).
+10. **Nav update:** Feed | Votes | Projects | Propose
+
+Implementation slices: A (clean up votes) → B (propose tab) → C (project backend) → D (project UI) → E (AI assistant modularity) → F (admin digest).
+
+### Files changed this session
+
+**Modified (backend):**
+- `civic-hub/src/utils/anthropic.ts` — prompt caching on system blocks
+- `civic-hub/src/modules/civic.proposal_assistant/service.ts` — lower maxTokens, cleanMessage, extractFallbackMessage, code fence stripping
+- `civic-hub/src/modules/civic.proposal_assistant/systemPrompt.ts` — require suggested_revision on hard blocks, empty field nudge
+- `civic-hub/src/modules/civic.proposal_drafts/models.ts` — add `skip_modified_flag` to UpdateDraftInput
+- `civic-hub/src/modules/civic.proposal_drafts/index.ts` — conditional `draft_modified_since_review` based on skip flag
+- `civic-hub/src/controllers/proposalDraftController.ts` — accept `skip_modified_flag`, merge considerations into description on submit
+
+**Modified (frontend):**
+- `civic-hub/ui/src/components/AssistantPanel.tsx` — remove review button, update empty state text
+- `civic-hub/ui/src/components/AssistantPanel.css` — remove review button styles, add suggestion card word-break
+- `civic-hub/ui/src/components/DraftingForm.tsx` — add review button, improve status text
+- `civic-hub/ui/src/components/DraftingForm.css` — review button styles
+- `civic-hub/ui/src/pages/ProposeDraft.tsx` — mobile layout fix, FAB positioning, suggestion clearing on re-review, skip_modified_flag on apply
+- `civic-hub/ui/src/pages/ProposeDraft.css` — mobile layout, overflow fixes
+- `civic-hub/ui/src/pages/ProposalDetail.tsx` — link parsing fix
+- `civic-hub/ui/src/pages/Propose.tsx` — "Submit proposal" rename
+- `civic-hub/ui/src/services/api.ts` — skip_modified_flag parameter
+
+### What's next
+
+The three process types implementation, following the session prompt at `~/Documents/vote-propose-project-process-prompt.md`. Start with Slice A (clean up votes) and work through the slices in order.
+
+### Open questions
+
+1. **Projects media upload** — storage backend for user-uploaded images (Supabase Storage, S3, etc.) needs to be decided before Slice D.
+2. **Admin digest frequency** — daily? configurable? Needs decision before Slice F.
+3. **Propose sub-types** — "idea" vs "concern" — is this the right framing, or should it be simpler?
+
+---
+
+## AI-Augmented Proposal Process — Slices A & B — 2026-05-19
+
+**Status:** Backend foundation (Slice A) and frontend UI shell (Slice B) complete. Builds clean (both backend `tsc --noEmit` and frontend `npm run build`). Not yet tested against a live database or with real Claude API calls. Slices C (orientation modal, polish) and D (steward dispute flow) remain.
+
+### What was built
+
+**Backend (Slice A):**
+
+- **Database migration** (`civic-hub/supabase/migrations/20260520000000_proposal_drafts.sql`) — adds `category` and `assistant_helped` columns to existing `proposals` table; creates `proposal_drafts` table with conversation history (JSONB), review results, edit-invalidation flag, steward approval, and status lifecycle.
+- **Multi-turn Claude client** (`civic-hub/src/utils/anthropic.ts`) — new `callClaudeMultiTurn()` function accepting a `messages` array for multi-turn conversations. Existing `callClaude()` untouched. Same retry, timeout, and error handling.
+- **Hub config files** (`civic-hub/config/hubs/floyd/code-of-conduct.md`, `proposal-best-practices.md`) — runtime documents loaded by the assistant service. CoC defines hard blocks; Best Practices defines soft suggestions and draft generation guidance. Editable without code changes.
+- **Proposal assistant module** (`civic-hub/src/modules/civic.proposal_assistant/`) — `models.ts` (Phase, Category, Suggestion, DraftState types), `systemPrompt.ts` (builds the full system prompt from template + runtime docs with file caching), `service.ts` (callAssistant function that orchestrates Claude calls and parses structured JSON responses).
+- **Draft persistence module** (`civic-hub/src/modules/civic.proposal_drafts/`) — full CRUD for proposal drafts: create, get, list, update, appendConversation, saveReviewResult, applyDraftProposal, setDraftStatus.
+- **Routes and controller** (`civic-hub/src/routes/proposalDraftRoutes.ts`, `civic-hub/src/controllers/proposalDraftController.ts`) — 7 endpoints: POST create, GET list, GET by ID, PATCH update, POST assistant message, POST review, POST submit. All require `requireResident`. Owner-only access enforced.
+- **Existing file updates** — `app.ts` mounts draft routes before proposal routes (avoids route shadowing); `civic.proposals` module accepts `category` and `assistant_helped` in createProposal; controller passes them through.
+
+**Frontend (Slice B):**
+
+- **API service** (`civic-hub/ui/src/services/api.ts`) — added `ProposalDraft`, `DraftSuggestion`, `AssistantResponse` types; `createDraft`, `getDraft`, `updateDraft`, `sendAssistantMessage`, `reviewDraft`, `submitDraft` functions. Updated `CivicProposalSummary` and `CivicProposalDetail` with `category` and `assistant_helped` fields.
+- **CategorySelector** (`civic-hub/ui/src/components/CategorySelector.tsx`) — three radio cards for Issue/Idea/Project with descriptions.
+- **SuggestionCard** (`civic-hub/ui/src/components/SuggestionCard.tsx`) — renders soft/hard suggestions with severity badge, quoted text, revision preview, Apply/Dismiss actions.
+- **AssistantPanel** (`civic-hub/ui/src/components/AssistantPanel.tsx` + `.css`) — left-pane chat interface with message thread, inline suggestion cards, text input, Review button with edit-emphasis animation.
+- **DraftingForm** (`civic-hub/ui/src/components/DraftingForm.tsx` + `.css`) — right-pane form with category selector, title/description/sources/considerations fields, category-adaptive placeholders, status indicator, Submit/Dispute action row. Debounced auto-save on field changes.
+- **ProposeDraft page** (`civic-hub/ui/src/pages/ProposeDraft.tsx` + `.css`) — three-step flow: category selection → path choice (brainstorm/write-my-own) → two-pane drafting view (40/60 split on desktop, single-pane + floating FAB on mobile). Submit confirmation modal with disclosure.
+- **Routing** — `/propose` now renders `ProposeDraft` instead of `Propose` (old page stays in codebase but unrouted).
+- **"Drafted with assistant help"** label added to `ProposalDetail.tsx` when `assistant_helped` is true.
+
+### Architecture decisions
+
+- **No Anthropic SDK** — extended existing `callClaude` with `callClaudeMultiTurn` (~90 lines). Keeps the no-SDK philosophy consistent with the rest of the codebase.
+- **No streaming in v1** — request-response only. Assistant responses are short enough that waiting is acceptable. Streaming is a v1.1 enhancement.
+- **Conversation history in JSONB** — full chat history stored in the `proposal_drafts` row. Sent on each API call. Avoids a separate messages table.
+- **Config files on filesystem** — CoC and Best Practices read from `config/hubs/floyd/` at startup, cached in module-level variables. Env vars `CIVIC_COC_PATH` and `CIVIC_BEST_PRACTICES_PATH` allow override.
+- **Draft routes mounted before proposal routes** — `/proposals/drafts` registered before `/proposals` in `app.ts` so Express doesn't match "drafts" as a proposal `:id`.
+- **Edit-invalidation state machine** — `draft_modified_since_review` flag tracks whether the draft has changed since the last review. Submit and Dispute are both gated by this flag plus the review verdict.
+
+### Files changed
+
+**New files (backend):**
+- `civic-hub/config/hubs/floyd/code-of-conduct.md`
+- `civic-hub/config/hubs/floyd/proposal-best-practices.md`
+- `civic-hub/supabase/migrations/20260520000000_proposal_drafts.sql`
+- `civic-hub/src/modules/civic.proposal_assistant/models.ts`
+- `civic-hub/src/modules/civic.proposal_assistant/systemPrompt.ts`
+- `civic-hub/src/modules/civic.proposal_assistant/service.ts`
+- `civic-hub/src/modules/civic.proposal_assistant/index.ts`
+- `civic-hub/src/modules/civic.proposal_drafts/models.ts`
+- `civic-hub/src/modules/civic.proposal_drafts/index.ts`
+- `civic-hub/src/controllers/proposalDraftController.ts`
+- `civic-hub/src/routes/proposalDraftRoutes.ts`
+
+**New files (frontend):**
+- `civic-hub/ui/src/components/CategorySelector.tsx`
+- `civic-hub/ui/src/components/SuggestionCard.tsx`
+- `civic-hub/ui/src/components/AssistantPanel.tsx` + `.css`
+- `civic-hub/ui/src/components/DraftingForm.tsx` + `.css`
+- `civic-hub/ui/src/pages/ProposeDraft.tsx` + `.css`
+
+**Modified files:**
+- `civic-hub/src/app.ts` — mount draft routes
+- `civic-hub/src/utils/anthropic.ts` — add `callClaudeMultiTurn`
+- `civic-hub/src/modules/civic.proposals/models.ts` — add category, assistant_helped
+- `civic-hub/src/modules/civic.proposals/index.ts` — pass new fields through
+- `civic-hub/src/controllers/proposalController.ts` — accept category from request
+- `civic-hub/ui/src/services/api.ts` — draft API functions + updated types
+- `civic-hub/ui/src/App.tsx` — route change
+- `civic-hub/ui/src/App.css` — assistant-helped label style
+- `civic-hub/ui/src/pages/ProposalDetail.tsx` — assistant-helped indicator
+
+### What's incomplete (Slices C & D)
+
+**Slice C — Orientation modal + polish:**
+- First-time orientation modal (3 screens, localStorage flag)
+- Apply-suggestion-to-form visual feedback polish
+- Free-form chat phase refinement
+- Mobile assistant overlay interaction polish
+
+**Slice D — Steward dispute flow:**
+- `proposal_disputes` table migration
+- Dispute button functionality (currently wired to no-op)
+- Admin dispute review page
+- Steward actions (approve/suggest revisions/decline)
+- Email notifications to stewards
+- Integration with admin digest
+
+### Open questions
+
+1. **Migration deployment** — the `update_updated_at()` function used in the trigger must already exist from the initial schema migration. Verify before running.
+2. **Config file paths on Vercel** — the `config/` directory needs to be included in the Vercel deploy. Verify the build output includes it, or use env vars for content.
+3. **Claude API costs** — each brainstorm/review/chat call sends the full conversation history + system prompt (~4-5K tokens of system prompt). Monitor usage.
+
+---
+
+## Slice 14 — Welcome page + homepage promotion — 2026-05-19
+
+**Status:** Complete. Public `/welcome` page renders the curated community introduction with PDF download and feedback links. Dismissible banner on the home page and nav drawer link provide discoverability.
+
+### Changes
+
+- **Welcome content file** — `civic-hub/ui/src/content/welcome/welcome.md`. Copied from the operator's curated document with the closing italic Mosaic Foundation line removed (redundant on-site). Prose is untouched.
+- **Welcome page** — `civic-hub/ui/src/pages/Welcome.tsx` + `Welcome.css`. Public, unauthenticated. Reuses `ReactMarkdown` + `remark-gfm` and the `legal-page` / `legal-prose` CSS classes for visual consistency with legal pages, but is a standalone component (not `LegalPage`) so it can host the PDF download link at top and feedback CTA at bottom.
+- **PDF static asset** — `civic-hub/ui/public/floyd-civic-hub-introduction.pdf`. Copied as-is from the operator's source. Linked from the Welcome page as "Download as PDF (4 pages)".
+- **Dismissible welcome banner** — `civic-hub/ui/src/components/WelcomeBanner.tsx` + `WelcomeBanner.css`. Renders between `HubInfo` and `FeedVotesTabs` on the home page. Dismissal persists via `localStorage` key `welcome-banner-dismissed-v1` (bump the version suffix to re-show after meaningful content changes).
+- **Nav drawer link** — "Welcome" added to `DRAWER_LINKS` in `Nav.tsx`, positioned between "Votes" and "About". Ensures the page stays discoverable after banner dismissal.
+- **Route registration** — `/welcome` → `<Welcome />` added to `App.tsx`.
+- **IntroPopup update** — "Learn more" button now navigates to `/welcome` instead of `/about`, so the first-visit popup funnels to the richer introduction page.
+
+### Files changed
+
+UI only (no backend, no DB migration):
+- `civic-hub/ui/src/content/welcome/welcome.md` — new
+- `civic-hub/ui/src/pages/Welcome.tsx` — new
+- `civic-hub/ui/src/pages/Welcome.css` — new
+- `civic-hub/ui/src/components/WelcomeBanner.tsx` — new
+- `civic-hub/ui/src/components/WelcomeBanner.css` — new
+- `civic-hub/ui/public/floyd-civic-hub-introduction.pdf` — new (static asset)
+- `civic-hub/ui/src/App.tsx` — import + route for Welcome
+- `civic-hub/ui/src/pages/Home.tsx` — mounts `<WelcomeBanner />` between HubInfo and FeedVotesTabs
+- `civic-hub/ui/src/components/Nav.tsx` — added "Welcome" to `DRAWER_LINKS`
+- `civic-hub/ui/src/components/IntroPopup.tsx` — "Learn more" navigates to `/welcome`
+
+### Verified manually
+
+- `/welcome` renders full markdown content (headings, lists, bold, italic, links) for unauthenticated visitor. Document title: "Welcome · Floyd Civic Hub".
+- "Download as PDF (4 pages)" link opens the PDF in a new tab.
+- Home page shows the "New to the Floyd Civic Hub?" banner between HubInfo and tabs.
+- Dismissing the banner (× button) hides it; reload confirms `localStorage` persistence.
+- Nav drawer: Feed · Votes · Welcome · About — divider — Send feedback — legal links.
+- IntroPopup "Learn more" routes to `/welcome`.
+- `npm run build` (tsc) and `npx vite build` both pass cleanly.
+
+### Decisions worth flagging
+
+- **Welcome is standalone, not `LegalPage`.** It reuses the same CSS classes (`legal-page`, `legal-prose`) for visual consistency but doesn't use the `LegalPage` component because it needs utility rows (PDF link, feedback CTA) that `LegalPage` doesn't support. Avoids modifying `LegalPage` and risking side effects on the three legal pages.
+- **IntroPopup and WelcomeBanner are independent.** They use separate `localStorage` keys. A first-time visitor may see both; the IntroPopup is a modal that dismisses first, then the banner is visible on the home page. This is acceptable — the popup is a 3-sentence teaser, the banner links to the full introduction.
+- **Banner version key.** The key `welcome-banner-dismissed-v1` includes a version suffix. Bumping to `v2` will re-show the banner to all visitors — useful if the welcome content changes significantly.
+
+---
+
+## Test infrastructure + Cron route fix — 2026-05-12
+
+**Status:** Tests passing locally. Cron fix ready for deploy.
+
+### What was built
+
+**Automated test suite (45 tests total):**
+- 30 API integration tests (Vitest) covering health/discovery, events, processes, auth, proposals, search
+- 15 E2E browser tests (Playwright/Chromium) covering navigation, feed, votes, search
+- Shared test helpers in `tests/fixtures/helpers.ts` with auth bypass via CIVIC_DEMO_BYPASS_CODE
+- `vitest.config.ts` and `playwright.config.ts` with auto-server-start
+
+**TESTING.md** — living coverage tracker with flow inventory tables and quick-start commands.
+
+**CLAUDE.md updated** — added `npm run test:e2e`, `npx playwright*` to allowed commands; added TESTING.md update requirement to session rules.
+
+**Package.json scripts:** `test`, `test:watch`, `test:e2e`, `test:e2e:ui`, `test:e2e:headed`.
+
+### Cron route HTTP method fix
+All four Vercel Cron routes were registered as POST but Vercel Cron sends GET requests, causing 404s in production. Changed `.post()` → `.get()` on:
+- `src/routes/floydNewsSyncRoutes.ts`
+- `src/routes/digestRoutes.ts`
+- `src/routes/meetingSummaryRoutes.ts`
+- `src/routes/adminDigestRoutes.ts`
+
+Root cause: the handlers don't read `req.body` and auth uses the `Authorization` header, so GET is the correct method for cron-triggered endpoints.
+
+### Incomplete / needs attention
+
+- **Deploy required** for cron fix to take effect in production
+- **ANTHROPIC_API_KEY** and **MEETING_SOURCE_URL** env vars should be verified in Vercel production settings for meeting summary cron to work
+- Banner overlay experiment (Floyd county seal) was explored and reverted — no changes shipped
+
+### Commits (in `civic-hub/`)
+
+- `f7b2110` Test infrastructure (Vitest API + Playwright E2E)
+- *(cron fix uncommitted — ready for commit)*
+
+---
+
+## Slice 13 — Change-your-vote-while-open + UI polish round — 2026-05-08
+
+**Status:** Shipped to prod (Floyd). Migration applied, all vote/endorsement state wiped on prod for a clean rollout. Verified end-to-end in browser on the live site.
+
+### What was built
+
+**Vote-changing.** Residents can now update their vote any number of times while a vote is `active`. Receipt ID stays stable across changes — any previously-shown receipt still verifies to the user's current choice. Tally updates in real time, post-close anonymity guarantee preserved.
+
+### Trust model
+
+The receipt schema previously enforced a hard rule: `vote_records` and `vote_participation` share no join key. To allow vote-changing the server has to know "this user's receipt is X." We added a *transient* third table, `active_vote_keys (user_id, process_id, receipt_id)`, populated only while a vote is active and cleared on `closeVote`. Post-close, no persisted row links a user to their choice — privacy guarantee is identical to pre-Slice-13.
+
+Paper-ballot mental model: ballots can be changed before the box closes; once closed, only counted ballots remain.
+
+### Backend changes
+
+- `supabase/migrations/20260508120000_active_vote_keys.sql` — new table, `(user_id, process_id)` PK, FORCE RLS.
+- `src/modules/civic.receipts/index.ts` — `recordOrUpdateVote` (insert-or-update; same-receipt update path on duplicate participation), `clearActiveVoteKeysForProcess`. Old `recordVote` kept as a deprecated alias. Header rewritten to document the trust model.
+- `src/modules/civic.vote/index.ts` — `submitVote` short-circuits same-option re-submits with `unchanged: true` (no spurious events). Read model exposes `your_current_vote`.
+- `src/processes/voteProcess.ts` — calls `recordOrUpdateVote`; `process.close` calls `clearActiveVoteKeysForProcess` to drop the bridge.
+
+### Frontend changes
+
+- `ui/src/services/api.ts` — `VoteState.your_current_vote: string | null`.
+- `ui/src/components/VotePanel.tsx` — heading flips to "Your vote" once the user has voted; privacy notice mentions change-anytime; all option buttons stay enabled with the current choice highlighted; "Your vote has been updated" copy after a change.
+
+### UI polish (preceded slice 13 in the same session)
+
+- **Vote option buttons** restyled as full-width ballot cards: dark-blue border, light-blue hover, solid filled "voted" state with white checkmark.
+- **Content-first layout** on Process detail pages — `IssueContent` now renders before `VotePanel` / `ProposalPanel` / `ProposalCommentForm` so residents read the question and tradeoffs before they act.
+- **"Back to votes" pill button** with sticky positioning across Process, ProposalDetail, VoteResults pages.
+- **"What happens after this vote?"** heading: added question mark, font-size up to 1.25rem.
+
+### Migrations + data wipe
+
+- `active_vote_keys` table created in **both** dev (`urfmvqhzmamigssqwsya`) and prod (`nfhyypwoporfggqcerli`).
+- Per user request, all vote and endorsement actions wiped clean on prod: `TRUNCATE vote_participation, vote_records, active_vote_keys, proposal_supports`; `UPDATE proposals SET support_count = 0`; `state.{votes, supporters, support_count}` reset on every `civic.vote` row. Proposals/votes themselves untouched.
+
+### Edge case worth knowing
+
+If a user votes *before* the migration deploys (i.e. has a `vote_participation` row but no `active_vote_keys` row for an active process), the change-vote path refuses with "You have already voted on this process" — there's no DB-level link to look up their receipt. Mitigated on prod by the wipe; new voters going forward all get the change-vote affordance.
+
+### Commits (in `civic-hub/`)
+
+- `da4889f` Style vote option buttons as full-width ballot cards
+- `8eb8b0a` UI polish: content-first layout, pill back-nav, after-vote heading
+- `bbc982c` Slice 13: allow residents to change their vote while voting is open
+
+---
+
+## Proposal commenting + comment phase carryover — 2026-05-07 / 2026-05-08
+
+**Status:** Complete and verified in dev browser.
+
+### What was built
+
+**Part 1 — Proposal commenting:** Users can submit free-text comments on proposals in "submitted" or "endorsed" status, using the existing `civic.input` module as the data layer.
+
+**Part 2 — Comment phase carryover:** Comments carry forward from proposals to votes when a proposal is converted. Each comment is tagged with `phase: "proposal"` or `phase: "vote"` and the UI renders phase dividers to distinguish them.
+
+### Backend changes
+
+- `src/controllers/inputController.ts` — `proposalExists()` fallback for 404s. Auto-tags `phase: "proposal"` on proposal comments, `phase: "vote"` on vote comments. GET handler merges proposal-phase comments into vote comment lists when the vote has a `source_proposal_id`.
+- `src/modules/civic.input/models.ts` — New `CommentPhase` type, `phase` field on `CommunityInput`.
+- `src/modules/civic.input/index.ts` — `submitInput` accepts optional `phase` param, stores via two-step insert+update (workaround for PostgREST schema cache lag).
+
+### Frontend changes
+
+- `ui/src/components/ProposalCommentForm.tsx` — New standalone comment form (textarea + submit, 500-char limit, auth-gated).
+- `ui/src/pages/ProposalDetail.tsx` — Mounts `ProposalCommentForm` + `CommunityInputPanel` below endorsement section. Comment form suppressed for converted/archived proposals.
+- `ui/src/components/CommunityInputPanel.tsx` — Renders phase dividers ("Comments from the proposal period" / "Comments during the voting period") when comments span both phases.
+- `ui/src/services/api.ts` — `CommunityInput` type includes `phase`.
+- `ui/src/App.css` — Styles for `.input-phase-divider` and `.proposal-comment-form`.
+
+### Migration
+
+- `supabase/migrations/20260508000000_add_comment_phase.sql` — Adds `phase text` column to `community_inputs`.
+- Helper function `set_comment_phase()` created in Supabase for RPC access (workaround for schema cache).
+- **Both dev and prod Supabase projects** have the migration applied.
+
+### Spec compliance
+- Comments emit `civic.process.comment_added` events (inherited from `civic.input` module)
+- Admin moderation (hide/restore) works on proposal comments (inherited from `CommunityInputPanel`)
+- `civic.input` module stays decoupled — no import of `civic.proposals`
+
+### Note on Supabase environments
+Dev and prod are separate Supabase projects. Schema migrations must be applied to both. Dev = `urfmvqhzmamigssqwsya`, Prod (Floyd) = `nfhyypwoporfggqcerli`.
+
+---
+
+## Slices 16 → 19d + demo-hub.civic.social launch — 2026-04-29 / 2026-04-30
+
+**Status:** Shipped end-to-end. The hub evolved from single-tenant Floyd to multi-deployment-capable, and the first non-Floyd deployment — a public demo set in the fictional Town of Athens, Virginia — is live at `demo-hub.civic.social`. Eight related slices landed across two sessions, each individually-revertible but stronger together.
+
+**Net effect:**
+- Floyd production runs unchanged at `floyd.civic.social`.
+- A public demo (`demo-hub.civic.social`) shows the same product running for a fictional jurisdiction. Same `main` branch, same codebase, different env vars + different Supabase + different Vercel project. Sign in with code `123456` (no real OTP email is sent).
+- The same multi-deployment recipe can spin up additional hubs (other counties, other towns) without code changes.
+
+### Slice 16 — Admin queue digest (`ff87d48`)
+
+A new daily cron emails admins a digest of pending-review queue items: civic proposals awaiting review, vote results awaiting approval, meeting summaries awaiting publication. Empty digests skipped silently (matches user-digest pattern).
+
+- Module: `civic-hub/src/modules/civic.admin_digest/{models,service,index}.ts` — `buildAdminDigest()` reads queues; `renderAdminDigestEmail()` produces subject/html/text; `runAdminDigest(recipients[])` fans out via Resend.
+- Controller + route: `POST /internal/admin-digest/run` (CRON_SECRET bearer) at 13:30 UTC daily — after meeting-summary (11:30) and floyd-news-sync (12:00) so the day's freshly-ingested items are already in the queue.
+- Email subject pattern: `[Floyd Civic Hub] Admin queue: 2 proposals, 1 vote result, 7 meeting summaries`. Each non-empty queue gets a section with up to 5 items + "+ N more" overflow + deep link to the panel. Brand-navy headings; pluralization correct.
+- Optional kill switch: `ADMIN_DIGEST_ENABLED` (default true). New `scripts/dryRunAdminDigest.ts` for verifying payload + render against dev Supabase without dispatching.
+- No new schema, no new env var beyond the optional kill switch. Reuses CRON_SECRET, CIVIC_ADMIN_EMAILS, RESEND_API_KEY, RESEND_FROM, HUB_NAME.
+
+### Slice 17 — Clickable digest rows (`2a10ab0`)
+
+Every row in the user-facing digest email (`civic.digest/service.ts::renderGroupHtml`) is now wrapped in a single `<a href="..." style="display:block;text-decoration:none;color:inherit;">` so the entire row — title, summary, pill, whitespace — is one click target. The previous design only made the title and thumbnail clickable; pill and gaps were dead pixels.
+
+- Inner anchors removed (nested anchors are invalid HTML).
+- Title is now a `<span>` with the same color/weight; outer wrapper-anchor routes the click.
+- New 16px chevron (`>`) column on the far right in muted gray (`#9ca3af`) — reads as "tap me / there's more" without the blue-underlined-link look.
+- Architectural property: every digest item, regardless of `DigestItemKind` (announcement / vote_open / vote_results / meeting_summary), flows through this single template. Future kinds inherit the affordance with no per-kind work; only `PILL_COLORS[kind]` differs per type.
+- Plain-text path unchanged — plaintext rows already include both title and URL on each item.
+
+### Slice 17.1 — Shortened event pill labels (`c9ce641`)
+
+Pill labels were doing two jobs (role + type) and wrapping rows on longer authors. The section context already says "Announcements" — the trailing " announcement" suffix was redundant. "Government" was the biggest contributor to width.
+
+Two rules applied to both feed pill renderer (FeedPost.tsx) and digest pill renderer (civic.digest/service.ts):
+
+1. Drop trailing " announcement" — `"Admin announcement"` → `"Admin"`, `"Floyd County Government announcement"` → `"Floyd County Government"`, etc.
+2. Abbreviate `\bGovernment\b` → `Gov` via a small case-insensitive helper. `"Floyd County Government"` → `"Floyd County Gov"`.
+
+Both helpers (`abbreviateGovernment`) are documented as MUST-stay-in-sync between the email and the feed surfaces. Floyd's "FLOYD COUNTY GOV" pill on synced announcements visibly cleaner; row never wraps.
+
+Tracking issue [civic-hub#11](https://github.com/creatinglake/civic-hub/issues/11) opened for a future polish slice that adds per-kind icons (megaphone / ballot / etc.) to pills — discussed and deliberately deferred. Pill colors already discriminate kind.
+
+### Slice 17.2 — Mobile same-tab, desktop new-tab for external links (`a73a04d`)
+
+The Floyd-news-sync feed cards (and any other external-`action_url` posts) were unconditionally opening in a new tab via `target="_blank"`. On mobile, that loses iOS Safari's native "back to Floyd Civic Hub" chip and forces a tab-switcher trip to return. On desktop, multi-tab is the dominant research pattern and works fine.
+
+- New `ui/src/hooks/useIsWideViewport.ts` — `useSyncExternalStore`-backed hook over `matchMedia('(min-width: 769px)')`. Re-evaluates live on viewport resize. SSR-safe (defaults to true on server; client hydrator updates on mount).
+- `FeedPost.tsx`: external-link anchors spread `{...(isWideViewport ? { target: "_blank", rel: "noopener noreferrer" } : { rel: "noopener" })}`. Internal SPA `<Link to=...>` routes unchanged.
+- Power users can still Cmd-click / middle-click to force a new tab on either device.
+- The 769px breakpoint matches the existing mobile/desktop cutover used by `Nav.css`'s hamburger toggle and `Feed.css`'s image-stacking.
+
+### Slice 18 — Env-driven hub branding (`e157f76`, `df12383`)
+
+Refactor the UI to read all hub-branding values from `VITE_HUB_*` build-time env vars, with Floyd defaults baked in. This is the core unlock for multi-deployment: the same `main` branch can power Floyd production AND a separate demo Vercel project, each with its own name, banner, jurisdiction, tagline, and metadata via Vercel env-var overrides.
+
+Env-driven:
+- `VITE_HUB_NAME` — wordmark / display name (top nav, footer, intro popup, etc.)
+- `VITE_HUB_JURISDICTION` — geographic place (banner, residency copy)
+- `VITE_HUB_LABEL` — small-caps type label under the jurisdiction
+- `VITE_HUB_TAGLINE` — one-sentence tagline
+- `VITE_HUB_BANNER_URL` + `VITE_HUB_BANNER_ALT` — banner image path + alt text
+- `VITE_HUB_PAGE_TITLE` + `VITE_HUB_DESCRIPTION` — browser tab title + meta description (also og:title / og:description)
+
+Files:
+- `civic-hub/ui/src/config/hub.ts` — reads `import.meta.env.VITE_HUB_*` with Floyd defaults baked in via `??` fallbacks.
+- `civic-hub/ui/index.html` — title and OG metadata use Vite's native `%VITE_VAR%` substitution so per-deployment values bake in at build time.
+- Component updates: Nav.tsx (wordmark), App.tsx (footer brand), IntroPopup.tsx, ReAcceptModal.tsx, AuthModal.tsx, Settings.tsx, Search.tsx — all source from `hub.*` instead of hardcoded "Floyd Civic Hub" strings.
+- New `civic-hub/ui/.env` — committed Floyd defaults for index.html `%VAR%` substitution. Whitelisted in `.gitignore` (existing `.env` rule was hiding it). UI env file holds only public branding strings — secrets stay in `civic-hub/.env` which remains gitignored.
+- New `civic-hub/ui/.env.example` — operator-facing docs with a demo-deployment override example.
+
+Two layers of Floyd defaults (committed `ui/.env` values + `??` fallbacks in code) ensure Floyd's strings are present even if one mechanism somehow fails. Floyd production rendered identically before/after merge.
+
+### Slice 19a — Governance terminology env vars (`ba084c3`)
+
+Slice 18 covered branding (name, banner, etc.) but didn't generalize **governance-specific copy** — "Board of Supervisors," "BOS meeting summary," the IntroPopup body referencing "Floyd County residents," the AuthModal residency-step intro. Those stayed Floyd-specific until Slice 19a.
+
+New env vars (all Floyd-defaulted):
+- `VITE_HUB_GOVERNING_BODY_NAME` (long form, e.g. `"Board of Supervisors"` / `"Town Council"`) — used in delivered-to text, admin pages, vote-results subline.
+- `VITE_HUB_GOVERNING_BODY_SHORT` (abbreviation, e.g. `"BOS"` / `"Town Council"`) — used in pill labels and filter labels where width matters.
+- `VITE_HUB_INTRO_BODY` — full freeform paragraph for the IntroPopup welcome copy. Different jurisdictions need genuinely different framing here, so it's a body-level override rather than a templated placeholder.
+- `VITE_HUB_RESIDENCY_INTRO` — single sentence for the AuthModal residency-step description.
+
+Components updated to source from these:
+- `IntroPopup.tsx` (body uses `hub.intro_body`)
+- `AuthModal.tsx` (residency-step description uses `hub.residency_intro`)
+- `FeedPost.tsx` (meeting-summary pill `${hub.governing_body_short} meeting summary`; vote-results delivered-to uses `hub.governing_body_name`)
+- `FeedFilter.tsx` (meeting-summary filter pill uses `${hub.governing_body_short} meeting summaries`)
+- `VoteResults.tsx` (both delivered-to renderings)
+- `AdminMeetingSummaries.tsx` (title placeholder + page subtitle)
+- `AdminVoteResults.tsx` (page subtitle)
+- `Propose.tsx` ("official advisory vote" copy uses `hub.jurisdiction`)
+
+Out of scope: `About.tsx` is deeply Floyd-specific content; deferred. Demo's About page still shows Floyd content. Either hide the link via a flag or replace with generic copy in a future slice.
+
+### Slice 19b — Athens seed fixture + selector (`ba084c3`)
+
+New seed-data file (`src/debug/seedDataAthens.ts`) mirroring `seedData.ts` but rebranded for the fictional Town of Athens, Virginia. Same civic issues (green-box dumpsters, Flock Safety cameras) — those topics generalize cleanly across jurisdictions — but every Floyd-specific name, body, and after-vote recipient swaps to Athens-equivalent. Two scenarios:
+
+- `ATHENS_GREEN_BOX` — active vote, "Should the town of Athens invest in additional fenced-in dumpster sites?" Three options, 14-day voting window, direct activation.
+- `ATHENS_FLOCK_CAMERA` — proposed (gathering-support) vote, recipients `Athens Town Council` + `Athens Police Department`, three pre-loaded support actions, three pre-loaded community comments.
+
+Selector: `autoSeed.ts::selectScenarios()` reads `CIVIC_SEED_FIXTURE` env var.
+- `floyd` (default) → Floyd scenarios
+- `athens` → Athens scenarios
+- unknown values → log warning + fall back to Floyd
+
+`.env.example` documents the var with the demo example.
+
+What's NOT in this slice (deferred):
+- Athens announcement seed scenarios. The current `SeedScenario` shape works for `civic.vote` and `civic.proposal` but not for `civic.announcement` (announcements emit `result_published` outside the standard handler-action flow).
+- Athens Town Council meeting summary scenarios. Same reason — `civic.meeting_summary` uses a different creation flow.
+
+Extending `runScenario()` to support those is a follow-up.
+
+### Slice 19c — Skip OTP email on demo deployments (`385f095`, `b286e6d`)
+
+When `CIVIC_DEMO_BYPASS_CODE` is set on a deployment (the public demo at `demo-hub.civic.social`), `requestVerification()` short-circuits before:
+
+1. Generating an OTP
+2. Inserting a `pending_verifications` row
+3. Calling `sendEmail()` via Resend
+
+Effects on the demo:
+- No real emails go to throwaway / fake addresses (sender-rep risk eliminated).
+- Resend quota isn't burned for demo signups.
+- Visitors who don't expect an email don't get one with a different code than the IntroPopup told them to use.
+
+Why it's safe: `verifyCode()` already accepts the bypass code without needing a `pending_verifications` row (the existence check is wrapped in `if (pending) { delete }` — just cleanup, not a precondition). Floyd production has `CIVIC_DEMO_BYPASS_CODE` unset → the new short-circuit branch never fires → existing OTP flow byte-identical.
+
+### Slice 19d — Athens announcements + Town Council meeting summaries in seed (`8aaafab`, `4f73fc9`)
+
+The Slice 19b seed only had 2 votes (Green Box + Flock Cameras), leaving the demo's Announcements / Meeting summaries / Vote results filter pills empty. Slice 19d fills out the rest of the feed so the demo at `demo-hub.civic.social` looks lived-in rather than half-populated.
+
+Seed runner extended (`src/debug/autoSeed.ts`):
+- `runScenario()` now dispatches by process type:
+  - `civic.vote` / `civic.proposal`: existing path (action loop + civic.input community comments)
+  - `civic.announcement`: new `runAnnouncementSeed()` — calls `emitPublicationEvents()` (which fires `created` + `result_published`) and finalizes the row, mirroring how floyd-news-sync and the announcement controller publish.
+  - `civic.meeting_summary`: new `runMeetingSummarySeed()` — `emitCreationEvents()` then `approveMeetingSummary()` then finalize. Walks the state machine `pending → approved → published` so demo summaries appear in the public feed without an admin step.
+- `SeedScenario.actions` made optional (announcement + meeting summary scenarios don't use it). `debugController.ts` updated to handle undefined `actions[]`.
+
+Athens content (`src/debug/seedDataAthens.ts`):
+- 6 announcements: Town Council Meeting May 7, water main flush, spring festival, park benches survey, downtown sidewalk project, recycling pickup change. Author role `"Town of Athens Government"` — abbreviated to "Town of Athens Gov" in the pill via Slice 17.1's `abbreviateGovernment` helper.
+- 2 published meeting summaries: April 23 regular meeting (FY26 budget first reading, sidewalk contract award, recycling renewal, public comment) and April 16 budget workshop (department-by-department review). Block structure mirrors the AI pipeline output: 4–5 topic blocks per meeting, each with title + narrative summary, `action_taken` flagged where votes/motions were taken. `start_time_seconds` is null (no real recording).
+
+Selector updated:
+- `selectScenarios()` in `autoSeed.ts` spreads `ATHENS_ANNOUNCEMENTS` and `ATHENS_MEETING_SUMMARIES` alongside the two votes when `CIVIC_SEED_FIXTURE=athens`.
+- Order: votes → announcements → meeting summaries.
+
+Operational gotcha worth recording for future seed-fixture work:
+- The auto-seed has a `seedPromise` memoization within a single serverless instance. After a wipe, just hitting the demo URL won't trigger a fresh seed if the running function instance has already memoized "seed ran, skipped." Force fresh instances via a Vercel manual redeploy (Deployments → ... → Redeploy, uncheck cache) after any wipe-then-reseed flow.
+- Even with that, ordering matters: if a request hits the demo between a wipe and a code-deploy that introduces new scenarios, the OLD code's seed runs first and populates the OLD scenario set, blocking the new code's seed via the `count > 0` guard. Recipe: code-deploy first (so the new code is the only code reachable), THEN wipe, THEN manual redeploy. We hit this once during Slice 19d's first activation — recovery was re-wipe + manual redeploy.
+
+### demo-hub.civic.social — operator runbook
+
+Documenting the recipe for spinning up a non-Floyd hub from the same codebase. To create another (e.g. for a different county or another demo), repeat with different values.
+
+**1. Supabase project**
+- Create new Supabase project (Pro tier required if you already have 2 projects on the org).
+- Region: match Floyd's (East US — N. Virginia) for consistency.
+- Apply all 10 migrations from `civic-hub/supabase/migrations/*.sql` in chronological order via the SQL Editor (each as a separate paste-and-run; clear the editor between each so leftover SQL doesn't replay).
+
+**2. Vercel project**
+- New Project → import the same `creatinglake/civic-hub` repo.
+- Project name unique (cannot duplicate Floyd's `civic-hub`). Used `civic-hub-demo` for the demo.
+- Framework Preset: **Other** (NOT Express). Express expects a server entrypoint in the build output; we have a static SPA + `api/index.ts` serverless function.
+- Root Directory: `civic-hub`.
+- Build/Output settings: don't override — `vercel.json` provides them.
+
+**3. Env vars (Production scope, Production+Preview is also fine)**
+- Demo-specific values: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` (from the new Supabase), `BASE_URL` and `CIVIC_UI_BASE_URL` and `CIVIC_ALLOWED_ORIGINS` set to `https://demo-hub.civic.social`, `CIVIC_ALLOW_SEED=true`, `CIVIC_DEMO_BYPASS_CODE=123456`, `CIVIC_SEED_FIXTURE=athens`, `HUB_NAME=Athens Civic Hub`, `DIGEST_ENABLED=false`, `ADMIN_DIGEST_ENABLED=false`, `MEETING_SUMMARY_ENABLED=false`, `FLOYD_NEWS_SYNC_ENABLED=false`.
+- Copied from Floyd: `RESEND_API_KEY`, `RESEND_FROM`, `CIVIC_ADMIN_EMAILS` (or generated fresh).
+- Generated fresh: `CRON_SECRET` and `DIGEST_UNSUBSCRIBE_SECRET` via `openssl rand -hex 32`.
+- Skipped: `ANTHROPIC_API_KEY` (only needed when meeting-summary is enabled).
+- Slice 18/19a UI overrides: `VITE_HUB_NAME`, `VITE_HUB_JURISDICTION`, `VITE_HUB_LABEL`, `VITE_HUB_TAGLINE`, `VITE_HUB_BANNER_URL` (kept Floyd's `/floyd-banner.jpg` for v1 — it's a generic-looking small-town photo), `VITE_HUB_BANNER_ALT`, `VITE_HUB_PAGE_TITLE`, `VITE_HUB_DESCRIPTION`, `VITE_HUB_GOVERNING_BODY_NAME=Town Council`, `VITE_HUB_GOVERNING_BODY_SHORT=Town Council`, `VITE_HUB_INTRO_BODY` (Athens demo welcome), `VITE_HUB_RESIDENCY_INTRO` (Athens residency intro).
+
+**4. Custom domain**
+- Vercel demo project → Settings → Domains → add `demo-hub.civic.social`.
+- Vercel emits a CNAME instruction; add the record at the registrar where `civic.social` is registered (subdomain part only as the Name field; full target as Vercel's `cname.vercel-dns.com`).
+- Wait 5–30 minutes for DNS propagation + Vercel auto-provisioned SSL cert.
+
+**5. First seed**
+- After deploy, the auto-seed middleware runs on first request. It checks the processes table and skips if any rows exist, so wipe the table first if it has stale data:
+
+```sql
+DELETE FROM events;
+DELETE FROM community_inputs;
+DELETE FROM proposal_supports;
+DELETE FROM vote_records;
+DELETE FROM vote_participation;
+DELETE FROM proposals;
+DELETE FROM processes;
+```
+
+Order matters because of foreign keys. After the wipe, redeploy (Vercel → Deployments → ... → Redeploy, uncheck cache to force fresh function instances). On the first request after redeploy, the auto-seed runs and loads `CIVIC_SEED_FIXTURE` value's scenarios.
+
+### Verified end-to-end
+
+- Floyd production rebuilt after each merge — every visible surface unchanged.
+- Demo deploy at `demo-hub.civic.social`: Athens-branded chrome (wordmark, banner, footer, tab title), Athens IntroPopup welcome, Athens-jurisdiction residency intro, Athens-themed seeded votes (Green Box + Flock Cameras), no OTP email sent on signin (verified — entered `test@notreal.test`, got signed in via `123456` code, no email arrived).
+- Custom domain `demo-hub.civic.social` resolves with valid HTTPS.
+- Backend `npm run build` clean across all six slices.
+- UI `npm run build` clean.
+
+### What's still open / future polish (not blocking)
+
+- **Athens-specific banner image** — currently `/floyd-banner.jpg`. Drop a generic small-town image into `civic-hub/ui/public/demo-hub-banner.jpg` and flip `VITE_HUB_BANNER_URL` on the demo project.
+- **Athens announcements + Town Council meeting summaries in seed data** — requires extending `runScenario()` to support `civic.announcement` and `civic.meeting_summary` creation flows. Would make the demo feel more lived-in (current demo has only the 2 votes and an empty rest-of-feed).
+- **About page demo content** — still shows Floyd content. Either hide via a `VITE_HUB_HIDE_ABOUT` flag or override copy with `VITE_HUB_ABOUT_BODY`. Lowest priority — most demo visitors don't reach `/about`.
+- **`%VITE_VAR%` build warning** — from a literal `%VITE_VAR%` string in an HTML comment in `index.html`. Cosmetic only; build still succeeds. Worth a small polish commit.
+- **Email scope hygiene on Floyd Vercel project** — pre-existing flag from Vercel's "Needs Attention" warning that `RESEND_API_KEY` is set in all environments instead of Production-only. Best-practice cleanup; not urgent. Tracked under email deliverability section of [civic-hub#13](https://github.com/creatinglake/civic-hub/issues/13).
+
+### Tracking issues opened during the work
+
+- [civic-hub#11](https://github.com/creatinglake/civic-hub/issues/11) — per-kind pill icons (deferred polish from Slice 17.1)
+- [civic-hub#12](https://github.com/creatinglake/civic-hub/issues/12) — pre-scale safety net (tests, CI, error tracking, cron alerts)
+- [civic-hub#13](https://github.com/creatinglake/civic-hub/issues/13) — scale concerns (rate limiting, /events pagination, digest batching, email deliverability)
+- [civic-hub#14](https://github.com/creatinglake/civic-hub/issues/14) — demo deployment runbook (now mostly fulfilled by this slice — keep open as the canonical reference for spinning up future hubs)
+
+### Multi-tenant SaaS path — context for future-you
+
+What landed in this batch is **multi-deployment**: one codebase serves multiple Vercel projects, each fully isolated (separate Supabase, separate domain, separate env vars). Adding a new hub today is manual operator work (~15-30 min following the runbook above).
+
+To get to **multi-tenant SaaS** (one deployment serves many tenants, self-service onboarding, single bill, RLS-isolated data) you'd:
+1. Move the `VITE_HUB_*` config from env vars into a `tenants` DB table with the same field shape
+2. Add tenant-resolver middleware that reads request hostname and picks the right tenant row
+3. Replace `import.meta.env.VITE_HUB_NAME` etc. with `tenant.name` from the resolved row
+4. Move data isolation from "separate Supabase" to "tenant_id column on every table + RLS policies"
+5. Build a `/admin/new-hub` self-service flow
+
+The config schema you've now validated in production (`name`, `jurisdiction`, `governing_body_name`, `intro_body`, `residency_intro`, etc.) transfers directly. Today's work proves the schema; the migration to SaaS is mechanical, not exploratory. Natural moment to commit: when manual setup becomes a bottleneck (e.g. 10+ hubs) or a paying customer needs self-service onboarding.
+
+---
+
+## Slice 15 — Share votes (Web Share + clipboard fallback) — 2026-04-29
+
+**Status:** Shipped end-to-end to production (civic-hub commit `94be093`). A single "Share" button on `/process/:id` and `/proposal/:id` opens the OS-native share sheet on mobile / modern desktop browsers and falls back to copying the URL to the clipboard everywhere else. Static `og:image` added to `index.html` so paste-and-unfurl renders a clean preview card in iMessage, WhatsApp, Facebook groups, and Slack.
+
+### Decisions worth flagging
+
+- **No platform-specific buttons.** Civic content gets shared into Facebook groups, iMessage threads, WhatsApp DMs, neighborhood listservs — not posted to public Facebook / X walls. The OS share sheet covers all of those; per-platform buttons cover one each and clutter the UI. The user explicitly noted this mid-design and the implementation reflects it.
+- **Web Share API → clipboard → inline error.** Three-stage fallback. `navigator.share` when available; on `AbortError` (user dismissed the sheet) we silently exit; on any other share-API failure we fall through to `navigator.clipboard.writeText` so an iOS quirk or permission denial doesn't strand the user. Clipboard failure shows "Couldn't copy the link. Try selecting the URL in the address bar." for 4s. Real browser context succeeds at one of the first two paths in practice.
+- **Status-gated visibility.** The button only renders where sharing actually drives action:
+  - `/process/:id`: `civic.vote` in `{active, proposed, threshold_met}`; `civic.proposal` (process type) until status === `closed`.
+  - `/proposal/:id`: `civic-proposal` (the user-suggested-issue flow) in `{submitted, endorsed}`.
+  - Suppressed for `closed` / `finalized` / `converted` / `archived`. The URL still works for anyone who copies from the address bar; the button presence is a CTA, and there's no CTA value once voting has ended.
+- **Skip the listing pages for v1.** `/votes` and `/` show many cards; per-card share buttons would multiply CTA noise and most users don't share from a list. Detail pages only — once the user has committed to reading.
+- **Single shareText shape per surface.** Active votes get `"Vote on: <Title>"`; proposals get `"Endorse this proposal: <Title>"`. Some apps (Twitter, SMS) pre-fill this in the body; others (iMessage) attach it as a separate line; some ignore it entirely. The URL does the heavy lifting; the text is a contextual nudge.
+- **Static `og:image` only — per-vote OG deferred.** Paste-and-unfurl preview cards in iMessage / WhatsApp / Facebook / Slack now show the Hub banner + generic title + generic description. Per-vote unfurls (showing the actual vote title and description) would require a Vercel bot-detection rewrite that returns server-rendered HTML for known crawler User-Agents — the SPA can't inject `<meta>` tags for crawlers because crawlers don't run JavaScript. Tracked as a Slice 15.1 candidate if real residents share enough that the generic-card-for-every-link feels lossy.
+- **Pill style + size matches the brand action color, not a system "share" affordance.** Navy-on-white at 36px tap height with a chain-link icon — same palette as the Suggest-a-vote CTA so the surface reads as a primary civic action, not a generic OS button. Variant prop ("default" / "ghost") is in the component for future reuse but only "default" is consumed today.
+- **No analytics event for share initiation.** A `civic.share_initiated` event was considered and skipped — the click is a UX moment, not a civic action. If sharing volume becomes a real metric later, it goes through whatever frontend telemetry pipeline lands first (none today).
+
+### Files added / changed
+
+UI only (no backend / migration / new env vars):
+- `civic-hub/ui/src/components/ShareButton.{tsx,css}` (new) — reusable component, two visual variants, inline error state, copy-success flash.
+- `civic-hub/ui/src/pages/Process.tsx` — mounts `<ShareButton>` between the meta row and the interaction panel; status-gated for `civic.vote` and `civic.proposal` process types.
+- `civic-hub/ui/src/pages/ProposalDetail.tsx` — same pattern for the user-facing civic-proposal flow in `submitted` / `endorsed` states.
+- `civic-hub/ui/src/App.css` — `.process-share-row` spacing rule (negative top margin + 2rem bottom to sit cleanly below the meta row without doubling its bottom margin).
+- `civic-hub/ui/index.html` — added `og:image` (`/floyd-banner.jpg`), `og:image:alt`, and `twitter:card=summary_large_image`. The pre-existing `og:title` + `og:description` + `og:type` stayed.
+
+### Verified manually (in dev preview)
+
+- Active vote (`proc_greenbox_floyd_001`, status=active): "Share" button renders with `aria-label="Share: Add More Secure Dumpster (Green Box) Sites"`, sits between meta row and the Cast Your Vote panel.
+- Proposed vote (`proc_flockcam_floyd_001`, status=proposed): "Share" renders with the "gathering support" badge, same placement.
+- `navigator.share` is undefined in the Chromium preview iframe → falls through to `navigator.clipboard.writeText` → that's blocked without a trusted user gesture → inline error renders correctly. The path is provable; the surface that fails in iframe succeeds on a real device.
+- Build clean both roots; no console errors.
+
+### Deploy
+
+`git push origin main` → Vercel production build. No migration, no new env vars, no admin setup. Pure UI ship.
+
+### Trade-offs / future work
+
+- **Per-route OG tags would land bigger unfurl cards.** A `vercel.json` rewrite + a Vercel Edge / serverless function that returns server-rendered HTML for known crawler User-Agents (Twitterbot, facebookexternalhit, WhatsApp, Slackbot, Discordbot, LinkedInBot, etc.) would inject the actual vote title / description / image into the unfurl. Hold until residents actually share enough that generic-card-for-every-link feels lossy.
+- **`og:image` is a static banner — no per-vote graphic.** Even with per-route OG, drawing a per-vote card image (e.g. dynamic SVG with vote title + tally + Hub branding) is a separate slice. Cheapest path: a Vercel Edge function with `@vercel/og` rendering a templated card. Worth doing if and only if per-vote OG ships first.
+- **No share counter / analytics.** Both share initiations and successful copies are silent. If later we want to measure which votes get shared most, the natural surface is a `POST /process/:id/share-initiated` ping with no body — keeps it out of the events table and out of `/events`, since this is product telemetry, not civic action.
+- **`shareText` is hard-coded per surface.** "Vote on: <Title>" / "Endorse this proposal: <Title>" — fine for v1. If different surfaces want different framing later (e.g. results pages saying "See the result of: <Title>"), the prop is already there.
+- **Component supports a "ghost" variant that's unused today.** Outlined instead of filled. Kept in the component because if any second placement appears (e.g. inline next to a result-card link), a less-prominent variant is one prop away.
+
+---
+
+## Slice 14 — Send feedback (form + drawer/footer link + persistence) — 2026-04-29
+
+**Status:** Shipped end-to-end to production (civic-hub commit `b05b276`). A new operator-facing `/feedback` page captures product feedback (idea / bug / moderation / general), persists it to a new `feedback_submissions` table, and best-effort emails the operator. "Send feedback" links live in the drawer secondary group (above the legal docs) and in the footer.
+
+### Decisions worth flagging
+
+- **"Send feedback", not "Contact".** Active language signals we want input, not just an escape hatch. "Contact" reads as customer support; "Send feedback" frames the surface as catching feature requests, moderation flags, and general thoughts equally. One label, not three (Contact / Feedback / Suggest), so the user doesn't have to choose between near-synonyms.
+- **Single page, four-pill category.** Idea / Bug / Moderation / General as radio pills with per-pill hint text. The form server-validates the category against an enum-style CHECK constraint, so any client-side bypass returns a 400. Tagging at submit time is cheaper than triaging by reading every message later.
+- **Honeypot, not CAPTCHA.** A `.fb-honeypot` `<input>` rendered off-screen at `left: -9999px` with `tabIndex={-1}`. Real users never see it; bots that auto-fill every field trip it. The controller returns 200 with a normal success shape when the honeypot is set, so spammers can't probe the difference between accept and reject. No CAPTCHA, no rate limit, no stored IP — start simple.
+- **Anonymous and authenticated both work; signed-in users get auto-attribution.** When a Bearer token is present and valid, the controller resolves it to a `user_id` and stores that on the row. The form omits the name/email inputs in that case (they're redundant — the user record has them). When unauthenticated, name + email are optional and free-text. The endpoint never requires auth; legal-text changes, moderation flags, etc. shouldn't be gated.
+- **Persistence outside the events table.** `feedback_submissions` is its own table — feedback isn't a civic event (it's operator-facing product input) so it doesn't flow through `emitEvent()` and never appears on `/events`. The naming `civic.feedback` mirrors the other module folders for consistency, but that's surface-level only — the spec compliance bar at "all civic actions emit events" doesn't apply because feedback isn't a civic action.
+- **`user_id` is `ON DELETE SET NULL`.** A self-service account deletion (Slice 13.11) preserves the feedback row but drops attribution. Operator triage value persists; the deleted user's identity goes. Same anonymization model as comments and endorsements.
+- **Operator email is best-effort, never blocks success.** `submitFeedback()` returns the persisted row regardless of mail-send outcome. A failure logs `[feedback] Operator email NOT sent for fb_xxx: <reason>` and the operator backfills via DB triage. Users see "Thanks for the feedback" either way.
+- **Drawer placement: secondary link above legal, with primary-link styling.** The drawer used to be `[Feed · Votes · About] → divider → [legal links, muted]`. Slice 14 adds a `DRAWER_SECONDARY_LINKS` group between the divider and the legal block — currently just `Send feedback`, rendered with the regular `civic-nav-drawer-link` style (full weight, normal size). The muted `civic-nav-drawer-link-legal` styling is reserved for the policy reference links; "Send feedback" is an active-input affordance and reads as more inviting at full weight.
+- **Footer order: Send feedback · Privacy · Terms · Code of Conduct.** "Send feedback" leads because it's the action item — an aria-label change to `"Legal and feedback"` reflects the broadened group.
+- **Maintainer vs. admin separation noted, but deferred.** During verification the user asked who receives the operator email. Today the recipient is a single env var (`FEEDBACK_RECIPIENT_EMAIL`, fallback `contact@civic.social`) — fine for a single-operator hub. The bigger architectural split (admin = community moderator, multiple per hub; maintainer / operator = instance runner, one per hub) wasn't necessary to address for v1. Future Slice 14.1 candidate: add an `operator_email` field to the existing `hub_settings` row (Slice 4.2) and surface it on `/admin/settings`.
+
+### Files added / changed
+
+Backend (`civic-hub/src/`):
+- `supabase/migrations/20260429000000_feedback_submissions.sql` (new) — table, two CHECK constraints, two indexes (created_at DESC, category).
+- `modules/civic.feedback/{models,service,index}.ts` (new) — types, validation (`FeedbackValidationError`), persistence, operator-email render.
+- `controllers/feedbackController.ts` (new) — `handleSubmitFeedback` with honeypot drop, optional bearer→`user_id` resolution.
+- `routes/feedbackRoutes.ts` (new) — mounts `POST /` (parent path = `/feedback`).
+- `app.ts` — mounts `/feedback`; doc string lists `POST /feedback`.
+
+Frontend (`civic-hub/ui/src/`):
+- `pages/Feedback.tsx`, `pages/Feedback.css` (new) — pill radios, message + counter, name/email (anonymous-only), signed-in pre-fill notice, mailto fallback (inline-on-error and footer-affordance), success state with thank-you copy.
+- `services/api.ts` — `submitFeedback()` client + `FeedbackCategory` type.
+- `App.tsx` — `/feedback` route + footer "Send feedback" link (footer aria-label updated to "Legal and feedback").
+- `components/Nav.tsx` — `DRAWER_SECONDARY_LINKS` array, rendered with primary drawer-link styling between the divider and the legal group.
+
+### Verified end-to-end (in production)
+
+- Migration applied to prod Supabase via SQL editor before code deploy. Pure additive — no existing rows touched, no schema altered, reversible with `DROP TABLE feedback_submissions`.
+- `git push origin main` triggered Vercel production deploy of commit `b05b276`.
+- `/feedback` renders cleanly: heading, four category pills with switching hint text, message textarea + character counter (4000 cap), name/email (anonymous), submit gating on non-empty message, mailto fallback, off-screen honeypot.
+- Submitted a real test feedback as the production operator; row persisted to `feedback_submissions`; operator email arrived in inbox (Resend delivery against `FEEDBACK_RECIPIENT_EMAIL` after the operator set it in Vercel Production-scope env vars).
+- Drawer order verified: `Feed · Votes · About → divider → Send feedback (full weight) → Code of Conduct · Privacy · Terms (muted)`.
+- Footer order: `Send feedback · Privacy · Terms · Code of Conduct`.
+- No console errors.
+
+### Deploy sequence used
+
+1. Run migration against prod Supabase (paste SQL in Supabase SQL editor).
+2. `git push origin main` from `civic-hub/` → Vercel production build.
+3. Verify on prod URL.
+
+User opted to skip the staging-preview verification step for Slice 14 — the migration is purely additive and the new code path is isolated (no existing endpoint touched), so the blast radius if anything broke would have been contained to `/feedback` itself. Pattern not recommended as a default; was acceptable here because the surface is genuinely new and self-contained.
+
+### Trade-offs / future work
+
+- **Operator-email recipient is an env var, not an admin setting.** `FEEDBACK_RECIPIENT_EMAIL` (Production scope in Vercel). If/when the maintainer rotates or the hub is operated by someone without Vercel dashboard access, lift this into `hub_settings` and surface on `/admin/settings` (Slice 14.1 candidate — see "maintainer vs. admin" decision above).
+- **No admin triage UI.** Submissions live in the DB only. Admins read them via Supabase or a future `/admin/feedback` list view. For Floyd's submission volume that's fine; revisit when triage friction shows up.
+- **Honeypot only.** No rate limit, no IP logging, no CAPTCHA. If real spam volume materializes the next escalations are: (1) per-IP rate limit (1/minute, say) using an in-memory or Redis counter; (2) Resend's bot-detect SDK; (3) Cloudflare Turnstile. Hold until needed.
+- **No edit / delete after submit.** Submissions are write-once from the user's perspective. If a user types a typo and submits, they'd need to send a second submission with a correction. Acceptable for v1.
+- **Anonymous email field doesn't validate beyond browser-default.** The form uses `<input type="email">` so the browser blocks obviously malformed addresses, but the server doesn't re-validate. Worst case is a feedback row with a junk `email` string, which doesn't break anything — operator just can't reply.
+
+---
+
+## Slices 13 → 13.11 — Floyd news auto-sync + auth modal hardening + self-service account deletion — 2026-04-28 / 2026-04-29
+
+**Status:** Shipped end-to-end across the civic-hub subrepo (commits `5ab62cd` → `c536194`, plus housekeeping `c72b178`). Three loosely-related threads landed in this batch — a new ingestion module that auto-publishes Floyd County news posts as announcements, a hardening pass on the sign-in / sign-up flow, and a self-service account-deletion control in Settings. They're consolidated here because they shipped in one continuous push and share no cross-cutting refactor; each sub-slice is independently revertible.
+
+> **Repo note:** these commits live in the `civic-hub/` subrepo, which has its own git history separate from the mono-repo root. This HANDOFF entry lives in the mono-repo as the canonical build log; the per-commit messages in `civic-hub/` are the detail source.
+
+### Slice 13 — `civic.floyd_news_sync` module (`5ab62cd`)
+
+A new module under `civic-hub/src/modules/civic.floyd_news_sync/` that pulls posts from `floydcova.gov/news` daily and creates one `civic.announcement` per new post, auto-published to the feed and digest. Click on the synced feed card opens the post on Floyd's site externally — no admin review queue, no internal `/announcement/:id` page navigation.
+
+- `POST /internal/floyd-news-sync/run` (CRON_SECRET bearer) discovers entries via `fetchHtml` + cheerio trim + Claude extraction (later replaced — see 13.1).
+- Date filter excludes entries with a strictly-past `event_date` in the title or URL slug. Open-ended announcements (null date) and future-dated events are kept.
+- Dedupe is by `share_url` against existing `civic.announcement` rows. One row per `share_url`, ever — re-runs are idempotent.
+- Per-run cap defaults to 3 (`FLOYD_NEWS_SYNC_MAX_PER_RUN`).
+- Daily Vercel Cron at 12:00 UTC, between digest and meeting-summary crons in `vercel.json`.
+
+`civic.announcement` extension to support synced posts:
+- Optional `state.source` field `{ origin: "floyd-news"; share_url; ingested_at }` records provenance and acts as the dedupe key.
+- `sanitizeContent` gains an `allowEmptyBody` option, used only when `source` is set — synced announcements have no body since the click goes external.
+- `emitEvent` accepts absolute URLs in `action_url_path`; when the path starts with `http(s)://` it's used verbatim instead of being prefixed with the hub UI base. This is what routes feed-card clicks on synced announcements straight to `floydcova.gov`.
+
+Required env vars (Vercel, Production + Preview): `ANTHROPIC_API_KEY` (existing), `CRON_SECRET` (existing), `FLOYD_NEWS_SOURCE_URL` (optional, defaults to the news listing URL), `FLOYD_NEWS_SYNC_ENABLED` (optional, default true), `FLOYD_NEWS_SYNC_MAX_PER_RUN` (optional, default 3).
+
+### Slice 13.1 — switch to RSS, drop thumbnails (`fb8431c`)
+
+After 13 shipped, synced cards looked rough — Wix thumbnails were document-scan PDFs and we had no body content because Wix renders post bodies via client-side JS. Probing showed Floyd's RSS feed (`/blog-feed.xml`) is the cleaner data source: structured XML, real publication dates, more posts than the listing page (19 vs 3), and ~25% of items carry a real `<description>` the author wrote.
+
+- `connector.ts` now parses RSS via cheerio xmlMode. `parseRssFeed` returns `{ title, share_url, body, event_date, pub_date_iso }`. No Claude required for discovery.
+- `pipeline.ts` dropped `buildDiscoveryPrompt` + the Claude call.
+- `prompts.ts` deleted (unused).
+- Controller dropped the up-front `ANTHROPIC_API_KEY` check (no longer needed for discovery), changed `source_url` default to `/blog-feed.xml`, populates body from the RSS description when present, always sets `image_url` to `null`. Default per-run cap raised from 3 to 5 since the operation is now ~free.
+- New `src/utils/http.ts::fetchXml` helper (mirrors `fetchHtml` but with an Accept header for RSS / Atom / XML).
+
+What we are NOT doing: inventing body descriptions via Claude from titles alone (civic content shouldn't carry hallucinated specifics), nor running a headless browser to scrape the JS-rendered post body (cost-benefit doesn't justify it for ~3 posts/week).
+
+### Slice 13.2 — Claude paraphrase fallback for body-less RSS items (`e109b72`)
+
+About 75% of Floyd's RSS items have no `<description>` — only a title and (sometimes) an event_date in the slug. Title-only cards looked empty. Per user direction: derive the description from facts we already have (title, event_date) without inventing specifics.
+
+- New `civic.floyd_news_sync/paraphrase.ts`: Claude call with a tight prompt that forbids inventing times, locations, attendees, agenda items, or department names not in the title. Output capped to one sentence ≤ 200 chars, stripped of accidental quotes / fences.
+- Controller invokes `paraphraseTitle` for entries with empty body; RSS description still takes precedence when present.
+- Paraphrase failures are non-fatal — log + fall back to empty body.
+- `ANTHROPIC_API_KEY` check is conditional: only required when an entry needs paraphrase. Cards with RSS descriptions still ingest cleanly on a hub without an Anthropic key configured.
+- Per-entry log line distinguishes `body_source=rss / paraphrase / empty` for diagnostic visibility in Vercel logs.
+- Cost: one Claude call per body-less entry on first ingest only. Subsequent runs skip already-ingested rows via dedupe.
+
+### Slice 13.3 — synced announcements share the admin pill palette (`eeb9524`)
+
+The Floyd-news-sync cron sets `author_role = "Floyd County Government"`, which the existing `FeedPost` branching treated as a non-admin author and rendered with the lavender announcement-author palette. Visually that read as a different category from admin-authored announcements, even though both still match the "Announcements" filter pill.
+
+- Detect synced cards via `data.announcement.source.origin === "floyd-news"` (emitted alongside the announcement payload by `emitAnnouncementResultPublished` since Slice 13) and bump them into the admin pill palette.
+- The "Floyd County Government announcement" label stays — only the color changes.
+- Effect: admin announcements → orange "Admin announcement" pill (unchanged). Floyd-news-sync → orange "Floyd County Government announcement" pill (was lavender). Board member / committee announcements → still lavender.
+
+### Slice 13.4 — BOS label + backdated event timestamps (plumbing) (`c0ed013`)
+
+Two changes:
+
+1. Meeting summary pill label: "Meeting summary" → "BOS meeting summary" (Board of Supervisors). Single string change in `FeedPost.tsx`.
+2. Plumbing for backdating events to a caller-supplied timestamp:
+   - `CreateEventInput` gains optional `timestamp`. `emitEvent` uses it when present, else stamps `now`.
+   - `CreateProcessInput` gains optional `eventTimestamp` so the auto-emitted `civic.process.created` event can be backdated alongside manually-emitted module events.
+   - `civic.announcement` `EmitEventFn` + `emitAnnouncementCreated` + `emitAnnouncementResultPublished` accept an `opts.timestamp` pass-through.
+   - The floyd-news-sync controller initially passed `entry.pub_date_iso` (parsed from RSS) into both the `createProcess` call and the `emitAnnouncementResultPublished` call.
+
+Intent was to interleave backfilled posts naturally with other feed activity instead of clustering them at "now."
+
+### Slice 13.5 — revert active use of backdating, keep the plumbing (`285ab48`)
+
+Reverted the controller change from 13.4 for two reasons:
+- Going forward, posts come in same-day, so `pubDate ≈ now` anyway and the override has no observable effect.
+- Backdated events fall outside the digest's 24h window, which would silently drop synced announcements from the daily email if Floyd's pubDate is even slightly behind ingest time.
+
+The `eventTimestamp` / `timestamp` override plumbing on `createProcess` + `emitEvent` + `emitAnnouncement*` stays — it's optional, callable by any future backfill or migration that needs it. Reordering the existing 11 backfilled rows in production is now a one-time SQL `UPDATE` on the events table (drop the `events_no_update` trigger for the duration of the migration).
+
+### Slice 13.6 — pre-filter feed to renderable events before pagination (`754ee2e`)
+
+The feed page rendered empty for the "All" filter while "Announcements" rendered correctly — caused by `PAGE_SIZE` budget being starved by non-renderable events.
+
+The events stream contains many event types (`civic.process.created`, `aggregation_completed`, `updated`, etc.) that the feed UI does not render. Only `civic.process.started` (vote-open) and `civic.process.result_published` (everything else) produce a card. Before this fix the pipeline was: fetch all events DESC → take first 50 → map to posts → non-renderable events silently drop. That broke after the production backfill backdated 10 announcement `result_published` events to March/April, leaving the now-recent 50 events dominated by sync-run `civic.process.created` events.
+
+Fix in `Feed.tsx`: filter events through `kindFromEvent` first, then apply the user's type filter, THEN paginate. So `PAGE_SIZE` counts visible cards, not raw events. The Announcements filter "worked" before because its predicate already implicitly stripped non-announcement events; same mechanism, made universal.
+
+### Slice 13.7 — rename feed filter pill (`b503145`)
+
+`FeedFilter.tsx`: "Meeting summaries" → "BOS meeting summaries". Matches the per-card pill label updated in 13.4. Distinguishes from any future Planning Commission / School Board / etc. meeting kinds.
+
+### Slice 13.8 — favicon (`647978c`)
+
+Replaces the prior purple starburst with a simple navy circle (matches the suggest-a-vote button color, `--pill-vote-fg = #1e3a5f`), white capital "F" centered using Manrope with system-sans fallback. Single inline SVG, no PNG fallbacks (modern browsers all support image/svg+xml favicons).
+
+### Slice 13.9 — tighten AuthModal (`2484fc3`)
+
+Three behavioral changes after watching the sign-in flow in production:
+
+1. **Click-outside no longer dismisses the modal.** The X button (or Escape) is the only way to close. Rationale: accidental outside-clicks were losing form state mid-sign-up, especially disruptive after the OTP was already on its way. The `.intro-overlay` div lost its `onClick={onDismiss}` and the modal `div` lost its now-unnecessary `stopPropagation`. Other components using `.intro-overlay` are unaffected — only `AuthModal`-specific markup changed.
+2. **Email step no longer has the Terms / Privacy / CoC checkbox.** Existing users who had already accepted at sign-up were re-encountering it for no reason.
+3. **Residency step is now a single combined gate.** One checkbox confirming residency AND legal-doc acceptance, shown only when the verified user is NOT yet a resident (brand-new sign-ups). Returning residents skip the step entirely; the existing `ReAcceptModal` at the app root still catches them if their stored `tos_version` is stale.
+
+Implementation: `handleVerifyCode` no longer auto-`acceptTos`; it just logs in and routes new users to the combined gate. `handleResidency` calls both `affirmResidency` and `acceptTos`. `acceptTos` failure is non-fatal (re-acceptance modal will retry). Single `gateChecked` state replaces separate `residencyChecked` + `legalAccepted`.
+
+### Slice 13.10 — defer `login()` until residency + legal gate passes (`8c1ca8e`)
+
+User reported being able to close the modal at the residency step and still end up signed in — because `login()` was firing as soon as the verification code was accepted, before they confirmed residency or accepted the legal docs.
+
+Fix: hold the `verifyCode` result in local state (`pendingAuth`) and only call `login()` once the residency gate completes successfully. If the user closes the modal at the gate, no session was ever established — they have to start over with email + code, which is the correct behavior for an incomplete sign-up. Returning residents (`is_resident=true` at `verifyCode`) `login()` immediately and complete — the gate never blocks them.
+
+`handleResidency` picks the right token: `pendingAuth.token` for brand-new sign-ups, falling back to `useAuth`'s token for users who re-opened the modal already-logged-in (rare path: their `is_resident` is still false from a partial sign-up on another device).
+
+End-to-end deferred-login behavior requires a real backend; user verifies on production after deploy.
+
+### Slice 13.11 — self-service account deletion in Settings (`c536194`)
+
+Adds a danger zone on `/settings` where any signed-in user can delete their own account. Frees their email for re-use, removes the user record, cascades sessions. Public-record references (comments, endorsements, vote-participation rows) become orphaned by design — the civic record (vote tallies, comment threads) stays intact, but attribution to the deleted user disappears. **Vote secrecy is preserved automatically because `vote_records` has never carried a `user_id`.**
+
+Backend:
+- `civic-hub/src/modules/civic.auth/index.ts::deleteAccount(userId, email)`. Deletes `pending_verifications` by email first (so a stale OTP can't race a fresh sign-up), then deletes the user row (sessions cascade via FK `ON DELETE CASCADE`).
+- `civic-hub/src/controllers/authController.ts::handleDeleteAccount` resolves the bearer token to a user, calls `deleteAccount`, returns 200.
+- `civic-hub/src/routes/authRoutes.ts`: `DELETE /auth/me` wired up.
+
+Frontend:
+- `civic-hub/ui/src/services/auth.ts::deleteAccount(token)` API client.
+- `civic-hub/ui/src/pages/Settings.tsx`: danger-zone panel at the bottom of `/settings`. Two-step confirmation — user must type their own email to enable the destructive button. On success, the auth context is logged out locally and we `navigate("/", { replace: true })`.
+- `civic-hub/ui/src/pages/Settings.css`: red-bordered panel + destructive-button styling distinct from regular settings panels.
+
+What is intentionally NOT done:
+- **Cool-off / undo period.** Civic platforms generally don't need it; hard-delete is cleaner and matches the simpler privacy model. Can add a 30-day grace later if real users ask.
+- **Cascade-delete of comments/endorsements.** Those become orphan rows whose foreign-key strings no longer resolve to a user — the UI already renders that as no attribution. Preserves the civic record while erasing identity.
+- **Admin-side delete (`DELETE /admin/users/:id`).** Future slice for moderation-driven deletes.
+
+End-to-end testing requires a real session against a real backend; user verifies on production after deploy by deleting + re-signing-up with the same email.
+
+### Files changed (across all sub-slices)
+
+Backend (`civic-hub/src/`):
+- New module: `modules/civic.floyd_news_sync/{connector,pipeline,paraphrase,models,index}.ts` (`prompts.ts` introduced in 13, deleted in 13.1).
+- New controller / routes: `controllers/floydNewsSyncController.ts`, `routes/floydNewsSyncRoutes.ts`.
+- Auth: `modules/civic.auth/index.ts` (`deleteAccount`), `controllers/authController.ts` (`handleDeleteAccount`), `routes/authRoutes.ts` (`DELETE /auth/me`).
+- Event / process plumbing: `events/eventEmitter.ts`, `models/event.ts`, `models/process.ts`, `services/processService.ts` (timestamp override).
+- `civic.announcement`: `events.ts`, `index.ts`, `models.ts`, `service.ts` (synced-source field, `allowEmptyBody`, timestamp pass-through).
+- `civic.meeting_summary/index.ts`: exports `parseJsonArray` for reuse.
+- `processes/announcementProcess.ts`: timestamp pass-through.
+- `utils/http.ts`: new `fetchXml` helper.
+- `app.ts`: mounts `/internal/floyd-news-sync/run`.
+- `vercel.json`: daily cron entry at 12:00 UTC.
+
+Frontend (`civic-hub/ui/src/`):
+- `components/AuthModal.tsx` (13.9, 13.10 — substantial rewrite of the gate flow).
+- `components/Feed.tsx` (13.6 — pre-filter pagination).
+- `components/FeedFilter.tsx` (13.7 — pill rename).
+- `components/FeedPost.tsx` (13.3 — synced-card palette, 13.4 — pill string).
+- `pages/Settings.tsx`, `pages/Settings.css` (13.11 — danger zone).
+- `services/auth.ts` (13.11 — `deleteAccount` client).
+- `public/favicon.svg` (13.8).
+
+### Verified manually (across slices)
+
+- Floyd-news-sync end-to-end via `POST /internal/floyd-news-sync/run` against staging — backfill produced 11 rows, deduped on subsequent runs.
+- Feed renders correctly under the "All" filter after the 13.6 pre-filter fix; previously empty.
+- AuthModal flow: email step has 0 checkboxes; click-outside doesn't dismiss; closing at residency gate does NOT establish a session; returning residents log in immediately.
+- `/settings` danger zone gates the destructive button on email-match; success logs out and routes to `/`.
+- Favicon renders as navy circle with white "F" in dev preview.
+- `npm run build` clean across both roots.
+
+### Trade-offs / future work
+
+- **Synced-card body coverage.** ~25% real RSS descriptions, ~75% Claude-paraphrased one-liners, small minority empty (Claude failure or no key). Admins can `PATCH /announcement/:id` to manually annotate any synced row.
+- **Backdate plumbing is unused in the active code path.** Optional `timestamp` / `eventTimestamp` arguments stay in the signatures for future migration / backfill use; current callers don't pass them. If the abstraction stays unused for two more slices, consider removing.
+- **Account deletion has no admin variant.** `DELETE /admin/users/:id` is a future slice for moderation-driven deletes; today admins cannot remove a user except by going through the user's own session.
+- **AuthModal end-to-end behavior (deferred-login, account deletion) needs production verification.** Local preview confirms UI shape; real-backend verification is post-deploy.
+
+---
+
+## Slice 12.3 — Universal drawer + sticky chrome + image thumbnail layout — 2026-04-28
+
+**Status:** UI polish pass driven by direct user feedback after Slice 12.2 landed. Four discrete fixes: bring the hamburger back as the universal nav drawer (with legal pages added), give announcement-with-image cards a different layout so a 16:9 hero doesn't dominate the feed, make the Feed | Votes tab strip + filter pills stick under the top nav so they remain reachable while the page scrolls, and clean up two crowding issues on the Votes page.
+
+### Changes
+
+- **Hamburger drawer is now the universal nav entry point at every breakpoint.** Slice 12.2 hid it on desktop because the in-page tab strip covered Feed/Votes — but that meant routes without the strip (`/privacy`, `/admin/*`, `/search`) had no visible link to anything but the wordmark. The hamburger is back at every breakpoint, About is removed from the top nav (top nav is now wordmark + search + sign-in only), and the drawer now lists Feed · Votes · About followed by a visual divider then Code of Conduct · Privacy · Terms. Legal links are intentionally smaller / muted so they read as secondary policy footer pages, not primary surfaces.
+- **Image-bearing feed cards switch to a thumbnail layout.** The Slice 9 design used `aspect-ratio: 16/9` on a 100%-width image, which at the 1100px page-shell width rendered ~620px tall — visually dominating one card per scroll. New layout: when `imageUrl` is present the article gains a `has-image` class and `.feed-post-link` becomes a flex row with the text body on the left and a 144x144 square thumbnail on the right. On mobile (<= 600px) the layout switches to `flex-direction: column-reverse` so the image stacks above the text capped at 180px tall — still a recognizable visual anchor, never a scroll-eating hero. Imageless cards are unchanged.
+- **Persistent chrome stack on `/` and `/votes`.** Banner + HubInfo (jurisdiction name, "CIVIC HUB" label, tagline) scroll away normally as before. The Feed | Votes tab strip (`.feed-votes-tabs`) is `position: sticky; top: var(--nav-h)` — sticks immediately under the top nav. The filter pill row (`.feed-filter` on Home, `.votes-filter` on Votes) is `position: sticky; top: calc(var(--nav-h) + var(--tabs-h))` — sticks under the tabs. The result is a 3-row sticky chrome (nav + tabs + pills, ~182px tall) that remains reachable through arbitrary scroll depth while the resident is reading the feed.
+- **Votes page polish.** Removed the inline `+ Suggest a vote` green link next to the "Proposed Votes" heading — it duplicated the pinned suggest-a-vote CTA card at the top of the page and crowded the heading. Added `padding-bottom: var(--space-md)` to `.votes-filter` so the "Active Votes" heading underneath gets breathing room from the pill row instead of sitting flush against it.
+
+### Decisions worth flagging
+
+- **Sticky offsets are token-based, not magic numbers.** Two new tokens in `:root` — `--nav-h: 61px` and `--tabs-h: 45px` — are referenced by both filter rows and the tab strip. If the nav padding or hamburger size changes, updating one place updates the whole stack. Verified live: `getBoundingClientRect` returns `nav.top: 0`, `tabs.top: 61`, `filter.top: 106` once the page is scrolled past the chrome.
+- **Drawer divider is a `<li role="separator">`, not a CSS-only border.** Lets screen readers announce the visual grouping and keeps the markup semantic. Legal links use a `civic-nav-drawer-link-legal` modifier (smaller font, muted color) so the priority hierarchy reads at a glance.
+- **Mobile image layout is `flex-direction: column-reverse`, not a JSX reorder.** With the image as the second JSX child (after `.feed-post-body`), `column-reverse` on mobile flips visual order to put image on top while keeping the desktop thumbnail-on-right layout default. One source of truth in the JSX, one CSS rule per breakpoint — no per-breakpoint conditional rendering.
+- **Top nav `<ul>` renders only when `TOP_LINKS.length > 0`.** Easier to add a top-nav link later than to maintain a hidden empty list. Currently `TOP_LINKS` is `[]` and the wrapper element is omitted entirely.
+
+### Files changed
+
+UI only:
+- `civic-hub/ui/src/components/Nav.tsx` — empty `TOP_LINKS`; new `DRAWER_LEGAL_LINKS`; conditional top-nav `<ul>` render; drawer renders primary links + divider + legal links.
+- `civic-hub/ui/src/components/Nav.css` — hamburger default `display: inline-flex`; mobile media query no longer toggles its display; new `.civic-nav-drawer-divider` and `.civic-nav-drawer-link-legal` styles.
+- `civic-hub/ui/src/components/FeedPost.tsx` — wrapped non-image content in `.feed-post-body`; added `has-image` class to article when `imageUrl` is set; image moves to last child for the flex-row layout.
+- `civic-hub/ui/src/components/Feed.css` — `.feed-post.has-image .feed-post-link` flex row; `.feed-post-image` is now `flex: 0 0 144px` square (was `width: 100%; aspect-ratio: 16/9`); mobile `column-reverse` with capped 180px image height.
+- `civic-hub/ui/src/components/FeedVotesTabs.css` — sticky `top: var(--nav-h)`, z-index 90, page-bg background.
+- `civic-hub/ui/src/components/FeedFilter.css` — sticky `top: calc(var(--nav-h) + var(--tabs-h))`, z-index 89, page-bg background; bumped bottom padding to `var(--space-md)`.
+- `civic-hub/ui/src/App.css` — new `--nav-h` / `--tabs-h` tokens on `:root`; `.votes-filter` gets the same sticky treatment as `.feed-filter` plus the bottom padding fix.
+- `civic-hub/ui/src/pages/Votes.tsx` — removed the `.section-header-row` wrapper + inline `+ Suggest a vote` link; "Proposed Votes" heading + section description render directly.
+
+### Verified manually (in dev)
+
+- Desktop home (1280x900): hamburger | wordmark | search | Sign in. No About in top nav. Hub info, tab strip, filter pills, feed cards aligned at 1100px shell width.
+- Hamburger drawer (any breakpoint): Feed (active) · Votes · About — divider — Code of Conduct · Privacy · Terms (smaller, muted).
+- Sticky chrome math (`getBoundingClientRect` after scroll): `nav.top: 0`, `tabs.top: 61`, `filter.top: 106` — exact stack.
+- Image card layout (DOM-injected for verification since seed has no announcements): desktop renders body left + 144px square thumbnail right; mobile (375 wide) renders 180px-capped image on top + body below.
+- Mobile Votes (375 wide): chrome stack (nav + Feed/Votes tabs + All/Active/Proposed/Finalized pills) sticks at top while the suggest-a-vote CTA, sections, and footer scroll under it.
+- Votes page: "Proposed Votes" heading no longer paired with an inline green link; "Active Votes" heading sits below the pill row with visible padding instead of touching it.
+- `npm run build` clean (UI only — backend not modified). No console errors.
+
+### Trade-offs documented
+
+- **Sticky chrome footprint at small viewports.** On a 375-wide / 600-tall mobile viewport the persistent chrome (nav + tabs + filter) eats ~182px of viewport height — about 30%. Acceptable for a primarily reading-oriented feed but worth watching if real residents complain about content density on small screens. Easiest knob: drop the filter row from sticky on mobile (keep tabs only) or collapse tabs into the nav.
+- **`--nav-h: 61px` / `--tabs-h: 45px` are measured constants.** They depend on the actual rendered heights of `.civic-nav` and `.feed-votes-tab` (44px tap target + 1px border + chrome). If those internal heights ever change, the offsets must be re-measured. A more robust solution would be a `ResizeObserver` driving the offset via a CSS custom property, but it's not worth the complexity for the current static chrome.
+
+### Future work / not in this slice
+
+- Sticky chrome on `/announcement/:id`, `/process/:id`, etc. The tab strip only renders on `/` and `/votes` so the sticky logic is moot elsewhere — but if/when residents land on a process detail and want a one-click hop back to the feed, a smaller persistent affordance (a back-to-feed pill?) might help.
+- The drawer's divider + legal-link grouping is hand-rolled; if a third group ever appears (e.g. admin tools when logged in as admin), the structure should generalize to `Array<{ heading?: string; links: Link[] }>`.
+
+---
+
+## Slice 12.2 — Visual width alignment + desktop hamburger off — 2026-04-28
+
+**Status:** Polish pass. Slice 12.1 fixed the navigation IA but left a width inconsistency: in-page elements (tab strip, filter pills, feed list, suggest-vote CTA) were capped at 640px while the hub info and Votes-page sections used the full 1100px page-shell width. The two widths fought each other visually. This pass aligns everything to the same width and removes the desktop hamburger now that the in-page tab strip is the primary access path.
+
+### Changes
+
+- **All in-page elements now use `--max-width-shell` (1100px)** instead of `--max-width-feed` (640px). The narrower token is preserved in `theme.css` for any future component that still wants single-column reading width, but no element uses it currently. Affected: `.feed-votes-tabs`, `.feed-filter`, `.feed`, `.suggest-vote-cta`, `.votes-filter`.
+- **Desktop hamburger removed.** The mobile-only media query is restored (`@media (max-width: 768px) { .civic-nav-hamburger { display: inline-flex } }`). Desktop top nav is now: wordmark | About | search | Sign in. Feed and Votes are reachable via the in-page tab strip on `/` and `/votes`. From any other route (e.g. `/privacy`, `/admin/*`, `/search`) a desktop user clicks the wordmark to return to `/`, which is the Feed; from there the tab strip takes them to Votes — two-click max from anywhere.
+
+### Files changed
+
+- `civic-hub/ui/src/components/Nav.css` — hamburger default `display: none`; mobile media query restores it.
+- `civic-hub/ui/src/components/FeedVotesTabs.css` — `max-width-feed` → `max-width-shell`.
+- `civic-hub/ui/src/components/FeedFilter.css` — same.
+- `civic-hub/ui/src/components/Feed.css` — same.
+- `civic-hub/ui/src/App.css` — same on `.suggest-vote-cta` and `.votes-filter`.
+
+### Verified manually
+
+- Desktop home: top nav is wordmark | About | search | Sign in (no hamburger). Hub info, Feed/Votes tabs, filter pills, and feed cards all share the same left/right edges.
+- Desktop Votes: same alignment — hub info, tabs, suggest-vote CTA, status pills, sections all flush.
+- Mobile home: hamburger | wordmark | Sign in. Drawer shows Feed | Votes | About.
+- Mobile Votes: same. Filter pills + CTA + sections all viewport-width aligned.
+- `npm run build` clean.
+
+### Trade-off documented
+
+- **Two-click navigation from chrome routes.** From `/privacy`, `/admin/*`, or `/search` a desktop user has no direct "Votes" link in the top nav. The wordmark → Feed → tab → Votes path keeps it to two clicks; if/when someone reports it, easiest fix is re-adding `Votes` (without a badge) to the top nav links list or bringing back the hamburger on desktop.
+
+---
+
+## Slice 12.1 — Feed | Votes tab strip — 2026-04-27
+
+**Status:** Slice 12's first attempt promoted Votes into the top nav with an active-count badge — felt crowded next to the wordmark on mobile, and the home-feed Suggest-a-vote button surfaced even when the user was filtering by Announcements (wrong context). This follow-up replaces all that with a clean two-tab in-page strip below the banner.
+
+### Decisions worth flagging
+
+- **Tabs as routes, not a single-page state toggle.** The two tabs are React Router `<NavLink>`s — clicking "Feed" navigates to `/`, clicking "Votes" navigates to `/votes`. Active state comes from the URL. Bookmarkable, back-button-safe, no parallel UI state to keep in sync.
+- **"Feed" + "Votes" labels (one word each).** Considered "Civic Feed" / "Floyd Feed" — "Feed" pairs symmetrically with "Votes," is short on mobile, and "Civic Feed" is redundant when the whole site is a Civic Hub.
+- **Top nav slimmed to the secondary link only.** Feed and Votes are no longer in the top nav at any breakpoint — they live exclusively in the in-page tab strip and the hamburger drawer. The top nav now carries just `About` (plus search + sign-in), so the wordmark area stays calm.
+- **Hamburger now visible on every breakpoint, not mobile-only.** With Feed/Votes moved out of the top nav, the drawer is the universal escape hatch for routes that don't show the tab strip (e.g. `/privacy`, `/admin/*`, `/search`). On those routes a desktop user still has one click to Feed, Votes, or About.
+- **Suggest-a-vote stays out of the home feed entirely.** The home page filter pills are a *visual* discriminator (event-type filter); injecting a creative-action CTA there caused the user-reported confusion ("why does Announcements have a Suggest-a-vote button?"). The CTA only lives on the Votes page now, where the context is unambiguous.
+- **Drawer link list and top-nav link list separated explicitly.** `Nav.tsx` now has `TOP_LINKS` (About) and `DRAWER_LINKS` (Feed, Votes, About). About appears in both intentionally — top nav for desktop discovery, drawer for the universal-access pattern.
+
+### Files added / changed
+
+- `civic-hub/ui/src/components/Nav.tsx` — split into `TOP_LINKS` / `DRAWER_LINKS`. Active-vote badge fetch and promoted-link rendering reverted.
+- `civic-hub/ui/src/components/Nav.css` — hamburger now always visible; promoted-link / badge rules removed; mobile media query no longer toggles hamburger display.
+- `civic-hub/ui/src/components/FeedVotesTabs.{tsx,css}` (new) — the two-tab strip. Underline-style active state, sticky-friendly, single border-bottom that the active tab's underline replaces.
+- `civic-hub/ui/src/pages/Home.tsx` — mounts `<FeedVotesTabs>`; the action-row + Suggest-a-vote button removed.
+- `civic-hub/ui/src/pages/Votes.tsx` — mounts `<FeedVotesTabs>` directly above the suggest-a-vote CTA card.
+- `civic-hub/ui/src/components/FeedFilter.css` — `.home-action-row` and `.home-suggest-vote-button` rules removed (no longer used).
+
+### Verified manually (in dev)
+
+- Desktop: hamburger | wordmark | About | search | Sign in. Tab strip below banner.
+- Mobile: hamburger | wordmark | Sign in. Tab strip below banner.
+- Hamburger drawer: Feed, Votes, About — all three reachable from any route.
+- Clicking Votes tab navigates to `/votes`; clicking Feed tab navigates to `/`.
+- Home page: pills + feed; no Suggest-a-vote button.
+- Votes page: pinned suggest-a-vote CTA + status pills + sections.
+- Switching home-feed filter (e.g. Announcements) does NOT show a Suggest-a-vote button anywhere on the page.
+- `npm run build` clean both roots.
+
+### Future work
+
+- The legacy primary-link styles in `Nav.css` (`.civic-nav-links`, `.civic-nav-link`) still exist but only render `About` now. Could simplify to a single inline About link if we never plan to add another top-level link, but keeping the list makes future additions trivial.
+- Consider unifying `FeedFilter` and `votes-filter` styling into one shared pill component (currently there's CSS duplication between `FeedFilter.css` and the `.votes-filter*` rules in `App.css`).
+
+---
+
+## Slice 12 — Make votes prominent + "Suggest a vote" — 2026-04-27
+
+**Status:** Shipped end-to-end. Votes are now the most prominent thing on the Hub — a sticky nav link with an active-vote count badge (visible even on mobile), a "+ Suggest a vote" button paired with the home feed's filter pills, a pinned suggest-a-vote CTA card at the top of the Votes page, and pill-based status filtering (All / Active / Proposed / Finalized) on the Votes page that matches the home-feed pill pattern.
+
+The "issue" → "vote" terminology is now consistent across the UI: "Propose an issue" became "Suggest a vote" everywhere it appeared, with body copy that gently explains the proposal-needs-citizen-support flow.
+
+### Decisions worth flagging
+
+- **"Suggest a vote", not "Propose a vote".** The user pushed back on my naming concern (a citizen submits a `civic.proposal` which only *becomes* a `civic.vote` after enough endorsements — strictly they're proposing a topic, not a vote). The compromise: "Suggest" is softer than "Propose," doesn't promise a vote will happen, and keeps the word "vote" in the user's eyeline so the cognitive load stays low. The body copy on the Propose page explains the citizen-support gate explicitly.
+- **Promoted-link pattern in the nav.** Rather than a separate "promoted button" element, the existing `PRIMARY_LINKS` array gained an optional `promoted: true` flag. Render still uses one `<ul>`, but a CSS rule (`.civic-nav-link-item-promoted { display: list-item }` on mobile) keeps the promoted link visible while siblings collapse into the hamburger drawer. Easier to extend later (e.g., promote two items) without restructuring.
+- **Active-vote badge fetches via `listProcesses()`.** No new endpoint. Component-local fetch on mount, filter to `civic.vote` + `status === "active"`, count. At MVP scale (a handful of processes) the cost is negligible; if/when this becomes hot, a dedicated `/process/counts` endpoint is a one-line follow-up. Failure is non-fatal — badge stays hidden if the fetch errors.
+- **Home-feed filter pills + Suggest-a-vote button share one row.** A new `.home-action-row` wraps `<FeedFilter>` and the CTA `<Link>`. On wide screens they sit side-by-side; on narrow screens (<= 600px) the row stacks (pills first, button full-width below). The CTA reuses the same primary-button color (`--pill-vote-fg` / brand navy) as the Votes-page CTA so they read as the same action.
+- **Votes-page filter is its own thing, not the Slice 10 `<FeedFilter>` reused.** The home filter is a *visual* discriminator (event-type predicate). The Votes-page filter is a *data* discriminator (active vs proposed vs finalized status). Different mental model, different state shape — making one component cover both would be lossy. The styling is duplicated (~30 lines of CSS) but kept consistent visually so users perceive them as the same pattern.
+- **Pinned CTA card uses the vote-pill color palette.** Light-blue background (`--pill-vote-bg`), brand-navy border + heading + button (`--pill-vote-fg`). Reads as "vote-related action" without competing with the brand chrome.
+- **Promoted-link active state suppresses the underline on mobile.** The desktop primary nav uses an underline-style active state (`border-bottom: 2px solid`). On mobile, where Votes sits next to the wordmark and hamburger, the underline visually clashes with the surrounding chrome — so the mobile rule sets the active border-bottom to transparent. The link is still aria-current="page"; only the visual underline goes away.
+
+### Files added / changed
+
+UI only (no backend work):
+- `civic-hub/ui/src/components/Nav.tsx` — `PRIMARY_LINKS` gains `promoted` flag, badge fetch + render.
+- `civic-hub/ui/src/components/Nav.css` — `.civic-nav-badge` styles, mobile rule that shows promoted items only.
+- `civic-hub/ui/src/pages/Home.tsx` — wraps `<FeedFilter>` + `+ Suggest a vote` `<Link>` in `.home-action-row`.
+- `civic-hub/ui/src/components/FeedFilter.css` — `.home-action-row`, `.home-suggest-vote-button`, mobile-stack rule.
+- `civic-hub/ui/src/pages/Votes.tsx` — full rewrite: pinned CTA card, pill filter (URL-bound `?status=`), section visibility derived from filter, "Propose an Issue" → "Suggest a vote" copy.
+- `civic-hub/ui/src/pages/Propose.tsx` — title, description, submit-button copy updated.
+- `civic-hub/ui/src/App.css` — `.suggest-vote-cta*` and `.votes-filter*` styles.
+
+### Verified manually (in dev)
+
+- Mobile (375 wide): nav shows hamburger | wordmark | "Votes 1" badge | Sign in. Feed and About fall into hamburger drawer.
+- Mobile home: filter pills row + full-width "+ Suggest a vote" button below.
+- Mobile Votes page: CTA card at top with full-width "+ Suggest a vote" button, then pill filter row, then sections.
+- Desktop (1280 wide): nav shows wordmark | Feed | Votes (with badge, underlined when active) | About | search | Sign in. Layout same as before.
+- Desktop home: filter pills + button on the same row.
+- Desktop Votes page: CTA card sized to content with the button on its own line, filter pill row, sections.
+- Filter pill click on Votes page updates URL to `?status=<key>`, shows only the matching section.
+- Propose page reads "Suggest a vote" with the citizen-support explainer.
+- `npm run build` clean both roots.
+
+### Future work / not in this slice
+
+- Dedicated lightweight count endpoint if `listProcesses()` becomes a hot-path cost.
+- Live-updating badge (currently fetched once on Nav mount; doesn't update if a vote is created/closed in the same session).
+- Empty-state polish on the Votes page when a filter matches nothing (currently the section just shows its existing empty state copy).
+- Slight redundancy with the home page: the home feed filter pill "Votes" still surfaces vote events chronologically, while the Votes page surfaces vote *processes* by status. Both are useful but the overlap is real — track whether real users notice / complain.
+
+---
+
+## Slice 11 — Legal docs + minimal moderation — 2026-04-27
+
+**Status:** Shipped end-to-end. Three legal documents (Privacy Policy, Terms of Service, Code of Conduct) ship as React-Router pages rendered from bundled markdown via `react-markdown`. Footer carries the three links plus an operator tagline. Sign-up gates on a legal-acceptance checkbox; existing users hit a blocking re-acceptance modal when their stored version is null or stale. Admins can hide community-input comments and remove announcements; both actions emit restricted-visibility audit events and render tombstones to non-admins. A new `/admin/moderation` log lists every moderation action newest-first.
+
+This slice is the last pre-launch gate. The remaining blockers are operator-side: substituting placeholder strings in the legal markdown and getting a lawyer review.
+
+### Decisions worth flagging
+
+- **Render markdown, don't author copy.** The three legal markdown files came in pre-drafted (with a "Draft starter content — review before launch" callout at the top of each). Operator handles placeholder substitution and lawyer review; the build pipeline just bundles them. Vite `?raw` imports give us no network fetch, no CMS, and the docs ship inside the JS bundle — bumping a doc is a code change visible in git history.
+- **`{OPERATOR_NAME}`, `{CONTACT_EMAIL}`, `{OPERATOR_MAILING_ADDRESS}` are intentional literals.** They render verbatim on the public legal pages and in the footer until the operator does the find-and-replace. See "Operator setup" below for the exact substitution checklist.
+- **Internal cross-links route through React Router.** A custom `<a>` renderer on `react-markdown` swaps anchors whose href starts with `/` for React Router `<Link>`. External URLs and `mailto:` keep the default. Keeps the three docs feeling like one site instead of three full reloads.
+- **Fonts: Manrope for headings, Inter for body.** The slice spec mentioned Fraunces but the codebase actually uses Manrope (`--font-heading`). I used the existing tokens — defer to the deployed truth. Width capped at 70ch for readability.
+- **`CURRENT_LEGAL_VERSION = "1.0"` is hardcoded in `civic-hub/ui/src/config/legal.ts`.** Not an env var. Bumping it requires a code change so the trigger for forcing all users back through re-acceptance is traceable in git. Bump in the same commit as the markdown edits to keep version + content aligned.
+- **Acceptance is a single bundle.** The three docs are versioned together — accepting "1.0" accepts all three. Splitting them into three separate version cursors gives the user three modals on the next bump, which is worse UX for a marginal modeling improvement. Revisit if/when individual doc revs become more independent.
+- **Acceptance is recorded after `verifyCode()`.** The acceptance checkbox lives on the email step (it gates `Continue`), but the actual `/auth/accept-tos` POST happens immediately after the OTP verifies — that's the first moment we have a session token. If the call fails, the session still proceeds; the re-acceptance modal will catch the user on next page load. Failure is logged, not surfaced to the user, so a transient 500 doesn't break sign-up.
+- **Re-acceptance modal is blocking.** Mounted at the app root; renders whenever a signed-in user's `tos_version_accepted` is null or `!= CURRENT_LEGAL_VERSION`. No close affordance. Two actions: "Review and accept" and "Decline and sign out".
+- **Moderation events use `civic.process.updated` with `meta.visibility = "restricted"`.** No new event types. The `data.moderation` object discriminates: `{ action, target, reason, hidden_by | restored_by | removed_by }`. Restricted events are filtered out of the public `/events` feed (admin-only via Bearer token), out of the digest, and stay invisible to search. The Civic Event Spec §7 visibility model already supported this — the slice just exercises it.
+- **Comment hide is reversible — single most-recent-action shape.** `community_inputs` gains four columns (`hidden_at`, `hidden_by`, `hidden_reason`, `restored_at`). The `hidden` boolean is derived (`hidden_at IS NOT NULL AND (restored_at IS NULL OR restored_at < hidden_at)`). The full audit trail lives in the events table; the columns just carry current state for the public read filter. Re-hiding overwrites these columns.
+- **Announcement removal lives in `state.moderation` JSON.** No new column. The Slice 10.5 search migration already had a moderation predicate (`state -> 'moderation' ->> 'removed'`) anticipating this, so search excludes removed announcements automatically. The public `/announcement/:id` endpoint redacts body / image / links / link previews when `removed === true`; admins still receive the original via the same endpoint with their token attached. The list endpoint and the feed both exclude removed announcements entirely (rationale: an announcement is an affirmative publication; once retracted, we shouldn't keep broadcasting its presence).
+- **Comments stay in context with a tombstone; announcements drop out of the feed.** Different rationale per surface: a vote thread loses meaning if you simply delete a comment, so the tombstone preserves context ("a comment was here, the moderator hid it for a CoC violation"). An announcement on the feed is a publication act — once revoked, leaving it on the feed re-broadcasts the existence of the post we're trying to retract.
+- **Tombstones link to `/code-of-conduct`.** This is the canonical reason — even when the moderator's internal reason is "Spam" or "Doxxing", the public tombstone says "violating the Code of Conduct" and links there. The internal reason is admin-audit only.
+- **Caller identification on read endpoints uses a best-effort token check.** `/events`, `/process/:id/input`, and `/announcement/:id` decode the Bearer token (if any) and check `isAdminEmail()`. Any failure short of an admin-positive identification falls back to the public view — fail-closed. Avoids gating these reads behind `requireAuth` (which would break unauthenticated browsing).
+- **Reason chips are admin-friendly defaults, not an enum.** "Personal attack", "Harassment", "Doxxing", "Spam", "Other". The textarea remains the source of truth — chips just click-to-fill. Stored as the verbatim string in both the row and the event.
+- **Moderation log is read-only and unfiltered for MVP.** Newest-first scrolling list. Adding filters / search / pagination is additive when volume warrants it.
+- **Five-tab AdminTabs.** Order is now Proposals · Vote results · Moderation · Meeting summaries · Settings (per the slice IA spec).
+
+### Files added / changed
+
+Backend:
+- `civic-hub/supabase/migrations/20260427230000_legal_acceptance_and_moderation.sql` — adds `users.tos_version_accepted`, `users.tos_accepted_at`, and four moderation columns (`hidden_at`, `hidden_by`, `hidden_reason`, `restored_at`) on `community_inputs`. Documents that announcement moderation lives in JSONB `state.moderation` — no schema change needed.
+- `civic-hub/src/modules/civic.auth/{models.ts, index.ts}` — `User` interface gains the two TOS columns; `acceptLegalTerms(userId, version)` writes them.
+- `civic-hub/src/controllers/authController.ts` — `handleAcceptTos` for `POST /auth/accept-tos`. Token-gated.
+- `civic-hub/src/routes/authRoutes.ts` — route registration.
+- `civic-hub/src/modules/civic.input/{models.ts, index.ts}` — `CommentModeration` shape; `hideComment`, `restoreComment`, `getInputById`. Reasons capped at 500 chars. EmitEventFn extended with optional `visibility`.
+- `civic-hub/src/modules/civic.announcement/{models.ts, service.ts, index.ts}` — `AnnouncementModeration` on state; `removeAnnouncement`, `restoreAnnouncement`. New `getAdminReadModel` (full content) vs `getPublicReadModel` (redacted when removed). EmitEventFn extended with optional `visibility`.
+- `civic-hub/src/controllers/moderationController.ts` (new) — five admin endpoints: hide / restore comment, remove / restore announcement, GET log.
+- `civic-hub/src/routes/adminRoutes.ts` — mounts the five moderation routes under `/admin/moderation/*` (all gated by `requireAdmin`).
+- `civic-hub/src/controllers/eventController.ts` — filters restricted events for non-admin callers.
+- `civic-hub/src/controllers/inputController.ts` — public list redacts hidden comment bodies; admin sees full content.
+- `civic-hub/src/controllers/announcementController.ts` — admin-aware read; public list excludes removed announcements.
+- `civic-hub/src/controllers/digestController.ts` — drops restricted events and removed-announcement events from the digest window.
+
+Frontend:
+- `civic-hub/ui/src/content/legal/{privacy.md, terms.md, code-of-conduct.md}` — pre-drafted content (operator-supplied, render verbatim).
+- `civic-hub/ui/src/config/legal.ts` — `CURRENT_LEGAL_VERSION = "1.0"`, `CURRENT_LEGAL_LAST_UPDATED = "2026-04-24"`.
+- `civic-hub/ui/src/components/LegalPage.{tsx, css}` — shared markdown renderer with custom anchor mapping.
+- `civic-hub/ui/src/pages/{Privacy, Terms, CodeOfConduct}.tsx` — three-line page wrappers that import the markdown via `?raw`.
+- `civic-hub/ui/src/components/ReAcceptModal.tsx` — blocking modal mounted at the app root.
+- `civic-hub/ui/src/components/AuthModal.tsx` — acceptance checkbox on the email step; calls `/auth/accept-tos` after verify.
+- `civic-hub/ui/src/services/auth.ts` — `acceptTos()`; `AuthUser` gains the two TOS fields.
+- `civic-hub/ui/src/services/api.ts` — moderation API helpers (`adminHideComment`, `adminRestoreComment`, `adminRemoveAnnouncement`, `adminRestoreAnnouncement`, `adminGetModerationLog`); `CommunityInput.moderation`, `Announcement.moderation`.
+- `civic-hub/ui/src/components/CommunityInputPanel.tsx` — tombstone for hidden comments + admin "Hide for Code of Conduct violation" inline button + reason modal with chips. Restore button on existing tombstones.
+- `civic-hub/ui/src/pages/Announcement.tsx` — admin moderation toolbar (Remove / Restore), tombstone replaces body/image/preview/links when removed.
+- `civic-hub/ui/src/components/Feed.tsx` — drops posts whose underlying announcement has been removed.
+- `civic-hub/ui/src/pages/AdminModeration.tsx` (new) — read-only newest-first table.
+- `civic-hub/ui/src/components/AdminTabs.tsx` — Moderation tab inserted between Vote results and Meeting summaries.
+- `civic-hub/ui/src/App.tsx` — three legal routes, `/admin/moderation`, `<ReAcceptModal>` mount, two-row footer with Privacy / Terms / Code of Conduct links and operator tagline.
+- `civic-hub/ui/src/App.css` — footer rework, legal-acceptance checkbox, tombstone, moderation chips/modal/toolbar/table styles.
+- `civic-hub/ui/package.json` — `react-markdown` and `remark-gfm` added.
+
+### Restricted events: how they're filtered out of the public feed
+
+Every moderation action emits a `civic.process.updated` event whose `meta.visibility` is set to `"restricted"`. Three filters cooperate to keep them invisible to non-admins:
+
+1. **`GET /events`** — `eventController.handleGetEvents` decodes the Bearer token (if any), checks `isAdminEmail`, and filters `e.meta?.visibility === "restricted"` for everyone else.
+2. **The daily digest** — `digestController` filters restricted events out of the cron window before fanning out to users; it also tracks `removedAnnouncementIds` and drops any event whose `process_id` belongs to one (so the publish event doesn't re-broadcast a since-removed announcement).
+3. **Search** — Slice 10.5's `search_processes` RPC already has the `state -> 'moderation' ->> 'removed'` predicate.
+
+To verify manually: hit `GET /events` with no token. The response should never include a `meta.visibility = "restricted"` event. Hit it again with an admin Bearer token — restricted moderation events should appear.
+
+### Verified manually (in dev)
+
+- `/privacy`, `/terms`, `/code-of-conduct` render with proper typography. Cross-document links resolve via React Router (no full reload).
+- Footer shows Privacy · Terms · Code of Conduct on every page including the legal pages themselves; the operator tagline shows `Operated by {OPERATOR_NAME}` literally (placeholder is intentional).
+- AuthModal email step shows the legal-acceptance checkbox below the email input. The three doc links open in new tabs (`target="_blank"`, `rel="noopener noreferrer"`). `Continue` is disabled until both email is non-empty AND the checkbox is checked.
+- AdminTabs renders five tabs in the right order: Proposals · Vote results · **Moderation** · Meeting summaries · Settings.
+- `/admin/moderation` shows the empty state ("No moderation actions yet…") on a clean DB.
+- `GET /events` with no token → 200, zero restricted events in the response.
+- `POST /auth/accept-tos` with no token → 401.
+- `GET /admin/moderation/log` with no token → 401.
+- `npm run build` clean both roots.
+
+### Incomplete / future work
+
+- **Resident-initiated content reports / flagging** — admins moderate by encountering content. Adding a "Report" button and a reports queue is its own slice.
+- **Moderation queue / dashboard / metrics UI** — out of scope. The log page is read-only.
+- **Appeal workflow** — the Code of Conduct says "email {CONTACT_EMAIL} and a human will review." No structured appeal pipeline.
+- **Account bans (temporary or permanent)** — not implemented; only individual content removal.
+- **Public moderation transparency report** — the Code says we *can* publish aggregate stats on request. The mechanism is a future concern.
+- **Per-document version tracking** — the three docs share a single version cursor. Splitting (so a Privacy bump doesn't force re-acceptance of Terms / CoC) is a future refinement.
+- **i18n / translations** of legal content — not in scope.
+- **PDF export** of legal docs — residents can use the browser's print-to-PDF.
+- **CSP, cookie consent banner, GDPR-specific tooling** — the privacy policy covers rights; if EU-bound compliance becomes necessary, that's its own slice.
+
+### Operator walkthrough — final pre-launch checklist
+
+1. **Apply the migration in Supabase.** Open SQL Editor → New query → paste `civic-hub/supabase/migrations/20260427230000_legal_acceptance_and_moderation.sql` → run. Verify with:
+   ```sql
+   SELECT column_name FROM information_schema.columns
+     WHERE table_name = 'users'
+       AND column_name IN ('tos_version_accepted', 'tos_accepted_at');
+   SELECT column_name FROM information_schema.columns
+     WHERE table_name = 'community_inputs'
+       AND column_name IN ('hidden_at', 'hidden_by', 'hidden_reason', 'restored_at');
+   ```
+   Each should return its expected rows.
+
+2. **Fill in the legal placeholders.** This is a *blocker* — three placeholder strings appear ~10–15 times across the three files, but you only need to decide three actual values. Open each file in `civic-hub/ui/src/content/legal/` and find-and-replace:
+
+   | Placeholder | Example value |
+   | --- | --- |
+   | `{OPERATOR_NAME}` | "Floyd Civic Hub LLC" or your own name |
+   | `{CONTACT_EMAIL}` | "contact@floyd.civic.social" |
+   | `{OPERATOR_MAILING_ADDRESS}` | Your operating mailing address |
+
+   Files to edit:
+   - `civic-hub/ui/src/content/legal/privacy.md`
+   - `civic-hub/ui/src/content/legal/terms.md`
+   - `civic-hub/ui/src/content/legal/code-of-conduct.md`
+
+   Also update the footer in `civic-hub/ui/src/App.tsx` — the "Operated by {OPERATOR_NAME}" string is a literal too. Search/replace in App.tsx the same way.
+
+   Commit and redeploy.
+
+3. **Have the legal docs reviewed by a lawyer.** Pre-launch *blocker*, not a suggestion. Each doc opens with a "Draft starter content — review before launch" callout that should be removed only after that review is done. Find a lawyer familiar with Virginia and US privacy / consumer law. Update the docs based on their feedback. Bump `CURRENT_LEGAL_VERSION` in `civic-hub/ui/src/config/legal.ts` if any change is material; bump the `*Last updated*` and `*Version*` lines in each markdown file too.
+
+4. **Decide who the moderation admin is.** If it's just you, the Code of Conduct's promise that "if the admin is the subject of the complaint, we'll escalate to an independent reviewer" needs a real person you can route those complaints to. Identify one before launch.
+
+5. **Read the Code of Conduct end-to-end yourself.** What's shipped is the policy you're committing to. If anything in it doesn't match your intent, edit it before public sign-ups open.
+
+### Legal version bump protocol (for future revisions)
+
+When any of the three legal documents needs a substantive update:
+
+1. Edit the markdown file(s) under `civic-hub/ui/src/content/legal/`.
+2. Update the `*Last updated: YYYY-MM-DD*` and `*Version: X.Y*` lines at the top of the changed file(s).
+3. Bump `CURRENT_LEGAL_VERSION` in `civic-hub/ui/src/config/legal.ts` (and `CURRENT_LEGAL_LAST_UPDATED`).
+4. Commit all of that together. Every existing user will hit the re-acceptance modal on their next sign-in until they accept the new version.
+5. Optional but recommended: keep a `CHANGES.md` in `civic-hub/ui/src/content/legal/` summarizing what changed, why, and when.
+
+### What stayed the same on purpose
+
+- All Civic Event Spec compliance — moderation reuses `civic.process.updated` and the existing visibility model. No new event types.
+- All five required Civic Hub endpoints unchanged.
+- The Slice 8.5 vote-results rename, Slice 9 image / link-preview structure, and Slice 10 / 10.5 feed surfaces — moderation is layered on top, not into.
+- Vote-results, meeting-summary, and proposal moderation — none of those are resident-authored, so moderation doesn't apply.
+- Comments inside the vote-results page (admin-curated) — those are not `civic.input` rows; this slice's hide tooling does not apply.
+
+---
+
+## Slice 10.5 — Full-text search across the Civic Hub — 2026-04-27
+
+**Status:** Shipped end-to-end. A search icon now lives in the nav (between primary links and the avatar on desktop, top of the mobile drawer). Submitting takes the resident to a `/search?q=...` page with relevance ranking, multi-select post-type filtering, date-range buckets, sort toggle, and pagination — all bookmarkable via URL params. Backend uses Postgres FTS via two RPC functions defined in the new migration; the `civic.search` service module follows the same pluggability rules as `civic.digest` (pure functions + injected callbacks).
+
+### Decisions worth flagging
+
+- **Postgres FTS, not Elasticsearch / Algolia.** A `tsvector` column + GIN index + trigger + two RPC functions handle everything for the foreseeable hub scale. Free, integrated, sufficient. Documented in the migration.
+- **RPC, not the JS query builder.** `supabase-js`'s `.textSearch()` operator can't express `ts_rank`-ordered results, so pagination on relevance would break. The migration defines `search_processes(p_q, p_types, p_from, p_to, p_sort, p_limit, p_offset)` and `search_processes_count(...)`; the controller calls them via `.rpc(...)`. SQL stays reviewable in the migration file; the controller is a thin orchestrator.
+- **`search_doc` is built from `title || description || state::text`.** Stringifying state captures announcement bodies, meeting block titles, vote_context.description, etc., without per-type extraction logic. Trade-off documented inline: matches can hit JSON keys (e.g. "title") in addition to values, producing occasional false positives. Acceptable for MVP — per-type extraction is a refactor we'll do if the signal/noise drops below useful.
+- **Trigger fires on UPDATE OF (title, description, state) only.** Crucially excludes `search_doc` itself, so the migration's backfill UPDATE doesn't recurse and ordinary writes that don't touch indexable columns don't pay tokenization cost.
+- **Moderation predicate baked in from day one.** Search excludes any process where `state -> 'moderation' ->> 'removed' = 'true'`. This is a no-op until Slice 11 introduces the field, then quietly does the right thing.
+- **Status filter excludes drafts and pending records.** Only `active`, `closed`, `finalized` are searchable — no leak of vote-results records that are still in admin review, no leak of unpublished votes.
+- **Empty `q` short-circuits server-side.** The controller / module returns `{ hits: [], total: 0, took_ms: 0 }` without a DB hit. The `/search` page's no-query state uses this.
+- **URL is the single source of truth on the page.** Every filter / sort / pagination change rewrites params via React Router; the page reads URL state on mount and on every URL change. Bookmarkable, shareable, back/forward-friendly.
+- **Multi-select type filter is a fresh component, not Slice 10's `<FeedFilter>` reused.** Slice 10's filter is single-select event-predicate-based; the search page wants multi-value (`?type=vote&type=announcement`) with different selection semantics. The pill *styles* are shared via a `FeedFilter.css` import in `Search.tsx`.
+- **`/` keyboard shortcut focuses the search bar.** Skips when an input/textarea/contenteditable already has focus — standard pattern, cheap, useful.
+- **Comment search is future work.** Comments live in `civic.input` rows; including them needs a second indexed table, a separate result type in the UI, and careful moderation. Skip for MVP. Documented in code comments.
+- **Hub boots cleanly without `civic.search` mounted.** If `searchRoutes` isn't in `app.ts`, every other code path is unchanged — the search bar's submit just produces a 404 on `/api/search`, and the page surfaces that as an error.
+
+### Files added / changed
+
+Backend:
+- `civic-hub/supabase/migrations/20260427200000_add_search_doc.sql` — `search_doc` column, trigger, GIN index, backfill, two RPC functions.
+- `civic-hub/src/modules/civic.search/{models,service,index}.ts` — pluggable service module.
+- `civic-hub/src/services/searchExecutor.ts` — concrete RPC adapters.
+- `civic-hub/src/controllers/searchController.ts` — `GET /search` handler.
+- `civic-hub/src/routes/searchRoutes.ts` — wires the controller; mounted in `app.ts` at `/search`.
+- `civic-hub/src/app.ts` — route mount + entry in the root `/` JSON.
+
+Frontend:
+- `civic-hub/ui/src/services/api.ts` — `search()` wrapper + types.
+- `civic-hub/ui/src/components/SearchBar.tsx` + `.css` — reusable search affordance.
+- `civic-hub/ui/src/components/Nav.tsx` + `Nav.css` — `<SearchBar>` mounted.
+- `civic-hub/ui/src/pages/Search.tsx` + `Search.css` — URL-bound results page.
+- `civic-hub/ui/src/App.tsx` — `/search` route registered.
+
+### Incomplete / future work
+
+- **Comment search** (across `civic.input` rows). Out of scope for MVP.
+- **Auto-suggest / typeahead.** Defer.
+- **`ts_headline` highlighted snippets** in result cards. Skippable for v1.
+- **Tag-based filtering / saved searches / search analytics** — separate slices.
+- **Cross-hub federated search.** Future federation concern.
+
+---
+
+## Slice 10 — Feed polish: filter pills, engagement counts, popup rewrite — 2026-04-27
+
+**Status:** Shipped UI-only — no backend changes, no migrations, no module edits. Three small features land on top of the post-Slice-9 feed:
+
+1. **Filter pills above the feed.** Five pills (All / Votes / Announcements / Vote results / Meeting summaries) using the Slice 8 color tokens.
+2. **Engagement-count line on each card.** Sits between summary and timestamp.
+3. **IntroPopup rewrite.** Now a native `<dialog>` element with collapsed copy and two buttons.
+
+### Files added / changed
+
+- `civic-hub/ui/src/components/FeedFilter.tsx` + `.css` — new component.
+- `civic-hub/ui/src/components/Feed.tsx` — engagement count fields + helpers.
+- `civic-hub/ui/src/components/Feed.css` — `.feed-post-engagement` typography rule.
+- `civic-hub/ui/src/components/FeedPost.tsx` — engagement field + restructured summaries.
+- `civic-hub/ui/src/pages/Home.tsx` — composes `<FeedFilter>` + `<Feed>`.
+- `civic-hub/ui/src/components/IntroPopup.tsx` — rewritten on native `<dialog>`.
+- `civic-hub/ui/src/components/IntroPopup.css` — fresh styles.
+- `civic-hub/ui/src/pages/About.tsx` + `civic-hub/ui/src/App.css` — "Show me the welcome again" affordance.
+
+---
+
+## Slice 9 — Rich post content: images, link previews, colored card borders — 2026-04-27
+
+**Status:** Shipped end-to-end. Announcements and vote-results records can carry an admin-uploaded featured image (with required alt text), link preview cards for embedded URLs, and feed cards lead with the attached image when present. Email digest gets a small thumbnail when an image is present.
+
+**Design pivot mid-slice:** dropped OG-image fallback and CSS-generated covers in favor of a thin 4px colored top border per kind. Feed page height roughly halved while keeping type signals via pill + border.
+
+### Key files added
+
+Backend:
+- `civic-hub/supabase/migrations/20260427100000_post_images_and_link_previews.sql`
+- `civic-hub/src/modules/civic.link_preview/{models,scraper,service,index}.ts`
+- `civic-hub/src/controllers/uploadController.ts`, `linkPreviewController.ts`
+- `civic-hub/src/services/postImageStorage.ts`, `linkPreviewCache.ts`, `linkPreviewFetcher.ts`
+- `civic-hub/src/routes/uploadRoutes.ts`, `linkPreviewRoutes.ts`
+
+Frontend:
+- `civic-hub/ui/src/components/PostImagePicker.tsx` + `.css`
+- `civic-hub/ui/src/components/PostFeaturedImage.tsx` + `.css`
+- `civic-hub/ui/src/components/LinkPreviewCard.tsx` + `.css`
+
+---
+
+## Heading typeface swap: Fraunces → Manrope — 2026-04-27
+
+**Status:** Operator decision. Fraunces replaced with Manrope — geometric sans, no serifs. Body face (Inter) unchanged.
+
+---
+
+## Slice 8.5 — Rename Civic Brief → Vote Results — 2026-04-27
+
+**Status:** Cleanup slice. The `civic.brief` module renamed end-to-end to `civic.vote_results` (folder, type identifier, TypeScript symbols, controllers, routes, public + admin URLs, UI pages, API service wrappers, CSS pill tokens). Two visible behavior changes alongside the rename: (1) closed votes now produce exactly **one** feed post (the previous pair of "Civic Brief delivered" + "Vote results published" is gone), and (2) the public results page captures a snapshot of the original vote's description, options, and voting window so a viewer arriving cold can see what was being chosen between. The admin review-and-approve workflow is unchanged in behavior — only the name and presentation changed.
+
+### Summary of name moves
+
+| Old | New |
+|---|---|
+| `civic-hub/src/modules/civic.brief/` | `civic-hub/src/modules/civic.vote_results/` |
+| `src/processes/briefProcess.ts` | `src/processes/voteResultsProcess.ts` |
+| `src/controllers/briefController.ts` | `src/controllers/voteResultsController.ts` |
+| `src/controllers/adminBriefController.ts` | `src/controllers/adminVoteResultsController.ts` |
+| `src/routes/briefRoutes.ts` | `src/routes/voteResultsRoutes.ts` |
+| `ui/src/pages/Brief.{tsx,css}` | `ui/src/pages/VoteResults.{tsx,css}` |
+| `ui/src/pages/AdminBriefs.{tsx,css}` | `ui/src/pages/AdminVoteResults.{tsx,css}` |
+| `BriefProcessState`, `BriefContent`, `BriefSummary`, `BriefDetail`, `PublicBrief`, `BriefContentPatch`, `BriefPublicationStatus`, `BriefPositionBreakdown`, `CreateBriefFromVoteInput` | `VoteResults*` counterparts |
+| `createBriefState`, `editBrief`, `approveBrief`, `formatBriefEmail`, `emitBrief*` | `createVoteResultsState`, `editVoteResults`, `approveVoteResults`, `formatVoteResultsEmail`, `emitVoteResults*` |
+| `getBriefRecipients`, `setBriefRecipients` | `getVoteResultsRecipients`, `setVoteResultsRecipients` |
+| `adminListBriefs`, `adminGetBrief`, `adminPatchBrief`, `adminApproveBrief`, `getPublicBrief` | `adminListVoteResults`, `adminGetVoteResults`, `adminPatchVoteResults`, `adminApproveVoteResults`, `getPublicVoteResults` |
+| Public route `/brief/:id` | `/vote-results/:id` (legacy 301 + SPA `<Navigate>`) |
+| Admin routes `/admin/briefs/:id` | `/admin/vote-results/:id` (legacy 301 + SPA `<Navigate>`) |
+| AdminTabs label "Civic Briefs" | "Vote results" |
+| Feed pill class `.feed-pill--brief` | `.feed-pill--vote-results` |
+| Theme tokens `--pill-brief-{bg,fg}` | `--pill-vote-results-{bg,fg}` (same hex, color family preserved) |
+| Digest kind `brief_published` | `vote_results_published` |
+| Digest kind `vote_result_published` | **removed** (vote `result_published` is no longer digest-renderable) |
+| Event payload `data.brief_id` | `data.results_id` (both fields accepted indefinitely via shim) |
+
+### What stayed the same on purpose
+
+- **Env vars**: `BOARD_RECIPIENT_EMAIL`, `CIVIC_ADMIN_EMAILS`, `CRON_SECRET`, `RESEND_API_KEY`, `SMTP_*` — all unchanged. Existing Vercel and Supabase configurations don't break.
+- **`hub_settings` DB key**: still `brief_recipient_emails`. The JS function name moved (`getBriefRecipients` → `getVoteResultsRecipients`) but the storage key didn't, so a `setBriefRecipients()` call from a previous session writes to the same row a `getVoteResultsRecipients()` call now reads from. Comment in `hubSettings.ts::SETTING_KEYS` documents this on purpose.
+- **API field name**: `brief_recipient_emails` is still what `/admin/settings` returns and accepts. The Settings UI consumes that field and is operator-facing config — renaming the wire format would be a bigger coordination job.
+- **Approval workflow**: human-in-the-loop admin review → email Board → publish to feed. The seven-step orchestration in `service.ts::approveVoteResults` is the same shape it was in `approveBrief`.
+- **Pluggability**: a hub that doesn't register `civic.vote_results` (formerly `civic.brief`) in the registry still works — votes close, no results record is created, no admin review. Same behavior gate as before.
+- **Civic Event Spec**: untouched. `civic.process.result_published` is still the event type. Only the discriminator field name in the payload changed.
+
+### Backwards-compat shims (transitional, can be removed later)
+
+Slice 8.5 events emitted on/after the rename carry `data.results_id`. Events emitted before still carry `data.brief_id`. Events are append-only by spec — we never rewrite them. Both fields are accepted indefinitely in:
+
+- `civic-hub/ui/src/components/Feed.tsx::kindFromEvent`
+- `civic-hub/ui/src/components/FeedPost.tsx::eventToPost` (announcement / meeting / vote-results discrimination)
+- `civic-hub/src/modules/civic.digest/filter.ts::isDigestRenderable` + `classifyItemKind`
+
+Process rows where `processes.type` hasn't yet been migrated still load via a transitional `type === "civic.brief"` alias in:
+
+- `src/controllers/processController.ts::handleListProcesses` (public-list filter)
+- `src/controllers/voteResultsController.ts::handleGetVoteResults` (public read)
+- `src/controllers/adminVoteResultsController.ts::handleAdminListVoteResults` + `handleAdminGetVoteResults`
+- `ui/src/pages/Votes.tsx::voteResultsByVote`
+- `ui/src/components/FeedPost.tsx::FeedProcessKind` union
+- `ui/src/components/FeedPost.tsx::eventToPost` (`cachedType === "civic.brief"`)
+
+These transitional aliases keep the UI sane during the brief window between deploying the new code and the operator running the SQL migration. **Once the operator has applied the migration and a sufficient grace period for legacy events has passed (~3-6 months), the `civic.brief` branches can be deleted.** The legacy SPA route `/brief/:id` (a `<Navigate>` to `/vote-results/:id`) should stay indefinitely — it costs nothing and keeps stored event `action_url`s clickable forever.
+
+### URL redirects — which path actually fires
+
+Vercel's `vercel.json` rewrites `/(.*)` → `/index.html` for everything that isn't `/api/*`. So in production a browser navigating to a stored event `action_url` of the form `https://floyd.civic.social/brief/proc_abc123` lands on the SPA, not the Express backend. The operative redirect is therefore the React Router route in `ui/src/App.tsx`:
+
+```tsx
+<Route path="/brief/:id" element={<LegacyBriefRedirect />} />
+// LegacyBriefRedirect pulls :id from useParams and returns
+// <Navigate to={`/vote-results/${id}`} replace />
+```
+
+Verified live in this session: clicking a `/brief/:id` link in the feed (from a legacy event) takes the user to `/vote-results/:id` via the SPA without a full-page reload, and the page renders.
+
+The Express `app.get("/brief/:id", ...)` 301 redirect is also wired and verified (`curl -is http://localhost:3000/brief/proc_x` returns 301 with `Location: /vote-results/proc_x`). It only fires for direct API/curl clients — but it's cheap and worth keeping for completeness. Same applies to the legacy admin routes; both `/admin/briefs` and `/admin/briefs/:id` redirect via React Router to the new paths.
+
+### Vote-context snapshot
+
+`VoteResultsContent` gained an optional `vote_context: VoteContextSnapshot` field carrying the original vote's `description`, `options` (as `{option_id, option_label}` pairs), and the voting window's `starts_at` / `ends_at`. The snapshot is captured at vote-results creation time inside `voteProcess.ts::spawnVoteResultsFromClosedVote` from the live vote process — so editing the vote process later wouldn't change the snapshot retroactively (intentional).
+
+`vote_context` is **optional on the type and nullable on read** because vote-results records created before Slice 8.5 don't have the field. Both the public page (`VoteResults.tsx`) and the admin review form (`AdminVoteResults.tsx`) defend with a "Original vote context not available for this earlier record" notice rather than crashing. Verified live: legacy records render the fallback notice cleanly.
+
+The slice prompt's example shape used `vote_options: Array<{ id: string; label: string }>`. I used `{option_id, option_label}` instead to match the existing `VoteResultsPositionBreakdown` field names — same data, consistent naming inside the module. This is the only spec deviation.
+
+Vote options on `civic.vote` are stored as bare `string[]` (no separate label). The spawn site maps each option string into `{option_id: opt, option_label: opt}` — same convention `position_breakdown` already uses. When a future slice introduces real option labels distinct from option IDs, both the snapshot and the breakdown can pick them up uniformly.
+
+### Email to Board
+
+`formatVoteResultsEmail` updates:
+- Subject: `"<Hub> — Vote results: <title>"` (was `"<Hub> — Civic Brief: <title>"`).
+- Body heading: "Vote results" (was "Civic Brief").
+- New "About this vote" section in both HTML and plain-text bodies — inline `vote_context.description` + bullet list of `vote_options` so the Board sees the original question, not just the tally and comments.
+- Public link points to `/vote-results/:id`.
+
+### DB migration
+
+New file: `civic-hub/supabase/migrations/20260427000000_rename_civic_brief_to_vote_results.sql`.
+
+Two `UPDATE` statements wrapped in a transaction:
+1. `UPDATE processes SET type = 'civic.vote_results' WHERE type = 'civic.brief'`
+2. `UPDATE processes SET state = jsonb_set(state, '{type}', '"civic.vote_results"', false) WHERE state ->> 'type' = 'civic.brief'`
+
+**Operator-applied — Supabase migrations folder is not run automatically by the deploy.** Apply via Supabase → SQL Editor → New query → paste → Run. Verify with `SELECT type, COUNT(*) FROM processes GROUP BY type;` — expect zero `civic.brief` rows post-run.
+
+The migration is **safe to run before, after, or alongside the code deploy** because of the transitional `civic.brief` aliases in the controllers + UI. Best practice is still: run the migration first, redeploy second.
+
+### Verification done in this session
+
+`npm run build` clean in both `civic-hub/` and `civic-hub/ui/`. UI bundle: 340.88 kB raw / 97.53 kB gzipped (up ~4 kB from Slice 8 — the new VoteResults page + admin vote-context block + legacy redirect components).
+
+Live verification against the dev backend (port 3000, pointed at the Floyd Supabase) + dev UI (port 5173):
+
+- **Pre-migration data** (the seeded DB still has rows of type `civic.brief`):
+  - Feed renders **6 posts** (was 8 before this slice). The two pairs of "Civic Brief delivered" + "Vote results published" collapsed into single "Vote results" posts, exactly the duplicate elimination the slice was designed for.
+  - All five pill kinds in the wild: VOTE OPEN (light blue), VOTE RESULTS (teal — the keeper), ADMIN ANNOUNCEMENT (orange), MEETING SUMMARY (green). The previous "vote-results" blue pill is gone.
+  - Legacy `/brief/:id` action_urls in the feed → click → SPA `<Navigate>` lands on `/vote-results/:id` without a backend round-trip. Verified via `window.location.pathname`.
+  - Public `/vote-results/:id` page renders with: VOTE RESULTS eyebrow, Fraunces "Vote results: <title>" heading, teal delivery banner ("Delivered to the Board of Supervisors on April 22, 2026."), "About this vote" section with the legacy fallback notice (italic muted), Results with bar breakdown + "N residents voted", "What residents said" with comments. Provenance footer at bottom.
+  - Admin `/admin/vote-results` lists all 7 unmigrated records under the new tab label. Status filters work. Click-through opens the review form with the read-only "About this vote" block + community comments / admin notes textareas + "Approve and publish" button + the new confirmation copy.
+  - Backend Express redirect for `/brief/:id`: `curl -is http://localhost:3000/brief/proc_test` returns `HTTP/1.1 301 Moved Permanently` with `Location: /vote-results/proc_test`. Verified.
+- **No console errors** on any rendered surface.
+
+End-to-end vote-close → admin review → approve was NOT exercised this session (no fresh vote close was triggered against the live backend). The new spawn-site code path (`spawnVoteResultsFromClosedVote`) and the renamed `approveVoteResults` orchestration build clean and were grep-verified, but a true post-deploy smoke test is in the operator walkthrough.
+
+### Architectural notes — recorded so they outlive this slice
+
+- **The vote `result_published` event is preserved on the event log but excluded from Feed and digest.** Federated consumers + audit tools still see it; resident-facing surfaces don't, because the vote-results publication already covers it. This is the simplest way to honor "events are append-only" while delivering the "one post per closed vote" UX.
+- **Setting key vs function name divergence is intentional.** `hubSettings.SETTING_KEYS` says `VOTE_RESULTS_RECIPIENT_EMAILS: "brief_recipient_emails"` — the constant name is the new word, the underlying string remains the old word so the DB row keeps working. Documented at the constant definition.
+- **All transitional shims are clearly comment-marked** with the rationale and a "remove after migration applied" note. The shim list above is the full inventory.
+- **The legacy SPA redirect should never be removed**, even after the migration. It costs zero bytes once the redirect component is loaded and keeps the historical event log's `action_url`s clickable forever — important for any future federated consumer that mirrors this hub's events.
+
+### Files touched / added
+
+**Added (backend):**
+- `civic-hub/supabase/migrations/20260427000000_rename_civic_brief_to_vote_results.sql`
+
+**Renamed via `git mv` then content-edited (history preserved):**
+- `civic-hub/src/modules/civic.brief/` → `civic-hub/src/modules/civic.vote_results/` (six files inside: models, service, events, lifecycle, email, index)
+- `civic-hub/src/processes/briefProcess.ts` → `voteResultsProcess.ts`
+- `civic-hub/src/controllers/briefController.ts` → `voteResultsController.ts`
+- `civic-hub/src/controllers/adminBriefController.ts` → `adminVoteResultsController.ts`
+- `civic-hub/src/routes/briefRoutes.ts` → `voteResultsRoutes.ts`
+- `civic-hub/ui/src/pages/Brief.{tsx,css}` → `VoteResults.{tsx,css}`
+- `civic-hub/ui/src/pages/AdminBriefs.{tsx,css}` → `AdminVoteResults.{tsx,css}`
+
+**Modified (backend):**
+- `civic-hub/src/processes/registry.ts` — handler key updated; rename comment added
+- `civic-hub/src/processes/voteProcess.ts` — `spawnBriefFromClosedVote` → `spawnVoteResultsFromClosedVote`; new vote_context input fields plumbed; `getProcessHandler("civic.brief")` → `"civic.vote_results"`
+- `civic-hub/src/services/hubSettings.ts` — function names + setting-key constant updated; storage key preserved
+- `civic-hub/src/controllers/adminSettingsController.ts` — caller updated; API field name preserved
+- `civic-hub/src/controllers/processController.ts` — public-list filter recognizes both type literals
+- `civic-hub/src/routes/adminRoutes.ts` — paths now `/admin/vote-results/*`
+- `civic-hub/src/app.ts` — mount `/vote-results`; legacy 301 redirect for `/brief/:id`; root `/` self-describing JSON updated
+- `civic-hub/src/modules/civic.vote/index.ts` — two doc comments updated to reference the new module name
+- `civic-hub/src/modules/civic.digest/models.ts` — `DigestItemKind`: rename `brief_published`, drop `vote_result_published`
+- `civic-hub/src/modules/civic.digest/filter.ts` — top-of-file rule comment rewritten; `isDigestRenderable` + `classifyItemKind` now exclude vote `result_published` and accept either id field
+- `civic-hub/src/modules/civic.digest/service.ts` — switch case + `GROUP_LABELS` + `PILL_COLORS` + `KIND_ORDER` use renamed kind
+
+**Modified (frontend):**
+- `civic-hub/ui/src/App.tsx` — new routes (`/vote-results/:id`, `/admin/vote-results[:id]`); legacy `/brief/:id` and `/admin/briefs[:id]` registered as `<Navigate>` redirects via `LegacyBriefRedirect` / `LegacyBriefAdminRedirect` wrappers; imports updated
+- `civic-hub/ui/src/components/AdminTabs.tsx` — tab label "Vote results", target `/admin/vote-results`
+- `civic-hub/ui/src/components/Feed.tsx` — `ProcessKind` union + `kindFromEvent` discrimination shim; metadata loader uses `getPublicVoteResults`
+- `civic-hub/ui/src/components/FeedPost.tsx` — `FeedPillKind` collapses brief → vote-results; `FeedProcessKind` keeps `civic.brief` as legacy alias; `eventToPost` returns null for vote `result_published`; brief/vote-results branches collapsed; `classifyHref` recognizes both `/vote-results/:id` (primary) and `/brief/:id` (legacy fallback)
+- `civic-hub/ui/src/components/Feed.css` — `.feed-pill--brief` → `.feed-pill--vote-results`; comment block explaining the collapse
+- `civic-hub/ui/src/styles/theme.css` — `--pill-brief-*` tokens renamed to `--pill-vote-results-*`; hex values preserved
+- `civic-hub/ui/src/services/api.ts` — three Brief* type renames (`PublishedBriefSummary`, `BriefSummary`, `BriefDetail`, `PublicBrief`, `BriefContent`, `BriefContentPatch`, `BriefPositionBreakdown`, `BriefPublicationStatus`); five service-wrapper renames; `VoteContextSnapshot` added
+- `civic-hub/ui/src/pages/Votes.tsx` — discriminator updated (legacy alias kept); chip text + link updated
+- `civic-hub/ui/src/pages/VoteResults.tsx` — full rewrite per Slice 8.5 §5 layout
+- `civic-hub/ui/src/pages/VoteResults.css` — full rewrite; new `.vote-results-*` classes; existing `.brief-bars` / `.brief-comments-list` / `.brief-admin-notes` primitives kept under their old names because the admin page also reuses them
+- `civic-hub/ui/src/pages/AdminVoteResults.tsx` — full rewrite per Slice 8.5 §6 (read-only "About this vote" block, vote-results copy throughout)
+- `civic-hub/ui/src/pages/AdminVoteResults.css` — additions for `.admin-vote-context*` and `.admin-vote-description-preview`
+
+### Operator setup walkthrough
+
+1. **Apply the migration.** Supabase → SQL Editor → New query → paste contents of `supabase/migrations/20260427000000_rename_civic_brief_to_vote_results.sql` → Run. Verify with `SELECT type, COUNT(*) FROM processes GROUP BY type;` — expect zero rows with `type='civic.brief'`. The transitional shims in the deployed code make this safe to run before, after, or alongside the code deploy.
+2. **Redeploy.** Push to GitHub; Vercel auto-deploys. Or **Deployments → latest → Redeploy** in the dashboard.
+3. **Verify on the live site:**
+   - Open the existing approved vote-results page that was previously titled "Civic Brief". The URL should redirect from `/brief/:id` → `/vote-results/:id`. The page heading should read "Vote results: …". The teal delivery banner should show "Delivered to the Board of Supervisors on …". Legacy records (created before Slice 8.5) should show the "Original vote context not available" notice in place of "About this vote" — that's expected.
+   - **Feed: confirm one post per published vote, not two.** Previously you'd see "Civic Brief delivered: …" + "Vote results published: …" for the same close. Now just one "Vote results: …" post.
+   - Open the daily digest email or trigger a manual run via `/api/internal/digest/run` (CRON_SECRET bearer required). Confirm vote-results items appear under "New vote results" and there are no "Vote results published" entries from the vote process directly.
+   - Open `/admin/vote-results`. Tab label is "Vote results". Page heading is "Vote results". The list shows existing records.
+4. **Trigger a fresh end-to-end run** if you have time: create a new vote, vote on it, close it, approve the results. Verify the new flow produces a results page with the **populated "About this vote" section** (vote description + options + voting window) — that's the proof the snapshot path works on fresh records.
+5. **No env var changes.** `BOARD_RECIPIENT_EMAIL`, `CIVIC_ADMIN_EMAILS`, `RESEND_*`, `SMTP_*`, `CRON_SECRET`, etc. all keep working.
+
+If anything looks off, the most likely culprits are: migration not applied (rows still type `civic.brief` — the transitional shims should still let everything render, but the admin URL will list 0 records if the shim is missed somewhere); a `data.brief_id` event slipping through the discrimination ladder; or a stale browser cache loading the old CSS without the renamed pill class.
+
+### Flagged for later
+
+- **Slice 10 prompt mentions "Briefs" as a filter pill label** — flag for update when Slice 10 is built. Filter pill labels for the feed should now use "Vote results" instead.
+- **Transitional `civic.brief` aliases should be removed** in a future cleanup slice once the operator has confirmed the migration is applied and a grace period for legacy events has passed (suggest ~3-6 months).
+- **The legacy SPA `/brief/:id` `<Navigate>` redirect should stay indefinitely.** Stored event action_urls live on the event log forever; removing the redirect would break clickability for any historical or federated consumer.
+
+---
+
+## Slice 8 — Visual redesign, nav restructure, feed post layout — 2026-04-25
+
+**Status:** Frontend-only polish pass before public launch. Nav collapsed from 7 top-level items to 3 public links + role-aware avatar dropdown. Feed posts redone content-first with a colored type pill. Wider 1100px shell. Inter + Fraunces typography. Daily digest email mirrors the new feed layout. No backend changes outside the digest formatter; no data model touches.
+
+### What changed at a glance
+
+- **Nav:** wordmark + Feed/Votes/About + Sign-in (signed out) or avatar dropdown (signed in). Hamburger-driven drawer below 768px.
+- **Feed posts:** title is the post's real content; a colored pill (Vote open / Vote results / Civic Brief / Meeting summary / role-aware Announcement) sits on the right of the title and drops below it on narrow viewports.
+- **Type system:** Inter (body/UI) + Fraunces (headings), self-hosted via `@fontsource-variable/*`. New 8-step type scale + `--font-size-*` tokens.
+- **Palette:** warmer `--color-bg` (#fafaf7), surface tokens, status tokens, and a five-key pill palette (`--pill-vote-bg/fg`, `--pill-results-*`, `--pill-brief-*`, `--pill-announcement-*`, `--pill-meeting-*`).
+- **Layout:** `.page-shell` caps content at 1100px on the `<main>`. Banner + nav + footer stretch edge-to-edge; the Feed column stays 640px and centers inside the shell.
+- **Timestamps:** unified `relativeTime` / `absoluteTime` helpers exported from `FeedPost.tsx`. Used on feed posts and on detail-page headers (Announcement, Brief, MeetingSummary). Less than 7 days renders relative; older renders absolute. Full datetime exposed via `title` attribute.
+- **Empty states:** Feed, Votes (active + completed), and admin lists carry warmer copy.
+- **Digest email:** title-first rows with inline-styled pills (hex literals matching the web `--pill-*` tokens). Plain-text alternative gains a `[Pill label]` suffix per row to retain the type signal.
+
+### Font hosting decision
+
+Variable fonts via `@fontsource-variable/inter@5.2.8` + `@fontsource-variable/fraunces@5.2.9`. **Self-hosted** — Vite bundles the woff2 files (10–85 kB each, latin/latin-ext/cyrillic/greek subsets) and emits `@font-face` declarations from the CSS index. No external CDN call, no privacy/CSP concerns, no build-config changes (plain ESM imports from `main.tsx`). Imported via the explicit CSS path:
+
+```ts
+import '@fontsource-variable/inter/index.css'
+import '@fontsource-variable/fraunces/index.css'
+```
+
+The bare `@fontsource-variable/inter` form fails TypeScript module resolution because the package's `exports` map only declares `.css` paths (no JS entry).
+
+### Pill colors — final palette + contrast
+
+The `--pill-<kind>-bg/fg` token pairs were verified against WCAG AA at the 12px pill type size. Spot-check (announcement, the lightest fg/bg combo): bg `#fbe5d3`, fg `#8c3210` → 6.75:1 contrast, comfortably above the 4.5:1 small-text threshold. Other combinations (navy on light blue, dark teal on light teal, dark green on light green) all measured higher.
+
+| Kind | Pill label | bg | fg | ~contrast |
+|---|---|---|---|---|
+| `vote-open` | "Vote open" | `#e0ecfc` | `#1e3a5f` | ≥7:1 |
+| `vote-results` | "Vote results" | `#d6e4f7` | `#15325a` | ≥7:1 |
+| `brief` | "Civic Brief" | `#d4ede8` | `#0f5a55` | ≥6:1 |
+| `meeting` | "Meeting summary" | `#d9ecd9` | `#0f4a26` | 8.2:1 |
+| `announcement` | role-aware | `#fbe5d3` | `#8c3210` | 6.8:1 |
+
+Announcement pill text is role-aware: admin → "Admin announcement"; legacy `"board"` → "Board member announcement"; any free-form label → "{Label} announcement". Same normalization runs in the digest formatter so the email and the feed never diverge on labelling.
+
+### Token additions to `theme.css`
+
+Surface (`--color-bg`, `--color-surface`, `--color-surface-alt`, `--color-border`, `--color-border-strong`, `--color-text-muted`, `--color-text-faint`); primary ink (`--color-primary-ink`); status (`--color-success`, `--color-success-bg`, `--color-error`, `--color-error-bg`, `--color-warning`, `--color-warning-bg`); five pill pairs; the type scale (`--font-size-xs` through `--font-size-4xl`); line heights (`tight`/`normal`/`relaxed`); pill radius (`--radius-pill`); popover shadow (`--shadow-popover`); layout caps (`--max-width-shell`, `--max-width-feed`).
+
+`index.css` was repointed to alias the legacy variable names (`--primary-color`, `--page-background`, etc.) onto the canonical tokens, so older component CSS (process cards, vote panel, admin pages) reads from the unified palette without per-file rewrites. Pre-Slice-1 CSS was the long tail flagged in the original `theme.css` header comment; the alias bridge resolves it for this slice without a full migration.
+
+### `eventToPost` — new return shape
+
+`FeedPostView` now carries `{ id, title, pillLabel, pillKind, summary, timestamp, href }` — no more event-type prefix baked into the title. The pill renders as a separate element. Parallel structure in the digest: `DigestItem` gained a `pill_label` field, populated in `eventToItem` and rendered as a colored span in the HTML email.
+
+The component still does no fetching; the Feed container hydrates `processMeta` and feeds `getProcessTitle` / `getProcessDescription` / `getProcessType` callbacks to `eventToPost`. Same lazy-load behavior as before.
+
+### Layout shell
+
+A new `.page-shell` class wraps `<main>`. It is **width-only** (max-width 1100, margin auto) — no horizontal padding — so existing inner-page paddings (`.feed`, `.hub-info`, `.section`, admin bodies) keep working unchanged. Three admin CSS files (`AdminBriefs.css`, `AdminSettings.css`, `AdminMeetingSummaries.css`) had their hardcoded `max-width: 800px` removed; their bodies now stretch to the shell's 1100px cap with their own `padding: var(--space-md) var(--space-lg) var(--space-xl)`. The hub banner image is now 240px tall (up from 200) and the hero text uses `--font-size-3xl` for the jurisdiction name.
+
+### Nav implementation notes
+
+- The signed-out **Sign in** button opens `AuthModal` directly (new behavior — previously the modal only opened via `useRequireAuth` from VotePanel/Propose etc.). The existing `useRequireAuth` paths still work for action gating.
+- **Avatar color** is deterministic from the user's email (32-bit hash mod 6 colors). All six backgrounds (navy, teal, terracotta, forest, violet, ochre) sit at low enough luminance that the white initial inside hits AA.
+- **Dropdown a11y:** `aria-haspopup="menu"`, `aria-expanded`, `role="menu"` with `role="menuitem"` children. Click-outside / Escape close. Arrow keys cycle items, Home/End jump endpoints, Tab closes. Focus returns to the avatar on Escape.
+- **Mobile drawer:** chosen over a full bottom sheet because it's simpler, hits the same thumb-reach goal at 375px (drawer items live at the top-third of the screen, not below the fold), and reuses the same dismiss/keyboard handling. Trade-off documented here in case a future slice wants the bottom-sheet polish.
+- **Tap targets:** `min-height: 44px` on every nav link, drawer link, dropdown item, sign-in button, avatar (36×36 with hover halo extending the hit area), hamburger (44×44 explicit).
+
+### Verification done in this session
+
+Both `npm run build` (backend `tsc`) and `cd ui && npm run build` (UI `tsc -b && vite build`) finish clean. UI bundle: 336.66 kB raw / 96.80 kB gzipped (336.64 → 336.66 kB after the role-normalization tweak; previously 332.27 kB at end of Slice 6 — the 4 kB delta is the new pill markup, type scale, popover styles, drawer, and avatar). Font assets: 11 woff2 subsets, ~340 kB total — only the latin subset (~85 kB) loads on a typical en-US session.
+
+Live verification against the dev backend (port 3000) + dev UI (port 5173):
+
+- **Desktop 1440×900:** wordmark + 3 primary links + Sign in / avatar render in the new shell. Hub hero ("Floyd County, Virginia" in Fraunces 32px, "CIVIC HUB" eyebrow uppercase Inter, tagline in Inter at 16px) sits inside the 1100px cap. Feed cards render with title-first layout: meeting summary card shows "Reorganization Meeting" + green MEETING SUMMARY pill on the right; announcement cards show "Fire Ban Until May 31st" + orange ADMIN ANNOUNCEMENT pill; vote-results, brief, vote-open pills all rendering with their distinct colors.
+- **Tablet 768×1024:** hamburger replaces the primary-link list; wordmark and Sign in / avatar stay visible. Hamburger-opened drawer renders Feed / Votes / About as full-tap-width rows.
+- **Mobile 375×812:** same nav behavior as 768. Feed cards stack; pill drops below the title onto its own line, right-aligned via `margin-left: auto` (verified at 142.47px left margin on a wrapped pill — the wrap pushes it to the right edge).
+- **Avatar dropdown (admin user):** click opens a menu containing SIGNED IN AS / email header, Settings / Post announcement / Admin panel / Log out items. Verified via `preview_eval`: 4 menuitems present, `role="menu"`, `aria-label="Account menu"`. Log out colored red via `--color-error`.
+- **Pill type coverage:** all five kinds enumerated in the live feed (`feed-pill--meeting`, `--announcement`, `--vote-results`, `--brief`, `--vote-open`).
+- **No console errors** on any rendered surface.
+- **Sign-in button** opens `AuthModal` from the nav.
+
+### Empty-state copy delivered
+
+| Surface | Old | New |
+|---|---|---|
+| Feed (no events) | "No civic activity yet." | "Floyd's civic feed is just getting started. Visit **About** to learn how this hub works." (with inline link) |
+| Votes / Active (no active, has completed) | "No active votes." | "No active votes right now. When the Board asks for resident input, it'll show up here." |
+| Votes / Active (no votes anywhere) | "No active votes." | "Nothing here yet. Come back soon — the first issues will launch shortly." |
+| Admin proposals (none) | "No proposals to review." | "No proposals yet. Resident-submitted issues land here for admin review before becoming votes." |
+| Admin briefs (none) | already on-spec | unchanged |
+| Admin meeting summaries (none) | already on-spec | unchanged |
+
+Brief and meeting-summary admin lists already shipped acceptable empty copy in earlier slices (Slice 3.5, Slice 6); left as-is.
+
+### Digest email cross-slice
+
+`formatDigestHtml` rewritten to use a 2-cell `<table>` per item so the pill aligns to the right edge across email clients (Gmail, Outlook, Apple Mail). Inline styles only — `<style>` blocks get stripped. Hex pill colors mirror the web `--pill-*` tokens. Title font stack is `Fraunces, Georgia, 'Times New Roman', serif`; body is `Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif` — clients without Inter/Fraunces fall back gracefully.
+
+`formatDigestText` keeps grouping but suffixes each row with `[Pill label]` so the type signal still travels in plain text. No new filter logic — the digest still emits exactly the four kinds it did in Slice 6 (vote/brief/meeting/announcement, with `vote_opened` and `vote_result_published` as separate kinds).
+
+`DigestItem.pill_label` is the only schema addition in `models.ts`. No callers outside the service construct `DigestItem`s, so the change is contained.
+
+### Small drift fixes discovered along the way
+
+- `eventToPost` and `eventToItem` (digest) both treat `author_role: "admin"` (lowercase) the same as missing — both normalize to "Admin" so the pill reads "Admin announcement". The legacy code only checked the capitalized "Admin" form, which would have rendered "admin announcement" lowercase on whatever events were emitted with the lowercase role. The slice spec is explicit about admin → "Admin announcement".
+- Removed the duplicated `formatDate` helpers from `Announcement.tsx` and `Brief.tsx` once they switched to the shared `relativeTime` / `absoluteTime` exports from `FeedPost.tsx`. `MeetingSummary.tsx` keeps its `formatDate` for the meeting calendar date itself (which is a fixed event date, not a publish event — should stay absolute) but uses the shared helpers for `published_at`.
+- `index.css` no longer defines its own `--primary-color`, `--page-background`, etc. — those names are now aliases pointing into the canonical tokens in `theme.css`. So the warmer `--color-bg` cascades automatically into older component CSS that referenced `--page-background`.
+- `prefers-reduced-motion` honored globally in `index.css` (animations + transitions reduced to ~0ms).
+- Viewport `<meta>` confirmed correct in `index.html` (was already set).
+
+### What was NOT touched (per slice's non-goals)
+
+Image attachments, link previews, OG scraping, no-image gradient fallback (Slice 9). Filter pills, engagement counts, IntroPopup rewrite (Slice 10). Search / sort. Backend modules outside `civic.digest`. Event model. Process registry. Dark mode.
+
+### Operator verification walkthrough
+
+1. **Redeploy.** Push to GitHub; Vercel auto-deploys. Or **Deployments → latest → Redeploy** in the dashboard.
+2. **Three viewports.** Open the live site at:
+   - **Phone / 375 px wide:** hamburger left, wordmark middle, avatar (or Sign in) right. Tap hamburger → Feed / Votes / About in a drawer. Posts stack; pill drops below the title (not truncated).
+   - **Tablet / 768 px:** same as phone — confirm the transition is clean.
+   - **Desktop / 1440 px+:** wordmark + 3 primary links + avatar all on one bar; hub identity wider; the Main Street banner has more breathing room.
+3. **Typography.** Headings should read in the warm Fraunces serif; body in clean Inter. If everything looks like the OS system font, the web fonts didn't load — refresh once; if still broken, flag it.
+4. **All pill kinds.** Scan the feed for: a vote open (light-blue VOTE OPEN pill), a vote results (slightly-darker-blue VOTE RESULTS), a brief (teal CIVIC BRIEF), an announcement (orange ADMIN ANNOUNCEMENT or "{Label} ANNOUNCEMENT"), a meeting summary (green MEETING SUMMARY). If you can't find one, post a test item via the appropriate flow.
+5. **Avatar dropdown.** Click the avatar circle. Confirm the menu shows your email, Settings, Post announcement, Admin panel, Log out. Tab through with the keyboard; Escape closes.
+6. **Daily digest.** Open the next scheduled email (or trigger a manual cron run). Confirm titles lead, colored pills follow on the right, grouping is preserved.
+7. **Approve or flag.** Iterate on whatever doesn't read right.
+
+**Before / after summary:** Nav went from 7 items to 3 + avatar dropdown. Feed posts went from prefix-titles ("admin announcement: Fire Ban…") to content-first with a color pill ("Fire Ban Until May 31st" + ADMIN ANNOUNCEMENT). Site width 800 → 1100. Typography system fonts → Fraunces (headings) / Inter (body). Empty states warmer. Daily digest mirrors the new feed.
+
+### Files touched / added
+
+**Modified (frontend):**
+- `civic-hub/ui/package.json` — added `@fontsource-variable/inter`, `@fontsource-variable/fraunces`
+- `civic-hub/ui/src/main.tsx` — import the two font CSS files
+- `civic-hub/ui/src/styles/theme.css` — extended palette, type scale, layout caps, pill tokens
+- `civic-hub/ui/src/index.css` — body font/bg from new tokens; legacy var aliases; reduced-motion media query
+- `civic-hub/ui/src/App.css` — `.page-shell` width cap; banner height; hub-info typography; footer max-width
+- `civic-hub/ui/src/App.tsx` — `<main className="page-shell">`
+- `civic-hub/ui/src/components/Nav.tsx` — full rewrite (wordmark, hamburger, avatar dropdown, AuthModal hook)
+- `civic-hub/ui/src/components/Nav.css` — full rewrite
+- `civic-hub/ui/src/components/Feed.tsx` — empty-state copy + inline About link import
+- `civic-hub/ui/src/components/Feed.css` — pill row layout, summary clamp, hover state
+- `civic-hub/ui/src/components/FeedPost.tsx` — `eventToPost` returns `{ pillLabel, pillKind }`; component renders pill; `relativeTime` / `absoluteTime` exported; lowercase-admin normalization
+- `civic-hub/ui/src/pages/Announcement.tsx` — relative timestamps via shared helper; removed local `formatDate`
+- `civic-hub/ui/src/pages/Brief.tsx` — same
+- `civic-hub/ui/src/pages/MeetingSummary.tsx` — relative `published_at` (kept absolute meeting_date)
+- `civic-hub/ui/src/pages/Votes.tsx` — empty-state copy
+- `civic-hub/ui/src/pages/AdminProposals.tsx` — empty-state copy
+- `civic-hub/ui/src/pages/AdminBriefs.css` — removed 800px cap (shell handles it)
+- `civic-hub/ui/src/pages/AdminSettings.css` — same
+- `civic-hub/ui/src/pages/AdminMeetingSummaries.css` — same
+
+**Modified (backend):**
+- `civic-hub/src/modules/civic.digest/models.ts` — added `pill_label` to `DigestItem`
+- `civic-hub/src/modules/civic.digest/service.ts` — populate `pill_label` per kind; HTML rewritten with table-row + pill markup; plain-text suffixed with `[Pill label]`; lowercase-admin normalization
+
+**No additions** of new source files. **No deletions**.
+
+---
+
+## Slice 6 — AI meeting summary process (civic.meeting_summary) — 2026-04-24
+
+**Status:** New `civic.meeting_summary` process type plus a Vercel-Cron-triggered daily pipeline that scrapes the Floyd Board of Supervisors minutes page, pulls each new meeting's PDF minutes + YouTube auto-transcript, asks Claude for a topic-timestamped summary, and creates a draft for admin review. Admin approval emits `civic.process.outcome_recorded` + `civic.process.result_published` and publishes the summary at `/meeting-summary/:id`. Feed + daily digest both surface the new kind.
+
+### Dual-archetype module — process-type + service pipeline in one folder
+
+`civic-hub/src/modules/civic.meeting_summary/` is simultaneously a process-type module (registered in the registry, produces read models, emits lifecycle events) and hosts a service module (the scraping + summarization pipeline invoked by cron). Both halves obey the same portability rule as every other module: no imports from the hub's event store, DB client, other modules, or the routes layer — everything is injected. Worth recording as a design principle alongside the `civic.digest` service-module pattern noted in Slice 5; I elected not to touch CLAUDE.md this pass since the guidance already reads "service modules and process-type modules live under `/modules/`, pluggability rules apply to both." A single CLAUDE.md entry when the third such module lands would consolidate cleanly.
+
+### Lifecycle compliance — skipped phases
+
+Meeting summaries skip Civic Process Spec Phases 1–3 (Framing, Activation, Participation) for the same reason `civic.announcement` does: the process has no participation window. The civic work begins at Phase 4 (Aggregation, the AI summarization step) and completes at Phase 6 (Publication). Emitted events per lifecycle phase:
+
+| Phase | Event | Where emitted |
+|---|---|---|
+| 0 Initiation | `civic.process.created` | `processService.createProcess` (auto) |
+| 4 Aggregation | `civic.process.aggregation_completed` | module, synchronously after creation |
+| (admin edits)  | `civic.process.updated` | module, per edit |
+| 5 Outcome/Decision | `civic.process.outcome_recorded` | module, on approval (`outcome_type: "informational"`) |
+| 6 Publication | `civic.process.result_published` | module, on approval |
+
+No `civic.process.ended` (never participation-active so never ends participation) and no `civic.process.feedback_received` in MVP (no resident-facing feedback surface). Same documented deviation shape as civic.announcement (Slice 4 HANDOFF).
+
+### Process-level status — mirrors civic.brief
+
+Starts `"active"` at creation (Phase 0 + Phase 4 complete together), jumps to `"finalized"` on approval publication. `"draft"` and `"closed"` are both skipped. This is the same deviation from Civic Process Spec §6.2 that civic.brief carries (Slice 3 HANDOFF). Recorded once there, referenced here — no fresh debate.
+
+### Process linking — intentionally none
+
+Meeting summaries do NOT populate `follow_up_process_ids` or `source_process_ids`. Per Civic Process Spec §11.3, process linking is for chains of civic activity *between Civic Processes*. A meeting summary's source is an external meeting (a PDF on a government site + a YouTube recording), not another Civic Process. Provenance lives in `state.source_minutes_url` and `state.source_video_url` instead. This rationale is flagged here so it isn't relitigated in a future compliance pass.
+
+### Things verified before writing code
+
+- **YouTube transcript access.** Used the unofficial `youtube-transcript` npm library (v1.3.0) — consumes YouTube's public `timedtext` endpoint via both the InnerTube API and a webpage-scraping fallback. No API key. **Fragility profile:** unofficial endpoint, can change without notice. `YOUTUBE_API_KEY` env var is reserved but unused in MVP. Transcript failures are non-fatal — the pipeline falls back to PDF-only summarization with a warning log. Documented in `src/utils/youtube.ts` and `.env.example`.
+  - Packaging quirk: the library's `package.json` sets `"type": "module"` but points `main` at a CJS-style bundle (`exports.X = …` assignments), so plain `import { YoutubeTranscript } from "youtube-transcript"` fails under ESM Node. We import the ESM file directly: `import ... from "youtube-transcript/dist/youtube-transcript.esm.js"`. If a future release renames that file this one line breaks — comment in `youtube.ts` explains the workaround.
+- **Claude PDF input shape.** Anthropic Messages API accepts native PDF document blocks: `{type: "document", source: {type: "base64", media_type: "application/pdf", data: <base64>}}`. No `pdf-parse` or text-extraction step. Size limits of ~32MB/~100 pages are comfortable for Floyd minutes (<2MB typical).
+- **Anthropic model choice.** Default `claude-sonnet-4-5-20251022` — Sonnet-tier, cost-reasonable for multi-document summarization. Pinned in `src/utils/anthropic.ts` as `DEFAULT_MODEL`, overridable via `ANTHROPIC_MODEL` env var. The response body carries the model id back, which we record in `state.ai_model` for provenance.
+- **Vercel plan constraint.** Added a second daily cron (`/api/internal/meeting-summary/run` at 11:30 UTC, 30 min before the 13:00 UTC digest run). If the deployment is still on Vercel Hobby and Hobby caps daily cron count, upgrade to Pro — flag for the operator, not a known issue.
+- **Floyd minutes page characteristics** (verified in the prompt, not re-verified here): server-rendered Wix page, PDF URLs follow `/_files/ugd/{bucket}_{hash}.pdf` pattern across multiple buckets, YouTube watch URLs are canonical, multiple videos per meeting are common, some meetings have no video. Pattern baked into `connectors/floydMinutes.ts`.
+
+### Backend — civic.meeting_summary module
+
+`civic-hub/src/modules/civic.meeting_summary/` — seven files:
+
+- `models.ts` — `SummaryBlock`, `MeetingSummaryProcessState`, `CreateMeetingSummaryInput`, `MeetingSummaryPatch`, `MeetingSummaryConfig`, the pluggable `MeetingSourceConnector` interface + `MeetingEntry`, and all injected-callback types (`EmitEventFn`, `FetchHtmlFn`, `FetchPdfFn`, `FetchYouTubeTranscriptFn`, `CallClaudeFn`). No hub imports.
+- `lifecycle.ts` — `canEdit`, `canApprove`, `assertApprovalTransition` mirroring civic.brief.
+- `events.ts` — four emitters: `emitMeetingSummaryAggregationCompleted` (Phase 4), `emitMeetingSummaryUpdated` (edits), `emitMeetingSummaryOutcomeRecorded` (Phase 5), `emitMeetingSummaryResultPublished` (Phase 6). All set `action_url_path = /meeting-summary/:id`. `result_published` carries `data.meeting_summary = {id, meeting_title, meeting_date, block_count}` as the primary Feed/digest discriminator, plus provenance links (`source_video_url`, `source_minutes_url`) so consumers don't need a second fetch.
+- `prompts.ts` — two exported string builders: `buildDiscoveryPrompt` (minutes-page HTML → JSON array of `MeetingEntry`) and `buildSummarizationPrompt` (PDF + transcript → JSON `{blocks}` object). Both prepend the admin's `MEETING_EXTRACTION_INSTRUCTIONS` verbatim inside `<admin_instructions>` tags. `resolveEffectiveInstructions` returns a generic fallback string when the env var is empty.
+- `service.ts` — pure state transitions: `createMeetingSummaryState`, `emitCreationEvents`, `editMeetingSummary`, `approveMeetingSummary`, `getAdminReadModel`, `getPublicReadModel`, `getAdminSummary`, `buildProcessDescription`. Approval is linear (`pending → approved` emit `outcome_recorded` → `published` emit `result_published`); no email delivery, no linked-vote step — simpler than `approveBrief`. Exports `AI_ATTRIBUTION_LABEL` constant shipped on every state so federated consumers see the disclaimer without relying on UI chrome.
+- `pipeline.ts` — cron flow as pure functions: `discoverMeetings`, `summarizeMeeting`, `buildCreateInput`, `buildDescription`. No I/O of its own; every effect is injected. The summarizer tolerates transcript failure (falls back to PDF-only), formats transcripts as `[HH:MM:SS] text` lines before sending to Claude, parses Claude's JSON with tolerance for markdown-fenced output (`extractJsonObject` / `parseJsonArray`).
+- `connectors/floydMinutes.ts` — ships the `floydMinutesConnector` with id `"floyd-minutes-page"`. Uses `cheerio` to strip Wix chrome (scripts, styles, svgs, images, meta, aria-hidden) and prefer `<main>` over `<body>` before sending to Claude. Preserves `<a href>` attributes. Logs `trimmed html {before}→{after}` for every discovery. Validates returned entries against domain-specific regex (PDF path, YouTube watch pattern, ISO date), drops malformed entries with a warn log.
+- `index.ts` — public surface. Exports the `PROCESS_DESCRIPTOR` constant.
+
+### Backend — utility clients
+
+- `src/utils/anthropic.ts` — tiny client posting to `https://api.anthropic.com/v1/messages`. No SDK. Accepts a text prompt + optional base64 document block. One in-function retry on HTTP 5xx / network failure with a 2s backoff, then give up (matches the slice scope — no complex retry). `DEFAULT_MODEL = "claude-sonnet-4-5-20251022"`; override via `ANTHROPIC_MODEL`. Returns `{text, model, usage}`.
+- `src/utils/youtube.ts` — `extractVideoId(watchUrl)` + `fetchYouTubeTranscript(watchUrl)`. Thin wrapper over `youtube-transcript` imported via its ESM path. Converts millisecond offsets to seconds for downstream use.
+- `src/utils/http.ts` — `fetchHtml` / `fetchPdf` with abort-controller timeouts (15s / 30s), user-agent headers, banned non-http(s) schemes as a minimal hardening step.
+
+None of these are imported by the module itself — they're wired in through the controller. A hub using a different LLM or transcript source plugs in different implementations without touching the module.
+
+### Backend — adapter + controller + routes
+
+- `src/processes/meetingSummaryProcess.ts` — thin `ProcessHandler` adapter. `initializeState` accepts `CreateMeetingSummaryInput` and bakes `status: "active"` into the returned state so `processService.createProcess` reads it as the row's process status. `handleAction` throws (summaries don't route through the generic action dispatcher). Registered in `src/processes/registry.ts` — header comment extended to note the module's opt-in nature.
+- `src/controllers/meetingSummaryController.ts` — five handlers:
+  - `handleRunMeetingSummary` (cron): CRON_SECRET bearer auth, `MEETING_SUMMARY_ENABLED=false` short-circuit, 500 when `ANTHROPIC_API_KEY` / `MEETING_SOURCE_URL` unset, connector lookup, per-entry dedupe by `source_id`, per-meeting failure isolation, structured `[meeting-summary]` logs, `{discovered, created, skipped_existing, failed, duration_ms}` response shape.
+  - `handleAdminListMeetingSummaries` / `handleAdminGetMeetingSummary` / `handlePatchMeetingSummary` / `handleApproveMeetingSummary` — mirror `adminBriefController` patterns. Sort pending first, then approved, then published; newest-first within each bucket.
+  - `handleGetPublicMeetingSummary` — public read, 404 for unpublished.
+- `src/routes/meetingSummaryRoutes.ts` — `meetingSummaryCronRouter` (cron) + default public router.
+- `src/routes/adminRoutes.ts` — four new routes under existing `requireAdmin`.
+- `src/controllers/processController.ts::handleListProcesses` — public-list filter extended to also hide non-published meeting summaries (parallels the existing civic.brief filter).
+- `src/app.ts` — mounts `/meeting-summary` public, mounts the cron router under `/internal` next to the digest cron, documents all five new endpoints in the root `/` self-describing JSON.
+
+### Frontend — two new pages + cross-slice updates
+
+- `ui/src/pages/AdminMeetingSummaries.{tsx,css}` — list + review. Four-status filter (All / Pending / Approved / Published). Review view: editable meeting title, editable topic-block list (per-row title + summary + HH:MM:SS timestamp + action-taken + reorder ↑/↓ + delete + add-block), editable admin notes, save draft, approve-and-publish with confirmation. Prominent AI-generated disclaimer banner on every admin review view. Timestamp input accepts HH:MM:SS, MM:SS, or plain seconds and parses to `start_time_seconds` (null when the meeting has no video, disabling the input).
+- `ui/src/pages/MeetingSummary.{tsx,css}` — public page at `/meeting-summary/:id`. Theme-token styling only. Header + AI disclaimer banner (text differs for video-less meetings: "AI-generated from minutes document only — no video recording available"). Provenance chips: View minutes PDF · Watch recording · Recording (segment N) for each additional video. Topic blocks rendered as cards: clickable HH:MM:SS timestamp chip (absent when `start_time_seconds === null`) linking to `{watch_url}?t=<n>s`, topic title, topic summary, optional "Action taken" callout. Admin notes section at the bottom.
+- `ui/src/components/AdminTabs.tsx` — added "Meeting summaries" tab between Civic Briefs and Settings.
+- `ui/src/App.tsx` — `/admin/meeting-summaries`, `/admin/meeting-summaries/:id`, `/meeting-summary/:id` routes.
+- `ui/src/services/api.ts` — `SummaryBlock`, `MeetingSummarySummary`, `MeetingSummaryDetail`, `PublicMeetingSummary`, `MeetingSummaryPatch` types; `adminListMeetingSummaries`, `adminGetMeetingSummary`, `adminPatchMeetingSummary`, `adminApproveMeetingSummary`, `getMeetingSummary` wrappers.
+- `ui/src/components/Feed.tsx` — `FeedProcessKind` extended with `civic.meeting_summary`; `kindFromEvent` branches on `data.meeting_summary` / `data.summary_id`; metadata loader fetches via `getMeetingSummary(id)` (parallel to `getPublicBrief`).
+- `ui/src/components/FeedPost.tsx` — `civic.process.result_published` branch for meeting summaries renders `"Meeting summary: <formatted date>"` with summary `"<meeting_title> — <n> topic{s} covered."`. `classifyHref` treats `/meeting-summary/:id` as an internal SPA route.
+
+### Cross-slice — Feed and digest stay in sync (now four kinds)
+
+- `src/modules/civic.digest/models.ts` — `DigestItemKind` extended with `"meeting_summary_published"`.
+- `src/modules/civic.digest/filter.ts` — `classifyItemKind` discriminates on `data.meeting_summary` / `data.summary_id`; `KIND_ORDER` places meeting summaries between briefs and announcements. Top-of-file comment updated to list all four kinds as of Slice 6.
+- `src/modules/civic.digest/service.ts` — `GROUP_LABELS` gains "New meeting summaries"; `eventToItem` has a `meeting_summary_published` case that builds `"Meeting summary: <formatted date>"` titles with `"<meeting_title> — <n> topic{s} covered."` summaries. Shared `formatMeetingDate` helper.
+
+Invariant: the Feed and the digest filter render the same set of event kinds, in the same discrimination order. Both sides still duplicate the rules (kept in sync by convention, not extraction to a shared module — future cleanup).
+
+### Vercel + environment configuration
+
+`civic-hub/vercel.json` — second cron entry added:
+
+```json
+{ "path": "/api/internal/meeting-summary/run", "schedule": "30 11 * * *" }
+```
+
+11:30 UTC = 07:30 EDT / 06:30 EST, 90 min before the 13:00 UTC digest. Chosen so newly-generated summaries (in `pending`, don't emit `result_published` until admin approves) are created before the digest window — though in practice there's no race because the digest only sees published events.
+
+`.env.example` — new section for Slice 6 with seven env vars documented:
+- `ANTHROPIC_API_KEY` — required. Starts with `sk-ant-…`. Cron returns 500 if unset.
+- `ANTHROPIC_MODEL` — optional; overrides `DEFAULT_MODEL = "claude-sonnet-4-5-20251022"`.
+- `YOUTUBE_API_KEY` — reserved for future slice; unused in MVP.
+- `MEETING_SUMMARY_ENABLED` — `"true"` (default) / `"false"`. Runtime kill-switch.
+- `MEETING_SOURCE_URL` — e.g. `https://www.floydcova.gov/agendas-minutes`. Required.
+- `MEETING_CONNECTOR_ID` — optional; defaults to `"floyd-minutes-page"`.
+- `MEETING_EXTRACTION_INSTRUCTIONS` — optional long-form admin guidance prepended to both Claude prompts. Built-in fallback used when unset. Starter suggestion for Floyd included in the env var comment.
+
+Reused unchanged: `CRON_SECRET`, `BASE_URL`, `CIVIC_UI_BASE_URL`, `HUB_NAME`, `CIVIC_ADMIN_EMAILS`.
+
+### New dependencies
+
+- `cheerio@^1.2.0` — HTML parsing for the Floyd connector's HTML-trimming step.
+- `youtube-transcript@^1.3.0` — unofficial YouTube transcript fetcher.
+
+### Preview verification
+
+Both `npm run build` (backend tsc) and `cd ui && npm run build` (UI tsc + vite) complete cleanly with no TypeScript errors. UI bundle sizes 332.27 kB raw / 95.61 kB gzipped (slight increase from Slice 5's 316.75 kB / 92.92 kB — the new page + state types).
+
+Ran the dev UI against the dev backend:
+- `/meeting-summary/not-a-real-id` returns the themed 404 page ("Meeting summary not found") — expected.
+- `/admin/meeting-summaries` renders the shared AdminTabs (four tabs: Proposals · Civic Briefs · **Meeting summaries** · Settings), the heading, the subtitle, the four status filters (All / Pending / Approved / Published), the "Authentication required" error when unauthed — all expected.
+- Direct curl against the three new endpoints without auth returns the correct status codes: public read → 404, cron without `CRON_SECRET` → 401, admin list without session → 401.
+- No browser console errors on either page render.
+
+End-to-end (cron discovery → summarization → admin approval → publication) **was NOT exercised in this session** because (a) `ANTHROPIC_API_KEY` is not set in the local `.env`, (b) the minutes page fetch would spend real API credits on every run, and (c) `CRON_SECRET` is not set locally either. Route gates and HTTP plumbing are verified; full-flow smoke testing needs a production or preview Vercel environment with the new env vars configured. Operator walkthrough below covers that setup.
+
+### Architectural decisions — recorded here so they outlive this slice
+
+- **Meeting is the source, not the process.** A Civic Process linking is for chains of civic activity *between* Civic Processes (Process Spec §11.3). A meeting is external to the hub's process graph — the summary's source lives in `state.source_minutes_url` / `state.source_video_url`. If the spec later formalizes external-source linking, this module gains a new field without reshaping.
+- **Admin-customizable extraction instructions live in an env var for MVP.** A dedicated admin UI to edit `MEETING_EXTRACTION_INSTRUCTIONS` is a future slice. The env var + fallback string + inline editor UI is a three-slice arc; the first slice (env var only) is MVP-sufficient.
+- **One video per meeting in MVP.** The Floyd page commonly carries multiple recordings per meeting (segment 1 / segment 2 when a livestream drops). MVP summarizes only the first — `state.additional_video_urls` captures the rest for transparency (displayed on the public page, not fed into Claude). Full-meeting coverage is a flagged future enhancement.
+- **Events don't fire for cron run internals.** No `crawl_started` / `crawl_completed` events. Cron infrastructure isn't civic activity; structured `[meeting-summary]` logs carry the audit trail (same philosophy as `civic.digest`).
+- **Approval is linear, not gated by email delivery.** No external-recipient delivery step (unlike civic.brief). Approval → outcome_recorded → result_published, inline.
+
+### Scale limits — flagged for future attention
+
+- **Floyd cadence only.** The pipeline is sized for ~1–2 new meetings per run. On a first-ever run against a fresh deployment, Floyd's page lists dozens of historical meetings — the initial backfill will process all of them (expect several minutes of Vercel function time and $5–15 of API cost). Operator walkthrough step 6 flags this. Beyond Floyd's cadence (>5 new meetings/run), batching / parallelization is a future concern.
+- **YouTube transcript fragility.** The `youtube-transcript` library consumes the public `timedtext` / InnerTube endpoints. If either changes upstream, transcript fetches will start failing — pipeline catches and falls back to PDF-only summarization, but summaries lose timestamp grounding. Flagged; future mitigation is either another library or pinning a downloader of our own.
+- **Discovery is the critical path.** If Claude fails to parse Floyd's HTML (site-wide Wix rewrite, page renamed), discovery throws and the whole run aborts. Individual-meeting summarization failures are isolated, but discovery is not. Acceptable for MVP — the failure mode is clear and the operator sees a 500 from the cron.
+- **Vercel function timeout.** Pro plan = 60s. A 10-meeting first run could push this. If timeouts become a pattern, flip to batched runs (multiple short runs rather than one long one) or raise to Enterprise.
+- **No per-meeting retry on a later cron run.** When `summarizeMeeting` throws for a specific meeting, the `source_id` is NOT added to `existingSourceIds` for this run, but on the next day's run the meeting is still "new" (no process row exists) and the pipeline will re-try. A permanent failure mode (corrupted PDF, etc.) will silently fail every day. Acceptable for MVP; a "failed_source_ids" shadow table is a future concern.
+
+### Non-goals honored
+
+- No speaker diarization, no AssemblyAI / Deepgram / Whisper.
+- No direct YouTube scraping for meeting discovery.
+- No authoritative transcript framing — every surface carries the AI-generated disclaimer.
+- No multi-language summaries.
+- No admin UI for editing `MEETING_EXTRACTION_INSTRUCTIONS` (future slice).
+- No automatic re-summarization of an already-processed meeting.
+- No complex retry logic beyond one in-function retry on transient API failure.
+- No batching / queue architecture.
+- No ActivityPub / federation exposure — data model is federation-ready (events flow through `emitEvent`, `state` is a plain object, provenance links travel on `result_published` data).
+
+### Files touched / added
+
+**Added (backend):**
+- `civic-hub/src/modules/civic.meeting_summary/{models,lifecycle,events,prompts,service,pipeline,index}.ts`
+- `civic-hub/src/modules/civic.meeting_summary/connectors/floydMinutes.ts`
+- `civic-hub/src/processes/meetingSummaryProcess.ts`
+- `civic-hub/src/controllers/meetingSummaryController.ts`
+- `civic-hub/src/routes/meetingSummaryRoutes.ts`
+- `civic-hub/src/utils/{anthropic,youtube,http}.ts`
+
+**Modified (backend):**
+- `civic-hub/src/processes/registry.ts` — register civic.meeting_summary; comment extended
+- `civic-hub/src/routes/adminRoutes.ts` — four new meeting-summary admin routes
+- `civic-hub/src/app.ts` — mount `/meeting-summary` + cron router under `/internal`; document endpoints
+- `civic-hub/src/controllers/processController.ts` — public-list filter hides non-published summaries
+- `civic-hub/src/modules/civic.digest/{models,filter,service}.ts` — fourth digest kind `meeting_summary_published`
+- `civic-hub/package.json` — `cheerio`, `youtube-transcript`
+- `civic-hub/vercel.json` — second cron entry
+- `civic-hub/.env.example` — seven new env vars documented
+
+**Added (frontend):**
+- `civic-hub/ui/src/pages/AdminMeetingSummaries.{tsx,css}`
+- `civic-hub/ui/src/pages/MeetingSummary.{tsx,css}`
+
+**Modified (frontend):**
+- `civic-hub/ui/src/App.tsx` — three new routes
+- `civic-hub/ui/src/services/api.ts` — types + wrappers
+- `civic-hub/ui/src/components/AdminTabs.tsx` — Meeting summaries tab
+- `civic-hub/ui/src/components/Feed.tsx` — kindFromEvent + metadata loader
+- `civic-hub/ui/src/components/FeedPost.tsx` — result_published meeting-summary branch; classifyHref
+
+---
+
+## Slice 5 — Daily email digest — 2026-04-23
+
+**Status:** A Vercel-Cron-triggered daily job assembles a per-user summary of new civic activity since that user's last digest and delivers it via Resend. Users are auto-subscribed on account creation (opt-out) and can unsubscribe via a signed link in every email or a toggle on the new `/settings` page. Digest delivery is infrastructure — no civic events are emitted for sends; structured `console.log` lines carry the audit trail.
+
+### Module archetype — service module, not a process-type module
+
+This is the first **service module** the hub has registered. `civic.digest` is not a civic process; it never appears in the process registry, never stores process state, and never owns a lifecycle. It's a background capability wired into the hub through a single controller.
+
+The pluggability rules from the process-type modules carry over verbatim: `civic.digest/*` does not import from the hub's event store, DB client, other modules, or the route layer. The hub injects everything (event list, user list, email sender) as function arguments. A hub that doesn't want digests simply doesn't mount `digestRoutes.ts` — nothing else in the codebase depends on the module being loaded.
+
+This distinction (service module vs process-type module) is worth formalizing in `CLAUDE.md` as a design principle when the pattern appears again. For now it's flagged here.
+
+### Backend
+
+#### civic.digest module — `civic-hub/src/modules/civic.digest/`
+
+Five files, fully self-contained:
+- `models.ts` — `DigestEvent`, `DigestUser`, `DigestHubContext`, `DigestItem`, `DigestEmail`, `DigestAssemblyInput`. Minimal views of the civic objects — the module never imports the hub's `CivicEvent` or `User` types directly.
+- `filter.ts` — `isDigestRenderable(event)` + `classifyItemKind(event)` + `sortDigestItems(items)`. Canonical list of which `event_type` / data-shape combinations are "digest-renderable." Comment at the top requires this to stay in sync with the Feed's filter in `ui/src/components/Feed.tsx` + `ui/src/components/FeedPost.tsx`.
+- `service.ts` — `assembleDigestForUser(input)` returns a `DigestEmail` or `null` (null = skip). `formatDigestHtml` / `formatDigestText` are exported for direct use / testing. HTML is inline-styled for email-client compatibility; plaintext is grouped the same way.
+- `unsubscribe.ts` — `buildUnsubscribeToken`, `verifyUnsubscribeToken`, `buildUnsubscribeUrl`. HMAC-SHA256 over `base64url(JSON.stringify({uid, p: "unsub_digest"}))`. Timing-safe signature compare. No expiry — unsubscribe links work forever.
+- `index.ts` — public surface.
+
+#### User schema — migration 005
+
+`civic-hub/supabase/migrations/20260423000000_digest_subscription.sql` adds two columns to `users`:
+- `digest_subscribed BOOLEAN NOT NULL DEFAULT TRUE`
+- `last_digest_sent_at TIMESTAMPTZ` (nullable — null means never sent)
+
+Plus a partial index on `digest_subscribed = TRUE` so the cron's subscriber scan stays cheap as user count grows. Existing users retroactively enroll (opt-out model).
+
+`civic-hub/src/modules/civic.auth/models.ts` + `index.ts` extended:
+- `User` interface gains `digest_subscribed: boolean` and `last_digest_sent_at: string | null`.
+- `rowToUser` defaults `digest_subscribed` to `true` when the DB row omits the field (defensive for pre-migration preview environments).
+- `verifyCode` (new-user creation path) sets `digest_subscribed: true` explicitly — documents the intent and protects against a future default change.
+- Three new service functions: `setDigestSubscription(userId, subscribed)`, `markDigestSent(userId, timestamp)`, `listSubscribedUsers()`.
+
+#### Event store helper
+
+`civic-hub/src/events/eventStore.ts` adds `getEventsSince(sinceIso)` — returns events with `created_at > since`, ascending. Used by the cron to pull one big batch, then filter per-user in memory (avoids N+1 DB fan-out).
+
+#### Three new HTTP surfaces — `civic-hub/src/controllers/digestController.ts`
+
+All three live in one controller; routes split across `digestRoutes.ts` for auth-gate clarity.
+
+- **`POST /internal/digest/run`** — Vercel Cron target. Requires `Authorization: Bearer <CRON_SECRET>` (Vercel Cron auto-injects this). Respects `DIGEST_ENABLED=false` (returns `{ skipped: true }`). Pulls all users with `digest_subscribed=true`, computes the earliest `since` cursor across the batch, calls `getEventsSince` once, then for each user: filters events to their window (`since = last_digest_sent_at ?? created_at`, capped to 30 days ago), calls `assembleDigestForUser`, sends via `utils/email.sendEmail` (Resend), and only advances `last_digest_sent_at` on a successful send. Empty digests are skipped silently. Individual-user failures (Resend 4xx/5xx, malformed data, etc.) are caught, logged, counted, and do NOT abort the batch — the next run retries them. Response shape: `{ processed_users, sent_count, skipped_count, failed_count, duration_ms }`.
+- **`GET /unsubscribe/digest?token=…`** — No auth. Verifies HMAC token → calls `setDigestSubscription(user_id, false)` → returns a themed HTML confirmation page. Invalid tokens → 400 with a "link is invalid, sign in to manage" page. 500 handler covers DB failures cleanly. All responses are `text/html` so email-client "click to unsubscribe" links land on a human page.
+- **`PATCH /user/settings/digest`** — `requireAuth` session bearer. Body `{ subscribed: boolean }`. Returns `{ digest_subscribed }`.
+
+Routes mounted in `src/app.ts`:
+- `app.use("/internal", digestCronRouter)`
+- `app.use("/unsubscribe", digestUnsubscribeRouter)`
+- `app.use("/user/settings", userSettingsRouter)`
+
+All three documented in the root `/` handler.
+
+#### Email formatting
+
+Subject: `{HUB_NAME} — {Weekday, Mon D} update (N new item[s])`. From: existing `RESEND_FROM`. HTML body is a single-column inline-styled layout (560px max-width) with four group headings ("New votes open", "New results published", "New Civic Briefs", "Announcements") — sections render only when non-empty. Each item: title linking to `event.action_url`, 1–2 line summary derived from event data, "Read more →" CTA. Footer: "Unsubscribe" + "Manage subscriptions" + the postal address from `HUB_POSTAL_ADDRESS`. Plain-text alternative included.
+
+### Frontend
+
+- **`ui/src/pages/Settings.tsx` + `.css`** — new page at `/settings`. Single "Daily email digest" panel with a checkbox-toggle. On mount: calls `/auth/me` to fetch the current subscription state (authoritative). On change: `PATCH /user/settings/digest`. Unauthenticated users see a "sign in to manage your settings" message. Styling pulls entirely from `styles/theme.css` tokens — no hardcoded colors or sizes.
+- **`ui/src/components/Nav.tsx`** — adds a `Settings` nav link visible only to signed-in users. Placed between Admin and the email/logout block.
+- **`ui/src/App.tsx`** — new `<Route path="/settings">`.
+- **`ui/src/services/auth.ts`** — `AuthUser` gains `digest_subscribed: boolean`.
+- **`ui/src/services/api.ts`** — new `setDigestSubscription(subscribed)` wrapper.
+
+No `/unsubscribed` SPA page — the backend returns a self-contained HTML confirmation, which is simpler and avoids a client-side round-trip on a link that users hit from an email client (possibly without cookies).
+
+### Vercel configuration
+
+`civic-hub/vercel.json` adds:
+```json
+"crons": [{ "path": "/api/internal/digest/run", "schedule": "0 13 * * *" }]
+```
+
+13:00 UTC = 09:00 EDT = 08:00 EST (Floyd County, Virginia).
+
+### Required setup before the cron works in production
+
+1. **Apply migration 005** to Supabase (SQL Editor → paste `supabase/migrations/20260423000000_digest_subscription.sql` → run). Adds the two columns on `users`.
+2. **Set Vercel env vars** (Production + Preview):
+   - `CRON_SECRET` — `openssl rand -hex 32`. Vercel Cron auto-injects this into request headers.
+   - `DIGEST_UNSUBSCRIBE_SECRET` — `openssl rand -hex 32`. MUST persist across deploys (rotating invalidates every outstanding unsubscribe link).
+   - `DIGEST_ENABLED=true` (or leave unset — defaults to true).
+   - `HUB_NAME=Floyd Civic Hub` (optional, defaults to this).
+   - `HUB_POSTAL_ADDRESS=Floyd, VA` (CAN-SPAM-style footer compliance).
+3. Verify `RESEND_API_KEY` and `RESEND_FROM` are already set (they're used by the OTP flow from earlier slices). The digest reuses these.
+
+### Env vars introduced in this slice
+
+Documented in `.env.example`:
+- `CRON_SECRET` — gate for the cron endpoint. If unset, every request returns 401.
+- `DIGEST_ENABLED` — `"true"` (default) or `"false"`. Runtime kill-switch.
+- `DIGEST_UNSUBSCRIBE_SECRET` — HMAC-SHA256 signing secret for unsubscribe tokens. Minimum 16 chars.
+- `HUB_NAME` — hub name shown in email subject, header, and unsubscribe confirmation page. Defaults to `"Floyd Civic Hub"`.
+- `HUB_POSTAL_ADDRESS` — city+state acceptable for pilot; shown in email footer.
+
+Existing `RESEND_API_KEY`, `RESEND_FROM` reused unchanged.
+
+### Preview verification
+
+- Backend (`npm run build` in `civic-hub/`): clean, no TypeScript errors.
+- UI (`npm run build` in `civic-hub/ui/`): clean; bundles at 316.75 kB / 92.92 kB gzipped.
+- `POST /internal/digest/run` with no/wrong `Authorization`: returns 401 `{ "error": "Invalid or missing cron credential" }` (verified).
+- `GET /unsubscribe/digest` with no token OR malformed token: returns the themed HTML error page (verified — 500 in local preview because `DIGEST_UNSUBSCRIBE_SECRET` isn't set in the local `.env`; 400 in production once the secret is configured).
+- `PATCH /user/settings/digest` without bearer: returns 401 `{ "error": "Authentication required" }` (verified).
+- `/settings` page renders for the signed-in admin: "Settings" heading, "Daily email digest" panel, "Subscribed — daily digest on" toggle. Nav shows the new Settings link.
+- `/admin/settings` page unchanged — both Brief delivery and Announcement authors panels still render and function as before (no regression).
+
+Full end-to-end cron → email delivery was NOT smoke-tested in preview because (a) migration 005 hasn't been applied to the local Supabase and (b) `DIGEST_UNSUBSCRIBE_SECRET` / `CRON_SECRET` aren't set locally. The route gates and HTTP plumbing are verified; the DB-write path requires the migration and the Resend path requires a valid API key in the environment. Both are production-deploy concerns.
+
+### Architectural decisions — recorded here so they outlive this slice
+
+**Digest filter must stay in sync with the Feed filter.** `civic.digest/filter.ts` duplicates the rules currently inlined in `ui/src/components/Feed.tsx` + `ui/src/components/FeedPost.tsx`. Neither side imports the other (frontend/backend boundary). Documented at the top of `filter.ts` and flagged here. Extracting both to a shared module is a future cleanup; for Slice 5 scope the rule is: **if the Feed grows a new visible post type, the digest must too, or residents will see things on the feed that never show up in their email** (and vice versa).
+
+**New-vote signal is `civic.process.started`, not `civic.process.created`.** The Slice 5 prompt said to include `created` as the "new-vote-open signal" for `civic.vote`, but the Feed uses `started` (the existing `created` events for votes are silently filtered out of the Feed — noted in Slice 4's HANDOFF). To keep the two filters aligned, the digest follows the Feed's convention: `started` is the "vote is now accepting ballots" signal for residents. If strict spec-prompt matching is needed later, this is a one-line change in `filter.ts`.
+
+**No civic events emitted for digest sends.** The user-facing spec of the hub is civic activity, not infrastructure. Delivery auditability comes from `console.log` lines of the form `[digest] user=<id> events=<N> sent=<true|false> [error=<...>]`, which Vercel surfaces under the function's run logs.
+
+**One big event query per cron run.** The cron computes the earliest `since` across the whole subscribed batch, issues a single `getEventsSince` call, and filters per-user in memory. This keeps the DB fan-out O(1) regardless of user count. The in-memory scan is O(users × events_in_window) — fine up to a few thousand users.
+
+### Scale limits — flagged for future attention
+
+- **Vercel function timeout.** Hobby = 10 s (likely not enough for even modest user counts once a real batch is running); Pro = 60 s; Enterprise = 300 s. For the MVP pilot (~50–500 users) Pro is the right floor. Beyond ~5 000 users the single-function approach breaks regardless of plan and needs batching / a queue — future slice.
+- **Resend rate limits.** Not addressed. Current implementation serializes per-user sends; if Resend throttles, per-user failures count toward the summary and get retried next run (because `last_digest_sent_at` doesn't advance on failure). This is acceptable for MVP.
+- **Single cron on Hobby.** Vercel Hobby supports daily crons. Pro supports more frequent. If we ever add a second cron, we may need the Pro plan.
+
+### Non-goals honored
+
+- No per-event-type subscription preferences (no "digest for votes only" toggle).
+- No per-user digest time preference.
+- No weekly / other frequencies.
+- No batching, queueing, or rate limiting logic.
+- No push / SMS / in-app notifications.
+- No open/click analytics.
+- No reuse of `services/mailer.ts` (that's reserved for transactional brief delivery) — Resend via `utils/email.ts` is the bulk channel.
+- Not registered in the process registry — civic.digest is a service module, not a process type.
+- No admin UI for globally toggling digests — `DIGEST_ENABLED` env var is the MVP control.
+
+### Files touched / added
+
+**Added (backend):**
+- `civic-hub/supabase/migrations/20260423000000_digest_subscription.sql`
+- `civic-hub/src/modules/civic.digest/{models,filter,service,unsubscribe,index}.ts`
+- `civic-hub/src/controllers/digestController.ts`
+- `civic-hub/src/routes/digestRoutes.ts`
+
+**Modified (backend):**
+- `civic-hub/src/modules/civic.auth/models.ts` — two new User fields
+- `civic-hub/src/modules/civic.auth/index.ts` — rowToUser defaults, digest_subscribed on create, three new service functions
+- `civic-hub/src/events/eventStore.ts` — `getEventsSince(sinceIso)`
+- `civic-hub/src/app.ts` — mount routes, document in root handler
+- `civic-hub/vercel.json` — `crons` entry
+- `civic-hub/.env.example` — 5 new vars documented
+
+**Added (frontend):**
+- `civic-hub/ui/src/pages/Settings.{tsx,css}`
+
+**Modified (frontend):**
+- `civic-hub/ui/src/App.tsx` — `/settings` route
+- `civic-hub/ui/src/components/Nav.tsx` — Settings link
+- `civic-hub/ui/src/services/auth.ts` — `AuthUser.digest_subscribed`
+- `civic-hub/ui/src/services/api.ts` — `setDigestSubscription` wrapper
+
+---
+
+## Slice 4.2 — Settings tab (admin IA cleanup) — 2026-04-23
+
+**Status:** Pure UI reorganization. No backend changes. Admin panel now has three tabs: **Proposals · Civic Briefs · Settings**. The two settings panels ("Brief delivery" and "Announcement authors") moved out of the Civic Briefs tab, where they were category errors, into a dedicated Settings tab.
+
+### Why
+
+Slice 4.1 parked the Announcement authors panel under Civic Briefs because that's where the hub-settings plumbing already lived (from the Slice 3 addendum). Author management has nothing to do with brief review, though — the user flagged the mismatch. A dedicated Settings tab is the correct IA and accommodates future config (theme, jurisdiction, email templates, etc.) without more tab proliferation.
+
+"Brief delivery" also moved to Settings even though it's brief-related. The distinction: brief *review* is a recurring workflow; brief *delivery recipients* is configuration set once and mostly forgotten. Putting configuration next to configuration (instead of mixed with an operational workflow) is the clearer model.
+
+### Changes
+
+- `ui/src/pages/AdminSettings.tsx` + `.css` — new page, owns both settings panels and their state/handlers. Renders under `AdminTabs` at `/admin/settings`. Heading: "Settings". Subtitle: "Hub-wide configuration. Changes take effect immediately — no redeploy required."
+- `ui/src/components/AdminTabs.tsx` — added third tab.
+- `ui/src/pages/AdminBriefs.tsx` — removed all settings state (`recipientsText`, `authors`, etc.), their `useEffect` loader, and handlers (`saveRecipients`, `saveAuthors`, `updateAuthor`, `addAuthor`, `removeAuthor`). Removed both `<section className="admin-settings-panel">` blocks from the list view JSX. Dropped unused imports (`adminGetSettings`, `adminPatchSettings`, `AnnouncementAuthor`). The page is purely the brief review queue again, as originally designed.
+- `ui/src/pages/AdminBriefs.css` — removed `.admin-settings-panel`, `.admin-settings-actions`, `.admin-settings-message`, `.announcement-author-row` styles (relocated to AdminSettings.css). Other admin-briefs-specific styles stay.
+- `ui/src/pages/AdminSettings.css` — new file; owns the relocated panel/row styles plus a small page wrapper.
+- `ui/src/App.tsx` — new `/admin/settings` route mounting `<AdminSettings />`.
+
+### Panel renames
+
+- "Delivery settings" → **"Brief delivery"** (more specific; "delivery" alone would collide with future "Announcement delivery" if that ever becomes a thing).
+
+### Preview verification
+
+- `/admin/settings` renders with both panels; previously-saved recipient + author values load correctly on tab switch.
+- `/admin/briefs` renders cleanly without settings panels; 4 filter buttons (All/Pending/Approved/Published) remain; brief review unchanged.
+- All three tabs highlight correctly; browser back between them works.
+- Save round-trip (recipients + authors) verified via `/admin/settings` PATCH.
+- Both UI and backend build clean; no TS errors.
+
+### Backend
+
+Untouched. `/admin/settings` endpoint, `hub_settings` table, auth middleware, announcement controller — all identical to Slice 4.1.
+
+### Files touched
+
+- `civic-hub/ui/src/pages/AdminSettings.{tsx,css}` (new)
+- `civic-hub/ui/src/components/AdminTabs.tsx` (add tab)
+- `civic-hub/ui/src/pages/AdminBriefs.{tsx,css}` (remove settings)
+- `civic-hub/ui/src/App.tsx` (add route)
+
+---
+
+## Slice 4.1 — Admin-editable announcement authors with flexible labels — 2026-04-23
+
+**Status:** The list of non-admin users authorized to post announcements is now admin-editable from the UI, with per-entry free-form role labels. Replaces the Slice 4 hardcoded-to-"board" model with a flexible "whatever you want to call them" model, while preserving backward compatibility.
+
+### Why
+
+Slice 4 shipped announcements with a two-role model: `"admin"` or `"board"`. Changing who could post required editing the `CIVIC_BOARD_EMAILS` Vercel env var + redeploying. The user asked for two things:
+1. Admin-editable list (no redeploy round-trip) — parity with brief recipient settings from Slice 3 addendum.
+2. Flexibility: support roles beyond Board — e.g. "Planning Committee", "Guest speaker" — because announcements may come from more than just the Board of Supervisors.
+
+### Model
+
+Announcement `author_role` is now a **free-form string** display label, not a fixed union. Permission-wise, there are still two internal tiers:
+
+- **`admin`** — always posts as "Admin", always editable by any admin, always has admin-panel access.
+- **`author`** — non-admin user in the admin-managed author list. Posts with the admin-configured label. Can only edit their own announcements.
+
+This keeps the permission model simple (binary: admin or not) while letting the display label be anything.
+
+### Precedence + fallback chain
+
+`resolveAuthorship(email)` in `middleware/auth.ts` walks:
+1. Is email in `CIVIC_ADMIN_EMAILS`? → `{ role: "admin", label: "Admin" }`.
+2. Is email in the `hub_settings.announcement_authors` DB row? → `{ role: "author", label: <configured label> }`.
+3. Is email in `CIVIC_BOARD_EMAILS` env var? → `{ role: "author", label: "Board member" }` (env-var fallback, preserves Slice 4 behavior).
+4. Otherwise → `null`.
+
+The env-var fallback means deploys that haven't yet visited the admin settings panel keep working without manual DB seeding.
+
+### Backend changes
+
+- **`src/services/hubSettings.ts`** — new `ANNOUNCEMENT_AUTHORS` key; `AnnouncementAuthor {email, label}` type; `getAnnouncementAuthors()`, `setAnnouncementAuthors()`, `lookupAuthorLabel()` helpers. `normalizeAuthors()` trims, dedups by lowercase email, rejects half-filled rows. JSON-serialized value in the key-value table.
+- **`src/middleware/auth.ts`** — removed synchronous `roleForEmail()` union. Added `isAdminEmail()` (sync) and `resolveAuthorship()` (async, DB-backed). `requireBoardOrAdmin` is now `requireAnnouncementPoster` — still resolves through email-list + DB, stamps `res.locals.effectiveRole` + `res.locals.authorLabel`. The old name `requireBoardOrAdmin` is re-exported as an alias so no external caller breaks.
+- **`src/controllers/authController.ts`** — `/auth/me` + `/auth/verify` responses now include `{role, author_label}`. UI uses both.
+- **`src/controllers/announcementController.ts`** — on create, stamps the resolved `authorLabel` onto `state.author_role`. Update handler passes `effectiveRole` (admin | author) to the module's `canEdit`.
+- **`src/controllers/adminSettingsController.ts`** — `/admin/settings` now includes `announcement_authors: AnnouncementAuthor[]` on GET and accepts it on PATCH. Rejects malformed bodies with 400.
+- **`src/modules/civic.announcement/models.ts`** — `AnnouncementAuthorRole` changed from `"board" | "admin"` union to `string`. Comment clarifies that older announcements may carry the literal `"board"`.
+- **`src/modules/civic.announcement/lifecycle.ts`** — `canEdit` now takes an `AnnouncementEditorRole = "admin" | "author"` (permission, not display).
+- **`src/modules/civic.announcement/service.ts`** — `updateAnnouncement`'s editor-role param matches the new enum.
+
+### Frontend changes
+
+- **`ui/src/services/auth.ts`** — `AuthRole` is now `"admin" | "author" | null`. `verifyCode` and `getMe` return `author_label` alongside role.
+- **`ui/src/context/AuthContext.tsx`** — exposes `authorLabel` in the context value; `login()` accepts it; `logout()` clears it. `canPostAnnouncements` now checks `role === "admin" || role === "author"`.
+- **`ui/src/components/AuthModal.tsx`** — passes `result.author_label` through `login()`.
+- **`ui/src/services/api.ts`** — `AnnouncementAuthor` type. `AdminSettings` extended with `announcement_authors: AnnouncementAuthor[]`. `AnnouncementAuthorRole` relaxed to `string`.
+- **`ui/src/pages/AdminBriefs.tsx`** + `.css` — new "Announcement authors" panel below the Delivery settings panel. Repeatable rows (email + label input + remove button); "+ Add author" button at the bottom; Save button. Empty-state message when no non-admin authors configured. Half-filled rows reject with an inline error before save.
+- **`ui/src/pages/Announcement.tsx`** — eyebrow is now `"${label} announcement"` (or just "Announcement" for admin-posted). Legacy `"board"` → `"Board member"` normalization for Slice 4 announcements.
+- **`ui/src/components/FeedPost.tsx`** — same label-driven format: admins render as "Announcement: …", everyone else as "{label} announcement: …". Legacy `"board"` same normalization.
+
+### Preview verification
+
+- Backend build clean, UI build clean.
+- `GET /admin/settings` returns `{brief_recipient_emails, announcement_authors}`.
+- `PATCH /admin/settings` with two authors (different labels) persists and round-trips correctly.
+- `/auth/me` for the admin returns `{role: "admin", author_label: "Admin"}`.
+- Admin panel shows both "Delivery settings" and "Announcement authors" panels, author rows render the previously-saved values.
+- Slice 4 announcements with `author_role: "board"` still render correctly on the public page and feed (backward compat).
+
+### Backward compatibility
+
+- Old announcements with `author_role: "board"` continue to display as "Board member" via a normalization step in the UI.
+- `requireBoardOrAdmin` export alias preserves any external code that imported it.
+- `CIVIC_BOARD_EMAILS` env var continues to work as a fallback when no DB row exists.
+- Admin email handling unchanged (`CIVIC_ADMIN_EMAILS`).
+
+### Files touched
+
+**Backend:**
+- `src/services/hubSettings.ts` — new types + helpers
+- `src/middleware/auth.ts` — new `resolveAuthorship`, `requireAnnouncementPoster`
+- `src/controllers/authController.ts` — /auth/me + /auth/verify return author_label
+- `src/controllers/announcementController.ts` — stamp label from middleware
+- `src/controllers/adminSettingsController.ts` — handle announcement_authors PATCH field
+- `src/modules/civic.announcement/models.ts` — author_role: string
+- `src/modules/civic.announcement/lifecycle.ts` — AnnouncementEditorRole enum
+- `src/modules/civic.announcement/service.ts` — new editor role enum in update
+- `.env.example` — CIVIC_BOARD_EMAILS doc updated to reflect fallback role
+
+**Frontend:**
+- `ui/src/services/auth.ts` — AuthRole + author_label on responses
+- `ui/src/context/AuthContext.tsx` — authorLabel in context
+- `ui/src/components/AuthModal.tsx` — pass author_label through login
+- `ui/src/services/api.ts` — AnnouncementAuthor type + AdminSettings extension
+- `ui/src/pages/AdminBriefs.tsx` + `.css` — Announcement authors panel
+- `ui/src/pages/Announcement.tsx` — label-driven eyebrow
+- `ui/src/components/FeedPost.tsx` — label-driven post title
+
+---
+
+## Slice 4 — Board announcements (civic.announcement) — 2026-04-22
+
+**Status:** New one-way communication channel from Board of Supervisors members (and admins) to residents. Announcements are a new `civic.announcement` process type with instant-publish semantics and transparent edits. A narrow Board-member role is introduced, distinct from admin.
+
+### Decisions captured before coding
+
+- **Branched from `main`** (not stacked on `slice-3-5-comments`). Slice 4 doesn't depend on Slice 3.5; they merge cleanly in either order.
+- **Plain text body** (not Markdown). Body is stored verbatim and rendered with preserved line breaks. A structured `links: {label, url}[]` array (up to 5) handles the "clickable link" need without introducing Markdown. Easy to swap to Markdown in a future slice if needed.
+- **Role exposure via `/auth/me` + `/auth/verify`**. Backend now returns `role: "admin" | "board" | null` derived from env-var email lists. UI reads role from AuthContext. This replaces the hardcoded `const ADMIN_EMAIL = "creatinglake@gmail.com"` check in `Nav.tsx` — no more hardcoded emails anywhere.
+- **Narrow Board capability.** Board members can post / edit announcements only. They do NOT get `/admin/*` access. `requireBoardOrAdmin` is a new middleware distinct from `requireAdmin`; existing admin routes are unchanged.
+
+### Spec compliance note (important)
+
+Announcements emit only `civic.process.created` and `civic.process.result_published` (on create) and `civic.process.updated` (on edit). Civic Process Spec §5 Phases 1–5 (Framing, Activation, Participation, Aggregation, Outcome/Decision) are intentionally **skipped** — there is no participation window, no aggregation, no outcome distinct from the posting itself. Emitting placeholder events for phases that don't correspond to meaningful civic activity would be misleading.
+
+This is a documented deviation pending a potential spec extension to recognize informational process kinds distinct from participation-driven and derivative kinds. Logged in `civic-hub/IDEAS.md` under Protocol / Federation for federation-readiness tracking.
+
+### Backend: new module + adapter
+
+`civic-hub/src/modules/civic.announcement/` — portable, pluggable. 5 files: models, lifecycle, events, service, index. State carries `content {title, body, links[]}`, `author_id`, `author_role: "board" | "admin"`, `created_at`, `last_edited_at`, `edit_count`. Length caps (title 200, body 5000, up to 5 links) enforced in the module's `sanitizeContent`. Authorization to edit (`canEdit`) lives in the module so any future non-HTTP caller enforces the same rules.
+
+`civic-hub/src/processes/announcementProcess.ts` — thin adapter. Rejects `handleAction` (announcements don't use the generic action dispatcher; the `/announcement/*` HTTP surface orchestrates create/edit directly via the module).
+
+Registered in `civic-hub/src/processes/registry.ts` alongside vote/proposal/brief. Hub boots cleanly if omitted.
+
+### Backend: auth + routes + controller
+
+- `src/middleware/auth.ts` — new `boardEmails()` helper, exported `roleForEmail(email)` that returns `"admin" | "board" | null` (admin wins if email appears in both), and new `requireBoardOrAdmin` middleware that allows users in either env list and sets `res.locals.effectiveRole`. Existing `requireAdmin` is unchanged — Board members cannot reach `/admin/*` routes.
+- `src/controllers/authController.ts` — `/auth/verify` and `/auth/me` responses now include `role: AuthRole`. The UI uses it to gate nav links and edit buttons without hardcoded emails.
+- `src/controllers/announcementController.ts` — `handleCreateAnnouncement`, `handleUpdateAnnouncement`, `handleGetAnnouncement`, `handleListAnnouncements`. Create fires `result_published` via the module's emitter after the generic factory has emitted `created`. Update enforces authorship (author or admin only) via `updateAnnouncement` in the module, returns 403 on unauthorized. Auto-finalizes the process status since announcements never participate.
+- `src/routes/announcementRoutes.ts` — `POST /announcement` (requireBoardOrAdmin), `PATCH /announcement/:id` (requireBoardOrAdmin, author/admin check inside), `GET /announcement/:id` (public). `GET /announcements` is mounted separately in `app.ts` so it doesn't collide with `/announcement/:id`.
+- `src/app.ts` — mounts the new routes, documents all four endpoints in the root handler.
+- `.env.example` — new `CIVIC_BOARD_EMAILS` var documented.
+
+### Frontend
+
+- `ui/src/services/auth.ts` — new `AuthRole` type; `verifyCode` and `getMe` return types include `role`.
+- `ui/src/context/AuthContext.tsx` — exposes `role`, `isAdmin`, `canPostAnnouncements` in the context value. `login()` accepts optional role. `AuthModal` passes role from the verify response through.
+- `ui/src/components/Nav.tsx` — "Post Announcement" link shown when `canPostAnnouncements`. "Admin" link shown when `isAdmin`. **Removed the hardcoded `ADMIN_EMAIL` constant** — all role checks now go through AuthContext.
+- `ui/src/services/api.ts` — `Announcement`, `AnnouncementSummary`, `AnnouncementLink`, `CreateAnnouncementInput`, `UpdateAnnouncementInput` types; four wrappers.
+- `ui/src/pages/PostAnnouncement.tsx` + `.css` — single page handles both create (`/announcement/new`) and edit (`/announcement/:id/edit`) via URL param. 200-char title, 5000-char body, repeatable link rows (add / remove, up to 5). Client-side gates: residents see a "not available" message; non-author Board members trying to edit someone else's announcement see "not your announcement". Backend enforces the same rules independently.
+- `ui/src/pages/Announcement.tsx` + `.css` — public page at `/announcement/:id`. ANNOUNCEMENT eyebrow, title, meta line with "Posted by {role} on {date}", "Last edited {date}" when edit_count > 0, Edit link visible only to author or admin. Body uses `white-space: pre-wrap` to preserve line breaks. Links rendered in a styled panel at the bottom.
+- `ui/src/components/Feed.tsx` — metadata loader extended: announcement events fetch from `GET /announcement/:id` (body serves as the feed summary). Kind discrimination uses `data.announcement` presence on `result_published` events.
+- `ui/src/components/FeedPost.tsx` — `eventToPost` `result_published` branch now handles three process kinds. Announcements render as **"Board announcement: {title}"** (role=board) or **"Announcement: {title}"** (role=admin). `classifyHref` treats `/announcement/:id` as an internal SPA route.
+- `ui/src/App.tsx` — three new routes: `/announcement/new`, `/announcement/:id/edit`, `/announcement/:id`.
+
+### End-to-end verified
+
+Against the local Vercel-connected hub:
+- **Auth role** — `/auth/me` for `creatinglake@gmail.com` returns `role: "admin"`.
+- **Create** — `POST /announcement` with title + body + one link succeeds, emits `civic.process.created` (generic, `/process/:id` action_url) + `civic.process.result_published` (module, `/announcement/:id` action_url). Returns 201 with the full announcement.
+- **Public read** — `GET /announcement/:id` returns full content, 404 for unknown IDs. No auth required.
+- **Edit** — `PATCH /announcement/:id` with body-only change bumps `edit_count` to 1, sets `last_edited_at`, returns `edited_fields: ["body"]`. Emits `civic.process.updated`. No-op edits (no actual field change) don't emit events.
+- **List** — `GET /announcements` returns newest-first summary rows with `edit_count` and `last_edited_at`.
+- **Feed** — UI feed renders the post as "Announcement: {title}" (admin-authored). The generic `created` event is silently filtered out by the existing Slice 1 `started`-only filter — confirmed no duplicate posts.
+- **Public page** — renders cleanly with ANNOUNCEMENT eyebrow, meta line with Posted/Last edited dates, body paragraph, Links panel. Edit link visible to the author/admin.
+- **Nav** — admin user sees Feed / Votes / About + Post Announcement + Admin + user/logout. Clean role-driven gating replaces the previous hardcoded email.
+
+### Environment variables introduced
+
+- `CIVIC_BOARD_EMAILS` — comma-separated list. Case-insensitive. Admin wins if both lists contain the same email. When unset, only admins can post announcements.
+
+Documented in `.env.example`. Needs to be set on Vercel (Production + Preview) before Board members can post in production.
+
+### Deferred / flagged
+
+- **Board-user preview verification** skipped. Only admin was tested end-to-end because `CIVIC_BOARD_EMAILS` isn't set in the local `.env`. Board role path is identical to admin in code; adding an email to the env var and authing as that user exercises it. Flagged for production verification after Vercel env vars are set.
+- **Markdown body rendering** — deferred. Plain text with preserved line breaks + structured links array covers most needs for MVP. Swap-in is a ~15-minute `react-markdown` change if needed.
+- **Informational process_kind spec extension** — announcements highlight a third class of civic process (informational, instant-publish) distinct from participation-driven (vote) and derivative (brief). Worth raising in the spec working group. Logged in IDEAS.md.
+- **User-record role field** — currently roles come from env-var email lists. Migration to per-user role records in the DB is a future concern; logged in IDEAS.md under Governance.
+
+### Files touched / added
+
+**Added (backend):**
+- `civic-hub/src/modules/civic.announcement/{models,lifecycle,events,service,index}.ts`
+- `civic-hub/src/processes/announcementProcess.ts`
+- `civic-hub/src/controllers/announcementController.ts`
+- `civic-hub/src/routes/announcementRoutes.ts`
+
+**Modified (backend):**
+- `civic-hub/src/middleware/auth.ts` — `boardEmails`, `roleForEmail`, `requireBoardOrAdmin`
+- `civic-hub/src/controllers/authController.ts` — role in /auth/verify and /auth/me
+- `civic-hub/src/processes/registry.ts` — register civic.announcement
+- `civic-hub/src/app.ts` — mount routes, document endpoints
+- `civic-hub/.env.example` — CIVIC_BOARD_EMAILS
+
+**Added (frontend):**
+- `civic-hub/ui/src/pages/PostAnnouncement.{tsx,css}`
+- `civic-hub/ui/src/pages/Announcement.{tsx,css}`
+
+**Modified (frontend):**
+- `civic-hub/ui/src/services/{auth,api}.ts`
+- `civic-hub/ui/src/context/AuthContext.tsx`
+- `civic-hub/ui/src/components/{Nav,Feed,FeedPost,AuthModal}.tsx`
+- `civic-hub/ui/src/App.tsx`
+
+---
+
+## Slice 3.5 — Community comments via civic.input — 2026-04-22
+
+**Status:** Community comments are now submitted via the vote flow and auto-populate the brief's `content.comments`. Also closes a pre-existing spec compliance gap: `civic.input.submitInput` now emits `civic.process.comment_added` events per Civic Event Spec §4.2 and Civic Process Spec §7.5.
+
+### Spec compliance fix
+
+**Gap closed:** `civic.input.submitInput` used to write to `community_inputs` without emitting any event. Participation actions MUST emit events per Civic Process Spec §7.5. Now emits `civic.process.comment_added` on every successful input submission, data shape:
+
+```json
+{
+  "event_type": "civic.process.comment_added",
+  "data": {
+    "comment": {
+      "id": "input_<hex>",
+      "body_preview": "<first 200 chars, trimmed>"
+    }
+  }
+}
+```
+
+Body preview truncated to 200 chars so events stay cheap to index/distribute; consumers that want the full body read `/process/:id/input`.
+
+### Architectural decision
+
+`civic.input` follows the same portability pattern as `civic.vote` — the host hub injects its `emit` function via `InputContext`; the module never imports the hub's event system. Preserves the module's guardrail ("MUST NOT import from civic.vote or any lifecycle/results code").
+
+### Changes
+
+**Backend:**
+- `src/modules/civic.input/models.ts` — new `EmitEventFn`, `InputContext`, `BODY_PREVIEW_LEN` exports.
+- `src/modules/civic.input/index.ts` — `submitInput` signature now requires `ctx: InputContext` with hub_id, jurisdiction, and emit callback. Emits `civic.process.comment_added` post-insert.
+- Three callers updated to pass `emitEvent`:
+  - `src/controllers/inputController.ts` — HTTP path (`POST /process/:id/input`)
+  - `src/controllers/debugController.ts` — dev seed endpoint
+  - `src/debug/autoSeed.ts` — startup auto-seed middleware
+- `src/modules/civic.brief/models.ts` — `CreateBriefFromVoteInput` accepts optional `comments: string[]`.
+- `src/modules/civic.brief/service.ts` — `generateBriefContent` seeds `content.comments` from the passed list via the existing `sanitizeList` (trim + dedup).
+- `src/processes/voteProcess.ts` — `spawnBriefFromClosedVote` reads `civic.input.getInputsByProcess(voteId)` and passes the comment bodies to the factory. Read failures are best-effort (warn, proceed with empty list — admin can still add manually).
+- `src/processes/briefProcess.ts` — `initializeState` passthroughs `comments` from the state input.
+
+**Frontend:**
+- `ui/src/components/VotePanel.tsx` — optional comment textarea above the vote buttons (500-char limit, counter, placeholder guiding the resident). On submit:
+  1. Vote first. If vote fails, stop.
+  2. If vote succeeded and comment non-empty, submit via `POST /process/:id/input`.
+  3. Comment submission failure after vote shows a non-fatal warning; vote stays recorded.
+  4. Full-success state shows "Your vote and comment have been submitted."
+- `ui/src/components/CommunityInputPanel.tsx` — refactored to read-only display. Submission form removed; the panel now just shows "Community comments" (heading renamed) with the list of past inputs. Actor prop no longer needed.
+- `ui/src/pages/Process.tsx` — CommunityInputPanel now renders for any civic.vote (panel returns null when empty), not gated on the per-process `community_input` content config.
+- `ui/src/App.css` — `.vote-comment-field` / `.vote-comment-textarea` / `.vote-comment-counter` / `.vote-comment-warning` styles. Tokens-only, no hardcoded values.
+
+### Test coverage
+
+`scripts/testBriefFlow.ts` extended with three new assertions (steps 5b, 5c, 7b):
+- Submitting a comment via `POST /process/:id/input` returns 201 with the stored body.
+- Exactly one `civic.process.comment_added` event fires, `data.comment.id` matches the returned input id, `body_preview` is ≤200 chars.
+- On vote close, the spawned brief's `content.comments` includes the submitted comment (seeded from civic.input before admin PATCH).
+
+All 22 assertions pass end-to-end. Admin PATCH of comments still replaces the seeded list with admin edits (existing behavior).
+
+### Preview verification
+
+- Backend + UI builds clean, no TS errors.
+- On a live active vote (Floyd Flock Camera), VotePanel renders the optional comment textarea with a 0/500 counter above the vote buttons, below the privacy notice. No console errors.
+- Placeholder text: "Share concerns, suggestions, context, or any thoughts worth passing on to the Board. Submitted when you cast your vote."
+
+### Non-goals honored
+
+- `civic.vote` module untouched — comments go through the parallel `civic.input` module.
+- No `kind` / `category` / `type` field added to `CommunityInput`. Generic comments only.
+- No separate event types for concerns/suggestions — `civic.process.comment_added` is the single canonical event.
+- No AI clustering, summarization, or moderation beyond what exists.
+
+### Files touched
+
+- `civic-hub/src/modules/civic.input/{models,index}.ts` (modified)
+- `civic-hub/src/modules/civic.brief/{models,service}.ts` (modified)
+- `civic-hub/src/processes/{voteProcess,briefProcess}.ts` (modified)
+- `civic-hub/src/controllers/{inputController,debugController}.ts` (modified)
+- `civic-hub/src/debug/autoSeed.ts` (modified)
+- `civic-hub/ui/src/components/{VotePanel,CommunityInputPanel}.tsx` (modified)
+- `civic-hub/ui/src/pages/Process.tsx` (modified)
+- `civic-hub/ui/src/App.css` (modified)
+- `civic-hub/scripts/testBriefFlow.ts` (extended)
+
+---
+
+## Slice 3 addendum — admin-configurable brief recipients — 2026-04-22
+
+**Status:** Admin UI in the Civic Briefs tab now exposes a "Delivery settings" panel for editing the brief recipient email list without a redeploy.
+
+### Why
+
+The Slice 3 approval flow read recipients from `BOARD_RECIPIENT_EMAIL` env var. Changing the recipient required a deploy, which is fine for infra but wrong for operational admins who need to re-route briefs as personnel / responsibilities shift. User asked for this directly.
+
+### Changes
+
+- **Migration 004** (`supabase/migrations/20260422000000_hub_settings.sql`) — new `hub_settings` table (key TEXT PK, value TEXT, updated_at, updated_by). RLS on, no permissive policies. Trigger keeps updated_at current on every write.
+- **`src/services/hubSettings.ts`** — generic key-value helpers + a `getBriefRecipients()` / `setBriefRecipients()` pair that dedupes + trims. `getBriefRecipients()` reads the DB value first and falls back to `BOARD_RECIPIENT_EMAIL` env var so existing deploys keep working before an admin has opened the settings panel.
+- **`src/controllers/adminSettingsController.ts`** — `GET /admin/settings` + `PATCH /admin/settings`. Shape is `{ brief_recipient_emails: string[] }`; extendable by adding more keys in the response type.
+- **`src/controllers/adminBriefController.ts`** — approval flow now calls `getBriefRecipients()` instead of reading env directly.
+- **`src/services/mailer.ts`** — removed unused `parseRecipients` helper; dedup/normalization now lives in hubSettings.
+- **`ui/src/services/api.ts`** — `AdminSettings` type + `adminGetSettings` / `adminPatchSettings` wrappers.
+- **`ui/src/pages/AdminBriefs.tsx` + `.css`** — "Delivery settings" card at the top of the list view. Textarea (comma- or newline-separated), save button, inline save-result message.
+
+### Required setup before deploy
+
+1. **Apply migration 004** to Supabase (SQL Editor → paste `supabase/migrations/20260422000000_hub_settings.sql` → run). Creates the `hub_settings` table.
+2. **Vercel env vars** (for Resend SMTP delivery — otherwise falls back to console logging which is invisible from the Vercel UI):
+   - `SMTP_HOST=smtp.resend.com`
+   - `SMTP_PORT=465`
+   - `SMTP_USER=resend`
+   - `SMTP_PASS=<your Resend API key>` (starts with `re_`)
+   - `SMTP_FROM=Floyd Civic Hub <adam@civic.social>` — must use a domain verified in Resend
+   - `BOARD_RECIPIENT_EMAIL=creatinglake@gmail.com` — still honored as a fallback; can be left blank once the admin has saved recipients in the UI
+3. Open `/admin/briefs` after deploy; enter `creatinglake@gmail.com` in the Delivery settings panel; hit Save. The next approval delivers there.
+
+### Compatibility note
+
+Existing `BOARD_RECIPIENT_EMAIL` env var is still honored as a fallback when no DB setting exists. Deploys without the migration applied will return 500 from the settings endpoint but approval still works via the env var — a hub that never opens the settings panel behaves exactly like before. The UI will surface the migration-not-applied error clearly on the settings panel.
+
+---
+
+## Slice 3 — Civic Brief generation + admin approval flow — 2026-04-22
+
+**Status:** Full-stack implementation of the Civic Brief lifecycle on branch `slice-3-briefs`. When a vote closes, a brief is generated automatically and enters an admin review queue. Admin approval delivers the brief to the Board of Supervisors via email, publishes it to the public feed, and finalizes the underlying vote. All events spec-compliant per Civic Event Spec v0.1 and Civic Process Spec v0.1.
+
+Slice 2 was not a separate slice — this slice follows directly from Slice 1.
+
+### Decisions captured before coding
+
+Cross-checked each prompt assumption against actual code state; five questions went to the user:
+
+- **Q1 concerns/suggestions** → leave brief content's community section empty at generation; admin writes it in during review. Future slice 3.5 will pre-populate from `civic.input`. _User also later consolidated `concerns` + `suggestions` into a single `comments: string[]` field for simplicity._
+- **Q2 finalization gating** → remove `process.finalize` from the HTTP adapter entirely. Brief module imports `finalizeVote` as a library function. No HTTP path publishes vote results without brief approval.
+- **Q3 admin nav** → shared `/admin` layout with tabs; keep sub-routes (`/admin/proposals`, `/admin/briefs`) for shareable URLs.
+- **Q4 briefs on /votes** → add "Completed Votes" section to `/votes` with brief-status chip per card: "Civic Brief pending review" (pending) or "View Civic Brief →" (published, links to `/brief/:id`). Briefs are not top-level entries on `/votes`.
+- **Q5 action_url fix** → central fix via new `CIVIC_UI_BASE_URL` env var in `eventEmitter`, not just briefs. Votes, briefs, and future process types all emit UI-facing action URLs from this slice forward. No short-term workarounds; forward-compat for federation.
+
+### Backend: new module
+
+`civic-hub/src/modules/civic.brief/` — portable, pluggable. Hubs can register or skip `civic.brief` without affecting other code paths.
+
+- `models.ts` — `BriefProcessState`, `BriefContent` (with `comments: string[]`), publication-status sub-states, injected callback types (`EmitEventFn`, `SendEmailFn`, `FinalizeLinkedVoteFn`).
+- `lifecycle.ts` — `canEdit`, `canApprove`, `assertPublicationTransition`.
+- `events.ts` — `emitBriefCreated`, `emitBriefAggregationCompleted`, `emitBriefUpdated`, `emitBriefOutcomeRecorded`, `emitBriefResultPublished`. All emit `action_url_path: /brief/:id` so feed posts link to the public brief page.
+- `email.ts` — pure HTML + text formatting for the board-delivery email.
+- `service.ts` — `createBriefState`, `editBrief`, `approveBrief` (the orchestration function). Approval runs: approve → email → deliver-to → outcome_recorded → publish → result_published → finalize linked vote → vote result_published.
+- `index.ts` — public surface.
+
+### Backend: adapter + factory hook
+
+- `civic-hub/src/processes/briefProcess.ts` — thin `ProcessHandler` adapter. Initializes state from a `CreateBriefFromVoteInput`; read/summary models map to the module's admin read models. Throws on any `handleAction` call (briefs don't have generic HTTP actions; admin uses `/admin/briefs/*`).
+- Registered in `civic-hub/src/processes/registry.ts` alongside `civic.vote` and `civic.proposal`.
+- `civic-hub/src/processes/voteProcess.ts` — on `process.close`, if `civic.brief` is registered, the adapter spawns a brief via the factory, emits the brief's `aggregation_completed`, and links the vote back to the brief via `follow_up_process_ids` (Civic Process Spec §11.3). If `civic.brief` is unregistered, close proceeds without spawning — hubs opt in cleanly.
+
+### Backend: vote module lifecycle changes
+
+- `civic.vote/events.ts` — new `emitAggregationCompleted` emitter with canonical Phase-4 data shape (`aggregation_method`, `participant_count`, `result_type`, `result_summary`).
+- `civic.vote/index.ts` — `closeVote` now emits both `ended` and `aggregation_completed` on close. `finalizeVote` is unchanged in behavior but is no longer reachable via HTTP; its comment explicitly documents it as library-only, brief-gated.
+- `voteProcess.ts` — the `process.finalize` action is deleted from the adapter's switch with an explanatory comment. This closes the gap where any caller could publish a vote result without brief approval.
+- Process descriptor updated: dropped `process.finalize` from `actions`; added `civic.process.aggregation_completed` to `events`.
+
+### Backend: event emitter — central action_url fix
+
+- `utils/baseUrl.ts` — new `uiBaseUrl()` helper. Reads `CIVIC_UI_BASE_URL`, falls back to `BASE_URL`, strips trailing slash.
+- `models/event.ts` — `CreateEventInput` adds optional `action_url_path` override for processes whose UI path isn't `/process/:id` (briefs use `/brief/:id`).
+- `events/eventEmitter.ts` — constructs `action_url` from `uiBaseUrl() + path`. `source.hub_url` continues to be `BASE_URL` (API origin, what federation partners hit), matching the spec's separation of concerns.
+- Resolves the Slice 1 "action_url points to API origin, not UI origin" follow-up.
+
+### Backend: routes + controllers
+
+- `routes/adminRoutes.ts` — adds `GET /admin/briefs`, `GET /admin/briefs/:id`, `PATCH /admin/briefs/:id`, `POST /admin/briefs/:id/approve`. All under `requireAdmin`.
+- `controllers/adminBriefController.ts` — list/get/patch handlers plus the full approval orchestration. The `finalizeLinkedVote` closure loads the vote, calls the vote module's `finalizeVote` as a library function (no HTTP round trip), and persists the vote. Idempotent on already-finalized votes. Halts cleanly on email delivery failure — brief stays `approved`, no further events fire, admin gets an actionable error.
+- `routes/briefRoutes.ts` + `controllers/briefController.ts` — public `GET /brief/:id`. Only `published` briefs return; pending/approved 404. Invisible to the public until admin approves.
+- `controllers/processController.ts` — `handleListProcesses` now filters out brief processes whose `publication_status !== "published"`. Prevents pending brief metadata from leaking via the public `GET /process` list.
+- `services/processService.ts` — new `saveProcessState(process)` for flows that mutate a process outside the action dispatcher (the brief approval flow persists both the brief and the linked vote through this). CORS middleware now allows `PATCH`.
+- `services/mailer.ts` — nodemailer transport with console-log fallback when any of `SMTP_HOST / SMTP_PORT / SMTP_USER / SMTP_PASS / SMTP_FROM` is unset. Parses comma-separated `BOARD_RECIPIENT_EMAIL` into a recipient list.
+
+### Frontend
+
+- `services/api.ts` — `BriefSummary`, `BriefDetail`, `PublicBrief`, `BriefContentPatch` types. Four admin wrappers + `getPublicBrief`. `ProcessSummary` union extended with `PublishedBriefSummary` for published briefs that show up in the public list.
+- `components/AdminTabs.tsx` + `AdminTabs.css` — shared tab nav at the top of both admin surfaces. Uses `NavLink` so `aria-current="page"` flips automatically.
+- `pages/AdminBriefs.tsx` + `AdminBriefs.css` — list with status filters (All / Pending / Approved / Published) and an inline review view. Review lets admin edit the `comments` list (line-separated textarea) and `admin_notes`; "Save draft" PATCHes, "Approve and publish" runs the backend orchestration with a confirmation step. Status chip shows where each brief is in the publication lifecycle.
+- `pages/AdminProposals.tsx` — now renders under the shared `AdminTabs` layout so both admin surfaces are one click apart.
+- `pages/Brief.tsx` + `Brief.css` — public brief page at `/brief/:id`. Clean readable render: eyebrow ("Civic Brief"), title, meta line with publish date + participant count + link back to the vote, positions rendered as CSS bars (participation % widths), comments list, admin notes. All tokens-referenced styles.
+- `pages/Votes.tsx` — split into three sections: **Active Votes** (status === `active` only — completed votes no longer pollute this section), **Proposed Votes** (unchanged), and new **Completed Votes**. Completed cards include a brief-status row: "View Civic Brief →" linking to `/brief/:id` if the matching brief is published, otherwise a "Civic Brief pending review" chip. Brief lookup is one-pass via a `Map<voteId, brief>` built from the public process list.
+- `components/Feed.tsx` — metadata fetch loop now branches by event: vote-type events pull from `GET /process/:id/state`, brief-type events pull from `GET /brief/:id`. Discriminator is the event itself (`data.brief_id` presence or `event_type === civic.process.started`).
+- `components/FeedPost.tsx` — `eventToPost` branches `civic.process.result_published` by process type: `civic.vote` renders **"Vote results published: [title]"**, `civic.brief` renders **"Civic Brief delivered: [title]"** with the backend's `headline_result` as summary. `classifyHref` extended to treat `/brief/:id` as an internal SPA route.
+- `App.tsx` — new routes `/admin/briefs` and `/brief/:id`.
+
+### Environment variables introduced
+
+- `CIVIC_UI_BASE_URL` — UI origin for `action_url` construction. Optional; defaults to `BASE_URL`. Set for split-origin dev only.
+- `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` — SMTP transport. All five or nothing; unset falls back to console-log email.
+- `BOARD_RECIPIENT_EMAIL` — where civic briefs are delivered on approval. Comma-separated is parsed. Required for approval to succeed; unset → 503.
+
+All six documented in `.env.example`.
+
+### Spec compliance
+
+- **Civic Event Spec v0.1** — every new event conforms to base schema (`id`, `version`, `event_type`, `timestamp`, `process_id`, `actor`, `jurisdiction`, `action_url`, `source`, `data`, `meta`). Brief events: `created`, `aggregation_completed`, `updated`, `outcome_recorded`, `result_published` — all canonical types per §4 and §7.4.
+- **Civic Process Spec v0.1** — brief spans Phases 0 (Initiation) → 4 (Aggregation, synchronous at creation) → 5 (Outcome/Decision, on admin approval) → 6 (Publication). Linked via `follow_up_process_ids` per §11.3. Outcome type = `advisory` per §10.2.
+- **Aggregation** — vote aggregation method recorded as `tallying`, brief's as `summarization` (§9.2).
+
+### Decisions made / deviations flagged
+
+- **Atomicity of approval sequence.** If `sendEmail` throws, brief stays `approved` and the subsequent events don't fire. If the vote finalization fails after `result_published` has already emitted for the brief, the brief is persisted but the vote is not — the events are in the log. This matches the existing `executeAction` race-condition gap and is an accepted pilot-phase limitation. Admin gets an actionable error.
+- **Single email recipient list** — `BOARD_RECIPIENT_EMAIL` accepts comma-separated multi-recipient (supported by the parser) even though the prompt specified single.
+- **Public `GET /process` list filtering.** Added a server-side filter so pending/approved briefs don't leak via the list endpoint. Only published briefs appear publicly. Admin uses `/admin/briefs` (full visibility).
+- **`process.finalize` removal** — confirmed no other code paths depend on the HTTP action; grep showed only the adapter's own case statement and tests referred to it. The library function `finalizeVote` is still exported and used by the brief approval flow.
+- **Atomicity note copied to this paragraph for visibility.** The hub's architecture persists events durably via `emitEvent` mid-sequence; if a later sequence step fails, the events are already in the log. This is consistent with the "events are the primary public interface" design principle but may surprise observers during the pilot. Future slice may introduce a transactional event queue if needed.
+
+### Verified in preview
+
+- Feed renders (`/`) — existing "New vote" post still surfaces; no brief `created` events accidentally posted.
+- `/votes` — all three sections (Active / Proposed / Completed) render. Completed is empty (no vote closed in current seed data) — expected.
+- `/admin/briefs` — renders the page shell, shared admin tabs visible, backend correctly returns "Authentication required" for unauth'd access.
+- `/brief/some-id` — 404 page renders cleanly for unknown IDs.
+- Backend `/health` — ok after reload.
+- Backend build (`npm run build`) + UI build — both clean, no TS errors.
+
+End-to-end smoke test (create vote → vote → close vote → admin approves → feed updates → brief page renders) wasn't fully exercised in this session because:
+- Vote close via HTTP requires a valid user session token from the email-OTP flow.
+- Admin approval requires `CIVIC_ADMIN_EMAILS` to include a session user AND `BOARD_RECIPIENT_EMAIL` set (even in console-fallback mode).
+
+The integration is type-checked and unit-coherent; remaining verification is best run on the Vercel preview URL with proper env vars configured, then re-tested against the staging Supabase (GitHub issue #2) once that lands.
+
+### Files touched / added
+
+**Added (backend):**
+- `civic-hub/src/modules/civic.brief/{models,lifecycle,events,service,email,index}.ts`
+- `civic-hub/src/processes/briefProcess.ts`
+- `civic-hub/src/controllers/{adminBriefController,briefController}.ts`
+- `civic-hub/src/routes/briefRoutes.ts`
+- `civic-hub/src/services/mailer.ts`
+
+**Modified (backend):**
+- `civic-hub/src/modules/civic.vote/{events,index}.ts`
+- `civic-hub/src/processes/{voteProcess,registry}.ts`
+- `civic-hub/src/services/processService.ts`
+- `civic-hub/src/controllers/processController.ts`
+- `civic-hub/src/events/eventEmitter.ts`
+- `civic-hub/src/models/event.ts`
+- `civic-hub/src/utils/baseUrl.ts`
+- `civic-hub/src/routes/adminRoutes.ts`
+- `civic-hub/src/app.ts`
+- `civic-hub/package.json` (nodemailer dependency)
+- `civic-hub/.env.example` (new env vars)
+
+**Added (frontend):**
+- `civic-hub/ui/src/components/AdminTabs.{tsx,css}`
+- `civic-hub/ui/src/pages/AdminBriefs.{tsx,css}`
+- `civic-hub/ui/src/pages/Brief.{tsx,css}`
+
+**Modified (frontend):**
+- `civic-hub/ui/src/services/api.ts`
+- `civic-hub/ui/src/pages/{Votes,AdminProposals}.tsx`
+- `civic-hub/ui/src/components/{Feed,FeedPost}.tsx`
+- `civic-hub/ui/src/App.{tsx,css}`
+
+**Doc updates:**
+- `civic-hub/IDEAS.md` — graduated the `action_url` backend fix (done this slice); added Slice 3.5 item to pre-aggregate `civic.input` into `BriefContent.comments`.
+
+### Open questions / follow-ups
+
+- **Slice 3.5 (pre-populate comments):** At brief generation time, read the list of community-input bodies tied to the source vote and seed `content.comments` with sanitized entries so admin review starts warm. Today the array is empty until the admin types.
+- **`result_published` title on vote events** — briefs already carry title in their `result_published` data; votes still carry only `result.tally`. Federated consumers of vote results need a callback to render. Smaller backend change once someone picks it up.
+- **End-to-end manual verification** — as noted, full vote-close → brief-approve → feed update hasn't been exercised live; best done on the Vercel preview once env vars are configured.
+- **Admin UX polish** — the comments editor is a simple textarea (one line per comment). A future pass could make this a reorderable list with per-entry delete buttons. Low priority.
+- **AdminProposals got a tab bar but its existing "back" flow was tied to a `<Link to="/">` — preserved semantically; flow still works.**
+
+---
+
+## Slice 1 — Feed rendering + navigation — 2026-04-21
+
+**Status:** Floyd Civic Hub MVP Slice 1 landed. Front-end only; no backend changes. `/` is now a civic feed; the former home (vote-process list + civic proposals + "+ Propose an Issue" button) moved verbatim to `/votes`; `/about` left untouched.
+
+Scope clarification: `/votes` renders *only* `civic.vote` processes (in any lifecycle state) and `civic.proposal` / civic-proposal submissions — i.e. everything in the voting pipeline. Other process types (future: `civic.announcement`, `civic.petition`, etc.) will get their own surfaces and must not be added to `/votes`. The filters in `pages/Votes.tsx` are type-explicit, not a catch-all, so new process plugins won't leak into `/votes` by accident.
+
+### Scope confirmation
+
+Before coding, reconciled the prompt against the actual repo state and got explicit user sign-off:
+- Move the entire existing Home content (Active Votes, Proposed Votes, legacy proposals, civic proposals + "+ Propose an Issue") verbatim to `/votes`.
+- Keep existing `/about` content as-is — it's already substantive, not a stub.
+- Nav is Feed / Votes / About only. Drop `Propose` from the nav; users still reach the Propose form from the Votes page. Keep the Admin link and user/logout cluster on the right side.
+- Theme: introduce a new `styles/theme.css` with the Slice-1 spec'd tokens and consume them only from new components. Pre-existing CSS continues to use the legacy variables in `index.css`. Consolidation deferred.
+- CLAUDE.md "Known Gap: Event Schema Alignment" section rewritten to reflect that the schema is aligned.
+
+### What was built
+
+**New files (all in `civic-hub/ui/src/`):**
+- `styles/theme.css` — semantic design tokens on `:root` (colors, typography, spacing scale, radii, elevation). Imported from `main.tsx` before `index.css`.
+- `components/Nav.tsx` + `Nav.css` — top sticky horizontal nav. Uses `NavLink` so the active link gets `aria-current="page"` and an `.is-active` class for styling. Primary links (Feed / Votes / About) on the left; Admin + user/logout cluster on the right.
+- `components/Feed.tsx` + `Feed.css` — feed container. Fetches `GET /events`, applies the Slice-1 event-type filter, paginates client-side (50 initial, +50 per "Load more"), and renders posts inside `<section aria-label="Civic activity feed">`. Accepts an optional `filter` prop for future filter/search UI so adding it later won't require a rewrite.
+- `components/FeedPost.tsx` — renders one post deterministically from a view-model. Exports `eventToPost(event, getDescription, getTitle)` which is where the event-type → post mapping lives (open for extension).
+- `pages/Votes.tsx` — the previous Home content, moved here unchanged.
+
+**Edited files:**
+- `pages/Home.tsx` — rewritten to render `<HubHeader />` + `<Feed />`. The old process-list Home logic now lives in `pages/Votes.tsx`.
+- `App.tsx` — imports the new `Nav`, wraps `<Routes>` in `<main>`, drops the inline `NavBar`, adds `/votes → <Votes />`. `/process/:id`, `/proposal/:id`, `/propose`, `/about`, `/admin/proposals`, `/votes/:id/log` routes unchanged.
+- `main.tsx` — imports `styles/theme.css` before `index.css` so tokens are defined before any component styles run.
+- `services/api.ts` — new `CivicEvent` type (mirrors `civic-hub/src/models/event.ts`) and `getEvents()` wrapper. No other API changes.
+
+### Filter rules (Slice 1)
+
+Only these event types render as posts; all others are filtered out.
+
+| Event type | Post title | Summary |
+|---|---|---|
+| `civic.process.started` | `"New vote: [title]"` | First line of process description |
+| `civic.process.result_published` | `"Results available: [title]"` | `"{n} participants — results now public."` |
+
+Rationale for `started` over `created`: `civic.process.created` fires as soon as a process row exists, which includes votes in "proposed" / "gathering support" states that haven't yet crossed the endorsement threshold. Surfacing those in the public feed would announce unofficial proposals as if they were real votes. `civic.process.started` fires only when the process enters active participation — the correct signal for "this is now an official vote, citizens should see it." Proposals remain visible on `/votes` (gathering-support section) during the support-collection phase; the feed picks them up only when they become active.
+
+`civic.process.ended` is also intentionally *not* rendered — per Process Spec §5 and Event Spec §4.1, `ended` means aggregation has begun; `result_published` means results have been approved for public release. Admin approval gates `result_published` (Slice 3). Surfacing `ended` would leak unreviewed results.
+
+**Future process types:** today civic.vote is the only module that emits `started`, so every `started` event renders as a "New vote: …" post. When additional process types (e.g. `civic.petition`, `civic.announcement`) start emitting `started`, the switch in `eventToPost()` needs a per-process-type branch to pick the correct post title/format. That's a one-case addition, not a restructure.
+
+### Pagination
+
+`GET /events` does not currently support `limit`/`offset`. Slice 1 fetches the full event list once and paginates client-side (50 per page). Server-side pagination is a worthwhile backend follow-up once the event store grows.
+
+### Per-post process metadata fetches
+
+`civic.process.created` events carry `data.process.{type, title}`, but no description. `civic.process.result_published` events carry only tally/total_votes, no title or description. To render titles and summaries, `Feed` fetches `GET /process/:id/state` lazily for each visible event and caches the result in a React state map keyed by `process_id`. A `useRef`-backed in-flight set dedupes fetches across `useEffect` re-runs (including StrictMode's dev-only double-invocation).
+
+This is a pragmatic Slice-1 choice. For federation-readiness, a future backend slice should emit the process title (and ideally a first-line summary) on `civic.process.result_published` so external hubs consuming Floyd's events never need to call back into Floyd. Until then, federated events from other hubs will render with a fallback title (`"Process {id}"`) rather than the real title.
+
+### `action_url` dev/prod mismatch — flagged
+
+The hub's emitter populates `action_url` with the *hub's own base URL* (e.g. `http://localhost:3000/process/:id` in dev, `https://floyd.civic.social/process/:id` in prod). Per Civic Event Spec §3, `action_url` is meant to be a "link to take action" — i.e. a user-facing URL. In the current setup the UI runs on a different origin than the API (`localhost:5173` vs `:3000` in dev), so clicking the literal `action_url` would hit the JSON API, not the UI route.
+
+Slice 1 works around this client-side: `classifyHref()` in `FeedPost.tsx` checks the `action_url`'s path — if it matches `/process/:id`, we navigate via React Router regardless of origin. Federation-origin URLs (unmatched paths, foreign origins) render as external anchors opening in a new tab. This is forward-compatible with federated events.
+
+**Recommended backend fix (future slice):** populate `action_url` with the UI origin / UI path, not the API origin. Ideally the hub has a separate `UI_BASE_URL` env var used for event emission. Low priority but worth doing before the feed is federated.
+
+### Spec-compliance check
+
+Cross-referenced the implementation against `/specs/`:
+- Feed reads from `GET /events` only — events remain the primary public interface.
+- Post filtering is keyed on `event_type` strings from the canonical set (Event Spec §4.1). New process plugins emitting new event types can be surfaced by extending the switch in `eventToPost()` — no structural change.
+- `action_url` used as the post link target — forward-compat for federation (events from other hubs carry their own origins).
+- Semantic HTML: `<nav aria-label="Primary">`, `<main>`, `<article>` per post, `<time datetime="…">` for timestamps with absolute-time `title` attributes for hover.
+
+### Theme architecture
+
+`theme.css` defines semantic tokens on `:root`: colors (bg, surface, surface-muted, text, text-muted, text-subtle, border, border-hover, primary, primary-text, primary-hover, focus), typography (font-body, font-heading, size-sm/base/lg/xl, line-height-tight/base), spacing scale (xs/sm/md/lg/xl), radii (sm/md), and elevation (shadow-card). Slice-1 components consume these tokens exclusively — no hardcoded hex codes, font names, or magic pixel values.
+
+The legacy variables in `index.css` (`--primary-color`, `--text-color`, etc.) remain in place for pre-existing components. A future "theme consolidation" slice should migrate legacy component CSS to the new token names so that a single theme override re-skins the whole app.
+
+### CLAUDE.md update
+
+- Renamed the "Known Gap: Event Schema Alignment" section to "Event Schema: Aligned with Civic Event Spec v0.1" and rewrote the body to describe the aligned state, with a historical note for archaeology.
+- Removed the "Event schema full alignment with Civic Event Spec (before Phase 2)" bullet from the "Deferred to Later Phases" list.
+- Note: CLAUDE.md's own permission model denies Claude writing to CLAUDE.md by default. The Slice 1 prompt explicitly instructed this change, which the user confirmed. The permission model was not modified.
+
+### Verified in preview
+
+Ran both the UI (`npm run dev`, port 5173) and the hub backend (`npm run dev`, port 3000). Against the current event store (2 `civic.process.created`, 1 `civic.process.proposed`, 1 `civic.process.started`, 2 `civic.process.updated`, 1 `civic.process.vote_submitted`):
+
+- Feed renders exactly 2 posts: `"New vote: Floyd County Flock Camera Use"` and `"New vote: Add More Secure Dumpster (Green Box) Sites"`. The 5 other events are silently filtered out (correct).
+- Both posts show their real descriptions as summaries, pulled from `/process/:id/state` and cached.
+- Nav shows Feed / Votes / About. Active link gets the blue underline and `aria-current="page"`. Visited `/`, `/votes`, `/about` in sequence; active state followed correctly each time.
+- `/votes` renders the previous Home UI identically — Active Votes, Proposed Votes with the "+ Propose an Issue" button, etc.
+- `/about` renders the existing `About.tsx` content (un-edited).
+- `npm run build` succeeds with no TypeScript errors.
+
+### Open questions / follow-ups
+
+- **Load-more button** not reached during smoke-test (only 2 renderable posts; threshold is 50). Exercising it requires more seeded events.
+- **Timestamp refresh:** relative timestamps (`"5 days ago"`) are computed at render time; they don't tick. For a long-lived session they'd go stale. Acceptable for Slice 1.
+- **Process-state refetch on mount:** each page-load of `/` fires `GET /process/:id/state` for every visible post. If the feed is popular, consider (a) having `result_published` carry the title in `data`, and (b) a lightweight `GET /process?ids=a,b,c` batch endpoint.
+- **Legacy nav CSS:** the old `.app-nav`, `.nav-links`, `.nav-link`, `.nav-link-admin`, `.nav-logout`, `.nav-user`, `.nav-user-email`, `.nav-right` classes in `App.css` are no longer referenced. Dead CSS; not removed this slice.
+- **`action_url` backend fix** (see above).
+- **Theme consolidation** (see above).
+- **Separate Supabase project for preview / staging deploys** — tracked as [civic-hub#2](https://github.com/creatinglake/civic-hub/issues/2). Do this before the next slice that touches writes; otherwise preview URLs write to production data.
+
+### Files touched
+
+- `civic-hub/ui/src/styles/theme.css` (new)
+- `civic-hub/ui/src/components/Nav.tsx` (new)
+- `civic-hub/ui/src/components/Nav.css` (new)
+- `civic-hub/ui/src/components/Feed.tsx` (new)
+- `civic-hub/ui/src/components/Feed.css` (new)
+- `civic-hub/ui/src/components/FeedPost.tsx` (new)
+- `civic-hub/ui/src/pages/Votes.tsx` (new)
+- `civic-hub/ui/src/pages/Home.tsx` (rewritten)
+- `civic-hub/ui/src/App.tsx` (rewritten nav + routes)
+- `civic-hub/ui/src/main.tsx` (adds theme.css import)
+- `civic-hub/ui/src/services/api.ts` (adds CivicEvent + getEvents)
+- `CLAUDE.md` (event-schema note rewritten; deferred-work bullet removed)
+- `HANDOFF.md` (this entry)
+- `.claude/launch.json` (added `hub` backend config for preview verification)
+
+---
+
+## Licensing, Repo Hygiene & Calculate America Recovery — 2026-04-20
+
+**Status:** Reference implementations licensed under BUSL-1.1. `civic-dashboard` renamed to `citizen-dashboard` (GitHub + local). Policy-sensitive repos flipped to private. The previously-orphaned Income Inequality Explorer source now safely in the (private) `Calculate_America` repo.
+
+### Pilot spec ToCs made clickable
+
+Followup to docs-repo creation. Converted plain-text ToCs in the two long pilot specs to GitHub-anchored markdown links.
+
+- `civic-social-docs/pilots/civic-hubs/spec.md` — all 33 numbered sections + "How to Read This Document" entry now click-jump.
+- `civic-social-docs/pilots/civic-identity/spec.md` — all 46 numbered sections + "How to Read This Document" + "References" now click-jump.
+- Discovered numbering mismatch in Hubs spec (body section 20 "AI-Assisted Moderation (Optional)" was missing from ToC). Added the missing ToC entry and renumbered items 21–33 to align with body. ToC and body section numbers now match cleanly.
+
+### BUSL-1.1 licensing for product code
+
+Surfaced concern: CC-BY 4.0 on docs has zero effect on product code (per-work licensing, no copyleft contagion). Audit revealed `civic-hub`, `civic-dashboard`, and `mosaic-social-site` had **no LICENSE file at all** — public visibility but no rights granted, an ambiguous legal state.
+
+Decision: license reference implementations under **Business Source License 1.1 (BUSL-1.1)** with the Mosaic Foundation as Licensor. Rationale: keeps source visible (open ecosystem narrative), reserves commercial deployment rights (revenue funds the commons, not shareholders), guarantees auto-conversion to Apache 2.0 after 4 years per release.
+
+**License parameters used:**
+
+| Parameter | Value |
+|---|---|
+| Licensor | `Mosaic Foundation` |
+| Additional Use Grant | `None. All Production Use requires a separate license granted by the Licensor at its sole discretion.` |
+| Change Date | `2030-04-19` (rolling — each future release ships with its own Change Date 4 years out) |
+| Change License | `Apache License, Version 2.0` |
+
+The Additional Use Grant is intentionally tight — no nonprofit/government carve-outs. All commercial use is case-by-case to prevent loophole abuse.
+
+**Repos licensed:**
+
+- `civic-hub`: `LICENSE` + `LICENSING.md` committed and pushed
+- `citizen-dashboard`: `LICENSE` + `LICENSING.md` committed and pushed
+
+`LICENSING.md` is a plain-English explainer that contrasts BUSL (reference implementations) with CC-BY 4.0 (ecosystem specs). It also clarifies that anyone is free to build their own implementation of the specs under any license they choose — the spec license does not constrain implementations.
+
+Note: GitHub's license detector marks BUSL as "Other / NOASSERTION" (BUSL isn't OSI-approved). Legal effect is identical regardless. Not actionable.
+
+### Repo rename: civic-dashboard → citizen-dashboard
+
+- Renamed on GitHub via `gh repo rename`. GitHub auto-redirects the old URL for external bookmarks.
+- Local clone's `origin` URL updated to the new GitHub URL.
+- Local folder renamed: `/Users/adamlake/Developer/civic-dashboard` → `/Users/adamlake/Developer/citizen-dashboard`.
+
+### Citizen Dashboard moved into Civic-Social-Mono on disk
+
+Per the established nested-repo pattern (alongside `civic-hub/` and `civic-social-docs/`), moved `citizen-dashboard/` from `/Users/adamlake/Developer/` into `/Users/adamlake/Developer/Civic-Social-Mono/`. Remains an independent git repo with its own GitHub remote. Parent's `.gitignore` updated.
+
+### Visibility decisions (confirmed and verified)
+
+| Repo | Visibility | Notes |
+|---|---|---|
+| `Civic-Social-Mono` (parent) | local only, no GitHub remote | Intentionally not pushed. Time Machine handles backup. |
+| `civic-hub` | PUBLIC | BUSL covers commercial restriction; visibility supports ecosystem trust. Vercel deployment (`civic-hub-two.vercel.app`) unaffected. |
+| `citizen-dashboard` | PUBLIC | GitHub Pages free tier requires public; custom domain `citizendashboard.civic.social` would break under private without GitHub Pro or migrating off Pages. BUSL covers commercial restriction. |
+| `Calculate_America` | PRIVATE | Policy-sensitive content (income inequality framing). |
+| `FairShare` | PRIVATE | Older version of the inequality app, no longer maintained. Pages site at `creatinglake.github.io/FairShare/` stops serving as a side effect — accepted. |
+
+### Licensing philosophy logged
+
+- **Specs and ecosystem documentation** = CC-BY 4.0 (open, attribution-only).
+- **Reference implementations** (Civic Hub, Citizen Dashboard, future engines) = BUSL-1.1 (source-available, commercial use case-by-case, auto-converts to Apache 2.0 after 4 years per release).
+- **Other implementations of the specs by third parties** = their choice, completely unconstrained. The CC-BY spec license does not bind implementations.
+
+---
+
+## Documentation Repo Created — 2026-04-19
+
+**Status:** New private GitHub repo `creatinglake/civic-social-docs` created and populated with 17 canonical documents. Lives at `civic-social-docs/` inside `Civic-Social-Mono/` as a nested git repo (parent ignores it via `.gitignore`).
+
+**URL:** https://github.com/creatinglake/civic-social-docs (private)
+
+### What was done
+
+**Repo structure**
+
+```
+civic-social-docs/
+├── README.md              ← project overview, status legend, license note
+├── LICENSE                ← CC-BY 4.0 (fetched from creativecommons.org)
+├── CONTRIBUTING.md        ← how to contribute via GitHub or email
+├── AUTHORS.md             ← founding author + contributor placeholder
+├── canon/                 ← foundational reference (3 docs)
+├── ecosystem/             ← substrate-level specs (8 docs)
+└── pilots/
+    ├── civic-identity/    ← Civic Identity Pilot v0.5 + 2 briefs
+    └── civic-hubs/        ← Civic Hubs Pilot v0.6 + 2 briefs
+```
+
+**Frontmatter convention**
+
+Every imported doc has YAML frontmatter:
+```yaml
+---
+status: <draft|review|stable>
+last-reviewed: 2026-04-19
+owners: [adam]
+version: 0.1
+---
+```
+
+### What's incomplete
+
+- **GitHub repo description** is empty. Suggested: `gh repo edit creatinglake/civic-social-docs --description "Canonical documentation for Civic.Social — open, federated infrastructure for civic participation"`.
+- **Editorial pass** needed before flipping any review/draft docs to stable, especially the funder-partner briefs and the AI-related ecosystem docs.
+- **Repo is PRIVATE.** Will flip to public after review: `gh repo edit creatinglake/civic-social-docs --visibility public`.
+
+---
+
+## Production Readiness — 2026-04-16
+
+**Status:** Civic Hub is **live in production** at `https://civic-hub-two.vercel.app`, backed by persistent Postgres on Supabase, with real email delivery via Resend and enforced backend auth.
+
+### What was done
+
+**Persistent data (10 tables, Supabase Postgres)**
+
+Every in-memory `Map` / array replaced with a Postgres table. Data now survives Vercel cold starts (previously every cold start wiped state, which broke sessions, active votes, and the event log).
+
+| Old (in-memory) | New (Postgres) |
+|---|---|
+| `civic.auth` maps | `users`, `sessions`, `pending_verifications` |
+| `processService.processes` | `processes` (state in JSONB) |
+| `eventStore.events` | `events` (append-only via trigger) |
+| `civic.proposals` maps | `proposals`, `proposal_supports` |
+| `civic.receipts` maps | `vote_records`, `vote_participation` (no join key — privacy guarantee) |
+| `civic.input.inputsByProcess` | `community_inputs` |
+
+Schema migrations in `civic-hub/supabase/migrations/`:
+- `20260416000000_initial_schema.sql` — all tables, indexes, RLS, triggers
+- `20260416000100_align_events_schema.sql` — align events columns with CivicEvent model, relax append-only trigger to block UPDATE only
+- `20260416000200_processes_columns.sql` — add `hub_id` and `process_version` to processes
+
+RLS is enabled and forced on every table with no permissive policies. Backend uses the Supabase `service_role` secret key (bypasses RLS). Anon/publishable key cannot read or write anything.
+
+**Backend auth enforcement (`civic-hub/src/middleware/auth.ts`)**
+
+- `requireAuth` / `requireResident` / `requireAdmin` middleware
+- Actor is taken from the validated Bearer token, never from the request body — closes the pre-existing "anyone could POST `{actor:'anyone'}` to vote as them" hole
+- Admin routes gated by `CIVIC_ADMIN_EMAILS` env var (comma-separated allowlist)
+- CORS gated by `CIVIC_ALLOWED_ORIGINS`; production refuses to start if unset
+- `/debug/seed` gated by `CIVIC_ALLOW_SEED` — unset in production, so live data can't be wiped even if the endpoint is hit
+- Session TTL: 30 days, with opportunistic cleanup on invalid-token lookups
+
+**Real email delivery (Resend)**
+
+- `src/utils/email.ts` — tiny wrapper around Resend's HTTP API (no SDK dep)
+- OTP codes emailed from `Floyd Civic Hub <noreply@floyd.civic.social>` (DKIM + SPF verified)
+- Hardcoded `"000000"` demo bypass replaced with `CIVIC_DEMO_BYPASS_CODE` env var — unset in production, set in dev/preview
+- Fallback: if `RESEND_API_KEY` is unset, code is logged to console (dev only)
+
+**Deployment**
+
+- Vercel auto-build on push to `main`
+- Three environments configured (Production, Preview, Development) with per-environment env vars
+- `vercel.json` updated to install devDependencies so `tsc` + `vite` work in the build step
+- Node pinned to `20.x` in `package.json` engines field
+- Event `action_url` and discovery manifest use a `baseUrl()` helper that strips trailing slashes (fixes the `https://host//path` double-slash issue)
+
+### Env vars in Vercel (11 total)
+
+| Key | Production | Preview | Development |
+|---|---|---|---|
+| `SUPABASE_URL` | yes | yes | yes |
+| `SUPABASE_SERVICE_ROLE_KEY` | yes | yes | yes |
+| `CIVIC_ADMIN_EMAILS` | yes | yes | yes |
+| `RESEND_API_KEY` | yes | yes | yes |
+| `RESEND_FROM` | `Floyd Civic Hub <noreply@floyd.civic.social>` | same | same |
+| `BASE_URL` | prod URL | same | `http://localhost:3000` |
+| `NODE_ENV` | `production` | `preview` | `development` |
+| `CIVIC_ALLOWED_ORIGINS` | prod URL | unset | unset |
+| `CIVIC_ALLOW_SEED` | **UNSET** | `true` | `true` |
+| `CIVIC_DEMO_BYPASS_CODE` | **UNSET** | `000000` | `000000` |
+
+### How to run locally
+
+```bash
+cd civic-hub
+cp .env.example .env        # then fill in real values
+npm run dev                  # http://localhost:3000
+```
+
+See `civic-hub/.env.example` for all env vars, and `civic-hub/supabase/README.md` for DB migration conventions.
+
+### Verified in production (end-to-end)
+
+- `/api/health` reports `db.ok: true`
+- Seed data present: 2 processes, 6 events, all with correct prod action_urls
+- Unauthenticated `POST /api/process/:id/action` → 401
+- Unauthenticated `GET /api/admin/proposals` → 401
+- `GET /api/debug/seed` → 403 (production is sealed)
+- OTP email delivered from `noreply@floyd.civic.social` to real inbox
+- Actor-spoofing via request body is ignored; emitted event's `actor` is the session's user_id
+
+### Known follow-ups (not blocking for pilot)
+
+- **Schema alignment with Civic Event Spec v0.1** — event model still uses `event_type/data/meta/source` shape vs. spec's flat top-level fields. Pre-existing known divergence, documented in CLAUDE.md.
+- **Custom domain** — currently on `civic-hub-two.vercel.app`; pointing `floyd.civic.social` (or similar) DNS → Vercel is a 10-min task when ready. Update `BASE_URL` and `CIVIC_ALLOWED_ORIGINS` in Vercel at the same time.
+- **Rate limiting** on `/auth/request-code` (and others) — anyone can spam the endpoint to trigger emails right now. Resend's free tier (3,000/month) is a natural cap, but abuse handling should come before broad user rollout.
+- **Pagination** on `/events`, `/process`, `/proposals` — unchanged, returns all rows. Fine at current scale.
+- **Concurrency on `executeAction`** — read-mutate-write against `processes.state` is not transactional. Under low concurrency it's fine. Hardening path: optimistic locking via `updated_at` compare-and-swap, or a Postgres RPC that does the whole dance server-side.
+- **Database backups** — Supabase free tier is daily backups, 7-day retention. Upgrade to Pro ($25/mo) when user data warrants it.
+- **Free-tier inactivity pause** — Supabase free projects pause after 1 week of inactivity. Mitigate with a Vercel Cron or GitHub Action hitting `/api/health` weekly.
+
+---
+
+## Component Status Snapshot
+
+### Backend: API Layer (`civic-hub/src/routes/`, `civic-hub/src/controllers/`)
+
+**Built:**
+- All five spec-required endpoints implemented: `GET /.well-known/civic.json`, `POST /process`, `GET /process/:id`, `POST /process/:id/action`, `GET /events`
+- Additional UI-facing endpoints: `GET /process` (list all), `GET /process/:id/state` (read model with tally)
+- Community input endpoints: `POST /process/:id/input`, `GET /process/:id/input`
+- **Proposal endpoints (2026-04-03):**
+  - `POST /proposals` — submit a new civic proposal
+  - `GET /proposals` — list proposals (optional `?status=` filter)
+  - `GET /proposals/:id` — get proposal detail (optional `?actor=` for support check)
+  - `POST /proposals/:id/support` — endorse a proposal
+- **Admin endpoints (2026-04-03):**
+  - `GET /admin/proposals` — list proposals for admin review (endorsed first, then submitted)
+  - `GET /admin/proposals/:id` — get full proposal detail for admin
+  - `POST /admin/proposals/:id/convert` — convert endorsed proposal to civic.vote process
+  - `POST /admin/proposals/:id/archive` — archive (reject/shelve) a proposal
+- **Auth endpoints (2026-04-03):**
+  - `POST /auth/request-code` — request email verification code (OTP logged to console in dev)
+  - `POST /auth/verify` — verify code, create/login user, return session token
+  - `POST /auth/residency` — affirm Floyd County residency (requires Bearer token)
+  - `GET /auth/me` — get current authenticated user (requires Bearer token)
+  - `POST /auth/logout` — destroy session
+- **Vote log endpoints (2026-04-04):**
+  - `GET /votes/:id/log` — public vote audit log (only after vote closes, shuffled)
+  - `GET /votes/:id/verify?receipt=X` — verify a vote receipt (exact match only)
+- Event filtering by `process_id`, `event_type`, and combined filters via query params
+- Pretty-print option on events endpoint (`?pretty=true`)
+- Debug seed endpoint (`GET /debug/seed`) — clears all data (processes, events, inputs, proposals) and reseeds
+- Health check at `GET /health`
+- Root endpoint returns endpoint directory
+- CORS middleware (allows all origins with `*`, includes `Authorization` header)
+- Process creation accepts optional `content` field for structured issue content
+
+**Missing/Rough:**
+- No input sanitization beyond basic required-field checks
+- No pagination on `GET /events` or `GET /process` — returns all records
+- No rate limiting
+- CORS is wide open — fine for dev, not for production
+- Admin routes (`/admin/*`) are unprotected — no admin-specific auth
+- Auth is email-based OTP with console logging (no real email delivery in dev)
+
+---
+
+### Backend: Process Model (`civic-hub/src/models/process.ts`)
+
+Structured content types for rich issue pages:
+- `ProcessContent` — optional field on Process, containing:
+  - `core_question`, `sections[]`, `key_tradeoff`, `links[]`, `community_input`, `after_vote`
+- Content is stored directly on the Process object and passed through read models
+- Backward-compatible — processes without content render the plain description only
+
+---
+
+### Backend: Modular Architecture (`civic-hub/src/modules/`)
+
+#### `/modules/civic.vote/` — Portable Vote Process Module
+
+Self-contained module implementing the full civic.vote lifecycle. No direct imports from hub routes or UI.
+
+**Lifecycle states:** `draft → proposed → threshold_met → active → closed → finalized`
+
+**Activation modes:**
+- `"direct"` — allows `draft → active` only
+- `"proposal_required"` — allows `draft → proposed → threshold_met → active` (full proposal path)
+
+**Actions:** `process.propose`, `process.support`, `process.unsupport`, `process.activate`, `process.vote`, `process.close`, `process.finalize`
+
+**Events emitted:** `civic.process.proposed`, `civic.process.threshold_met`, `civic.process.started`, `civic.process.vote_submitted`, `civic.process.ended`, `civic.process.result_published`
+
+#### `/modules/civic.proposals/` — Civic Proposal Intake Module (NEW 2026-04-03)
+
+Separate module for user-submitted civic proposals. Proposals are raw, unstructured ideas — distinct from curated civic.vote processes.
+
+**GUARDRAIL:** This module MUST NOT import from civic.vote. Conversion is handled by the admin controller.
+
+**Files:**
+- `models.ts` — Types: `Proposal`, `ProposalSupport`, `ProposalStatus`, `CreateProposalInput`, `ProposalConfig`
+- `events.ts` — Event emission helpers: `emitProposalSubmitted`, `emitProposalSupported`, `emitProposalEndorsed`, `emitProposalConverted`
+- `index.ts` — Service interface: create, list, support, convert, archive, read models
+
+**Lifecycle states:** `submitted → endorsed → converted` (or `archived`)
+
+**Endorsement threshold:** Configurable via `ProposalConfig.proposal_support_threshold` (default: 5). When support_count >= threshold, status auto-transitions to "endorsed".
+
+**Events emitted:**
+- `civic.proposal.submitted` — user creates a proposal
+- `civic.proposal.supported` — user endorses a proposal
+- `civic.proposal.endorsed` — proposal reaches support threshold
+- `civic.proposal.converted` — admin converts proposal to civic.vote process
+
+**Data model:**
+- Proposals stored in separate in-memory Map (not in process registry)
+- Support records stored per-proposal with unique constraint (one support per user per proposal)
+- Read models include `has_supported` for actor-aware views
+
+#### `/modules/civic.auth/` — Email-Based Authentication Module (NEW 2026-04-03)
+
+Minimal auth for civic participation. No passwords, no complex identity verification.
+
+**GUARDRAIL:** This module MUST NOT import from civic.vote or civic.proposals.
+
+**Files:**
+- `models.ts` — Types: `User`, `PendingVerification`, `Session`
+- `index.ts` — Service: request code, verify, affirm residency, session management
+
+**User data model:**
+- `id` — unique identifier (format: `user_<hex>`)
+- `email` — normalized (lowercase, trimmed)
+- `email_verified` — set to `true` on successful code verification
+- `is_resident` — set to `true` when user affirms Floyd County residency
+- `created_at` — ISO 8601 timestamp
+
+**Auth flow:**
+1. User enters email → `requestVerification()` generates 6-digit OTP, logs to console (dev)
+2. User enters code → `verifyCode()` validates, creates/finds user, returns session token
+3. First-time user: `affirmResidency()` sets `is_resident = true`
+4. Returning user: residency is persisted, skips step 3
+
+**Session management:**
+- Bearer token in Authorization header
+- In-memory session store (DEV-ONLY)
+- `getUserFromToken()` resolves token → user
+- `logout()` destroys session
+
+**OTP behavior:**
+- 6-digit random code
+- 10-minute expiry
+- DEV: Code logged to server console (no email sending — no external network calls)
+
+#### `/modules/civic.receipts/` — Anonymous Vote Receipt Module (NEW 2026-04-04)
+
+Strict data separation between user identity and vote records. No cryptographic complexity.
+
+**GUARDRAIL:** This module MUST NOT store receipt_id alongside user_id.
+
+**Files:**
+- `models.ts` — Types: `VoteRecord`, `UserParticipation`
+- `index.ts` — Service: `recordVote`, `verifyReceipt`, `getVoteLog`, `hasUserVoted`, `clearReceipts`
+
+**Data separation (two stores, no link):**
+- `voteRecords` (Map by receipt_id): `receipt_id`, `process_id`, `choice`, `created_at` — NO user_id
+- `participation` (Map by "user_id:process_id"): `user_id`, `process_id`, `has_voted` — NO receipt_id
+
+**Receipt generation:** `crypto.randomUUID()` — standard UUID v4
+
+**Privacy protections:**
+- Timestamps are stored internally but NEVER exposed publicly
+- Vote log is shuffled (Fisher-Yates) before rendering — no ordering inference
+- Vote log only available after vote is closed or finalized
+- Receipt lookup is exact match only — no partial or fuzzy search
+
+#### `/modules/civic.input/` — Community Input Module
+
+Separate module for free-text submissions tied to a process. GUARDRAIL: No imports from civic.vote.
+
+---
+
+### Backend: Process Registry (`civic-hub/src/processes/`)
+
+- Plugin architecture via `ProcessHandler` interface
+- Two process types registered: `civic.vote`, `civic.proposal` (legacy)
+- `voteProcess.ts` handler passes `content` and `jurisdiction` through read models
+
+---
+
+### Backend: Controllers
+
+- `processController.ts` — Process CRUD and action dispatch
+- `proposalController.ts` — User-facing proposal submission, listing, detail, and endorsement
+- `adminController.ts` — Admin proposal review, conversion to civic.vote, and archival
+- `authController.ts` — (NEW) Email auth flow: request-code, verify, residency, me, logout
+- `eventController.ts` — Event listing with filters
+- `inputController.ts` — Community input submission
+- `debugController.ts` — Seed data (clears all data including auth on reset)
+
+---
+
+### Backend: Debug / Seed Data (`civic-hub/src/debug/`)
+
+- Seed scenarios in `src/debug/seedData.ts` — not loaded at startup
+- **Floyd County Flock Camera issue** as the only seed scenario
+- Server starts clean with zero processes and zero proposals
+- `GET /debug/seed` clears all data and reloads
+
+---
+
+### Frontend: Pages (`civic-hub/ui/src/pages/`)
+
+- **`VoteLog.tsx` — NEW (2026-04-04)** — Vote audit log page (`/votes/:id/log`):
+  - Receipt lookup section: exact receipt ID search with found/not-found states
+  - Public vote log section: shuffled list of receipt_id + choice (no timestamps)
+  - Only available after vote is closed or finalized
+  - Before close: shows "Vote log will be available after voting ends"
+  - Auto-verifies if `?receipt=X` is in the URL
+  - Highlights matched receipt in the log table
+- `Home.tsx` — Two sections: Active Votes, Proposed Votes. Proposed Votes is a single unified section showing civic.vote proposals, legacy proposals, and civic.proposals together. Includes "+ Propose an Issue" CTA in section header. Empty states: "No active votes." / "No proposals yet."
+- `Process.tsx` — Vote/proposal detail with jurisdiction badge, structured content, community input
+- `About.tsx` — Full About page with 8 sections
+- **`Propose.tsx` — NEW (2026-04-03)** — User-facing proposal submission form:
+  - Fields: title (required), description (optional), links (optional, one per line)
+  - Submits to `POST /proposals`
+  - Redirects to Home on success
+  - Error handling and validation
+- **`ProposalDetail.tsx` — NEW (2026-04-03)** — Proposal detail page (`/proposal/:id`):
+  - Shows proposal title, description, status, submitted by, date
+  - Endorsement progress bar (support_count / threshold)
+  - "Endorse This Proposal" button (once per user)
+  - Status-specific notices: gathering support, endorsed, converted, archived
+  - Related links section
+- **`AdminProposals.tsx` — NEW (2026-04-03)** — Admin proposal review dashboard (`/admin/proposals`):
+  - **List view:** All proposals sorted by endorsed first, then submitted. Shows title, status badge, support count, submitter, date. Click to open detail.
+  - **Detail view:** Full proposal with description, links, endorsement count. "Review & Convert to Vote" button (endorsed only). "Archive" button.
+  - **Review/Convert view:** Editable form prefilled from proposal:
+    - Vote title, core question, voting options (one per line)
+    - Jurisdiction field
+    - Key tradeoff
+    - Context sections (dynamic add/remove): What is it, Why it matters, Concerns, Local context
+    - Learn more links (prefilled from submission)
+    - "Convert to Vote" creates civic.vote process and marks proposal as converted
+    - Emits `civic.proposal.converted` event
+
+---
+
+### Frontend: Components (`civic-hub/ui/src/components/`)
+
+- `ProcessCard.tsx` — Handles all lifecycle statuses
+- `VotePanel.tsx` — Full lifecycle support including "Remove Endorsement" button (proposed state only). Auth-gated: endorse and vote buttons trigger AuthModal for unauthenticated users. Includes vote privacy notice. Shows anonymous vote receipt after voting with receipt ID and "Verify my vote" link. Shows "View Vote Log" button when vote is closed/finalized.
+- `ProposalCard.tsx` / `ProposalPanel.tsx` — Legacy civic.proposal support
+- **`AuthModal.tsx` — NEW (2026-04-03)** — Multi-step auth modal:
+  - Step 1: Email input ("Create an account to participate")
+  - Step 2: 6-digit OTP verification (dev hint to check server console)
+  - Step 3: Residency affirmation checkbox ("I confirm that I am a resident of Floyd County, Virginia")
+  - Reuses `.intro-overlay` / `.intro-modal` styling. Escape/backdrop dismiss.
+  - Returning users with `is_resident = true` skip step 3 automatically.
+- `IntroPopup.tsx` — First-visit welcome modal with localStorage persistence
+- `IssueContent.tsx` — Structured content renderer
+- `CommunityInputPanel.tsx` — Community input submission and display
+- `HubHeader.tsx` — Hub banner with two-line header ("Floyd County, Virginia" / "Civic Hub") and tagline
+
+---
+
+### Frontend: Services & Config
+
+- `api.ts` — All process, vote, proposal, admin, and input API types and functions
+- **`auth.ts` — NEW (2026-04-03)** — Auth API client:
+  - `requestCode()`, `verifyCode()`, `affirmResidency()`, `getMe()`, `logoutApi()`
+  - `AuthUser` type with `id`, `email`, `email_verified`, `is_resident`, `created_at`
+  - Token storage in `localStorage` via `getStoredToken()`, `storeToken()`, `clearToken()`
+
+---
+
+### Frontend: Navigation & Routing (`civic-hub/ui/src/App.tsx`)
+
+**Updated (2026-04-03):**
+- `AuthProvider` wraps entire app — provides auth state to all components
+- Top nav bar: Home, Propose, About, Admin. Shows logged-in user email + logout button when authenticated.
+- IntroPopup shown on first visit
+- Routes: `/` (Home), `/process/:id` (Process), `/propose` (Propose), `/proposal/:id` (ProposalDetail), `/admin/proposals` (AdminProposals), `/about` (About)
+
+### Frontend: Auth Infrastructure (`civic-hub/ui/src/context/`, `hooks/`)
+
+**NEW (2026-04-03):**
+- **`AuthContext.tsx`** — React context providing: `user`, `token`, `actorId`, `canParticipate`, `login()`, `updateUser()`, `logout()`
+  - Restores session from `localStorage` on mount via `GET /auth/me`
+  - `actorId` = `user.id` (used as actor in all API calls) or `null`
+  - `canParticipate` = authenticated + email_verified + is_resident
+- **`useRequireAuth.ts`** — Hook for gating actions: `requireAuth(action)` runs the action if authenticated+resident, otherwise shows AuthModal. On auth completion, the pending action auto-executes (resume behavior).
+
+### Frontend: Styles (`civic-hub/ui/src/App.css`)
+
+**Added (2026-04-03):**
+- Propose page: `.propose-form`, `.form-field`, `.form-label`, `.form-input`, `.form-textarea`, `.propose-submit-button`
+- Community proposals section: `.section-header-row`, `.propose-link`, `.inline-link`
+- Proposal detail: `.proposal-endorsement-section`, `.proposal-endorsed-notice`, `.proposal-converted-notice`, `.proposal-archived-notice`
+- Admin page: `.admin-page`, `.admin-subtitle`, `.admin-action-message`, `.admin-proposal-list`, `.admin-proposal-item`
+- Admin status badges: `.admin-status-endorsed`, `.admin-status-submitted`, `.admin-status-converted`, `.admin-status-archived`
+- Admin detail: `.admin-detail-section`, `.admin-links-list`, `.admin-actions`, `.admin-convert-button`, `.admin-archive-button`
+- Admin review form: `.admin-review-form`, `.admin-sections`, `.admin-section-editor`, `.admin-remove-section`, `.admin-add-section`, `.admin-convert-actions`
+- Nav admin link: `.nav-link-admin` (right-aligned, subtle opacity)
+- Hub header: `.hub-label` (secondary label below jurisdiction name), `.hub-tagline` (replaces `.hub-description`)
+- Footer: `.app-footer` (centered, small, neutral), `.app-footer a` (underlined, subtle link styling)
+- All previously added styles preserved (issue content, community input, intro popup, endorsement actions, etc.)
+
+---
+
+### Test Infrastructure (`civic-hub/scripts/testFlow.ts`)
+
+70+ assertions across 3 phases — all passing. No changes needed for this session.
+
+---
+
+## Proposal → Vote Pipeline
+
+### How It Works
+
+1. **User submits proposal** via `/propose` page → `POST /proposals`
+   - Creates `civic.proposals` record with status "submitted"
+   - Emits `civic.proposal.submitted` event
+
+2. **Community endorses** via `/proposal/:id` page → `POST /proposals/:id/support`
+   - One endorsement per user per proposal
+   - Each endorsement emits `civic.proposal.supported` event
+   - When `support_count >= proposal_support_threshold` (default: 5):
+     - Status transitions to "endorsed"
+     - Emits `civic.proposal.endorsed` event
+
+3. **Admin reviews** via `/admin/proposals` dashboard
+   - Endorsed proposals surface at top of list
+   - Admin sees original submission (title, description, links)
+
+4. **Admin curates and converts** via Review & Convert form
+   - Prefills from proposal data
+   - Admin edits: title, question, options, context sections, tradeoff, links, jurisdiction
+   - On convert: creates `civic.vote` process via `createProcess()`
+   - Proposal status → "converted"
+   - Emits `civic.proposal.converted` event
+
+5. **Vote process continues** normal civic.vote lifecycle
+   - Created in "draft" status with `activation_mode: "proposal_required"`
+   - References source proposal via `state.source_proposal_id`
+
+### Architectural Boundaries
+
+- `civic.proposals` module is fully independent — no imports from civic.vote
+- Conversion is coordinated by `adminController.ts` which imports from both modules
+- Events flow through centralized `emitEvent()` as required
+- Proposals and processes use separate data stores
+- The legacy `civic.proposal` process type (in process registry) is retained for backward compatibility
+
+### Configuration
+
+- `proposal_support_threshold`: Set via `setProposalConfig()` on the module. Default: 5.
+- Currently hardcoded; should be made configurable via hub config file or API.
+
+---
+
+## Authentication & Participation Gating
+
+### Auth Flow (Email OTP)
+1. User clicks a gated action (endorse, vote, propose) → AuthModal opens
+2. User enters email → `POST /auth/request-code` → 6-digit OTP logged to server console (dev)
+3. User enters code → `POST /auth/verify` → session token returned, stored in `localStorage`
+4. First-time user: residency checkbox → `POST /auth/residency` → `is_resident = true`
+5. Returning user: if already `is_resident`, residency step is skipped
+6. Pending action auto-executes after auth completion (resume behavior)
+
+### Gated Actions
+- **Endorse proposal** (VotePanel "Endorse Proposal" button)
+- **Cast vote** (VotePanel vote option buttons)
+- **Submit proposal** (Propose page form submission)
+- **Endorse civic proposal** (ProposalDetail "Endorse This Proposal" button)
+
+### Residency Storage
+- Stored on `User.is_resident` (boolean) in the civic.auth module
+- Set once via `POST /auth/residency`, persists across sessions
+- Required before first participation — cannot vote/endorse/propose without it
+
+### Privacy Messaging
+- **VotePanel**: "Votes are private. Only total results are shown." (shown during active voting)
+- **About page** (Participation and integrity section): "Individual votes are not publicly associated with identities. Only aggregated results are displayed."
+
+### Session Persistence
+- Token stored in `localStorage` key `civic_auth_token`
+- AuthContext restores session on app mount via `GET /auth/me`
+- Nav bar shows user email + "Log out" button when authenticated
+
+---
+
+## Floyd County Flock Camera Issue
+
+### Where Created
+- Seed scenario: `civic-hub/src/debug/seedData.ts` → `FLOYD_FLOCK_CAMERA` export
+- Loaded via: `GET /debug/seed` endpoint
+
+### How Initialized
+1. Process created as `civic.vote` with `activation_mode: "proposal_required"`, `jurisdiction: "us-va-floyd"`
+2. Proposed via `process.propose` by `user:civic-admin`
+3. Three initial supporters seeded
+4. Three community inputs seeded
+5. **Support threshold: 5** — currently at 3/5
+
+### Structured Content
+Full issue content in `process.content`: core question, 4 sections, key tradeoff, 5 learn more links, community input config, after-vote info with recipients.
+
+---
+
+## Assumptions Made
+
+1. **Proposals are separate from processes** — civic.proposals has its own data store, not registered in the process registry. This keeps the two concerns cleanly separated.
+
+2. **Admin authentication is deferred** — `/admin/*` routes are unprotected. Any user can access them. Real auth is Phase 2.
+
+3. **Conversion creates a draft vote** — The converted vote starts in "draft" status with `activation_mode: "proposal_required"`. It still needs to go through the vote's own proposal/support cycle before becoming active.
+
+4. **Proposal support is permanent** — Once a user endorses a proposal, they cannot remove it (unlike vote endorsements which can be removed in "proposed" state). This is a deliberate simplification.
+
+5. **Threshold is module-level config** — All proposals share the same `proposal_support_threshold`. Per-proposal thresholds are not yet supported.
+
+6. **The admin review form is minimal** — No WYSIWYG, no preview, no image uploads. Just text fields matching the ProcessContent structure.
+
+7. **No notification system** — The admin dashboard IS the notification system. Admins must check it manually.
+
+8. **No real email delivery** — OTP codes are logged to server console. In production, integrate an email provider (e.g., SendGrid, SES). No external network calls in v0.1.
+
+9. **Auth does not enforce backend action gating** — The backend still accepts any `actor` string in action payloads. Auth gating is frontend-only for now. Backend enforcement would require middleware that validates Bearer tokens on action endpoints.
+
+10. **Session tokens have no expiry** — In-memory sessions last until server restart or logout. Production should add TTL.
+
+---
+
+## Open Questions
+
+1. **Admin authentication** — Admin routes are unprotected. How should admin access be controlled?
+
+2. **Backend auth enforcement** — Should action endpoints (`POST /process/:id/action`, `POST /proposals/:id/support`) require a valid Bearer token?
+
+3. **Per-proposal thresholds** — Should different proposals have different support thresholds?
+
+4. **Proposal editing** — Can submitters edit proposals after submission?
+
+5. **Converted vote initial state** — Should converted votes start in "draft" or skip to "proposed"?
+
+6. **Deprecate legacy civic.proposal process type** — The new civic.proposals module fully subsumes it.
+
+7. **Real email delivery** — What email provider for production OTP delivery?
+
+8. **Process descriptor API endpoint** — `PROCESS_DESCRIPTOR` exists but isn't served via API.
+
+---
+
+## Suggested Next Tasks
+
+### High Priority (Floyd Pilot)
+1. **Backend auth enforcement** — middleware to validate Bearer tokens on action endpoints
+2. **Admin authentication** — shared secret or admin email list
+3. **Real email delivery** — integrate email provider for OTP codes
+4. **Fix event feed ordering** — spec requires descending timestamp
+
+### Medium Priority
+5. **Session TTL** — add expiry to auth sessions
+6. **Add pagination** to `GET /events`, `GET /process`, `GET /proposals`
+7. **Align discovery manifest** with spec
+8. **Make proposal_support_threshold configurable** via hub config
+9. **Remove legacy civic.proposal process type** from registry
+
+### Lower Priority
+10. **Add real test framework** (vitest)
+11. **Add monorepo tooling** (npm workspaces)
+12. **Proposal edit endpoint** for submitters
+
+---
+
+*Last updated: 2026-05-27*
+*Civic Hub Build Log — extracted from monorepo HANDOFF.md*

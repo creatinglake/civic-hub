@@ -13,6 +13,7 @@
 import { getDb } from "../../db/client.js";
 import { generateId } from "../../utils/id.js";
 import { sendEmail } from "../../utils/email.js";
+import { isEmailOnBetaAllowlist } from "../../services/hubSettings.js";
 import type { User, PendingVerification, Session } from "./models.js";
 
 export type { User, PendingVerification, Session } from "./models.js";
@@ -41,13 +42,12 @@ function rowToUser(row: Record<string, unknown>): User {
     email_verified: Boolean(row.email_verified),
     is_resident: Boolean(row.is_resident),
     created_at: String(row.created_at),
-    // Default to true for older rows that pre-date the migration. The
-    // DB migration backfills the column, but the Boolean() coercion also
-    // keeps us safe for any response shape that omits the field.
-    digest_subscribed:
-      row.digest_subscribed === undefined || row.digest_subscribed === null
-        ? true
-        : Boolean(row.digest_subscribed),
+    // digest_frequency_days: null = unsubscribed, 1 = daily, etc.
+    // Default to 1 (daily) for rows that pre-date the migration.
+    digest_frequency_days:
+      row.digest_frequency_days === undefined || row.digest_frequency_days === null
+        ? null
+        : Number(row.digest_frequency_days),
     last_digest_sent_at: row.last_digest_sent_at
       ? String(row.last_digest_sent_at)
       : null,
@@ -99,6 +99,19 @@ export async function requestVerification(
     return {
       message: "Demo mode — use the displayed bypass code to sign in.",
     };
+  }
+
+  if (process.env.CIVIC_BETA_MODE === "true") {
+    const adminEmails = (process.env.CIVIC_ADMIN_EMAILS ?? "")
+      .split(",")
+      .map((e) => e.trim().toLowerCase())
+      .filter((e) => e.length > 0);
+    if (!adminEmails.includes(normalizedEmail)) {
+      const allowed = await isEmailOnBetaAllowlist(normalizedEmail);
+      if (!allowed) {
+        throw new Error("This hub is currently in private beta.");
+      }
+    }
   }
 
   const code = generateOTP();
@@ -245,7 +258,7 @@ export async function verifyCode(
     }
   } else {
     // Create new user. Race-safe: unique(email) will reject duplicates.
-    // digest_subscribed defaults to true (opt-out model, Slice 5). Setting
+    // digest_frequency_days defaults to 1 (daily, opt-out model). Setting
     // it explicitly here documents the intent and protects against a
     // future default change in the migration.
     const newRow = {
@@ -253,7 +266,7 @@ export async function verifyCode(
       email: normalizedEmail,
       email_verified: true,
       is_resident: false,
-      digest_subscribed: true,
+      digest_frequency_days: 1,
     };
 
     const { data, error } = await db
@@ -440,16 +453,17 @@ export async function deleteAccount(
 // --- Digest subscription (Slice 5) ---
 
 /**
- * Set the daily-digest subscription flag for a user.
- * Called by the UI settings toggle and by the unsubscribe endpoint.
+ * Set the digest frequency for a user. null = unsubscribed,
+ * 1 = daily, 3 = every 3 days, 7 = weekly, etc.
+ * Called by the UI settings dropdown and by the unsubscribe endpoint.
  */
-export async function setDigestSubscription(
+export async function setDigestFrequency(
   userId: string,
-  subscribed: boolean,
+  frequencyDays: number | null,
 ): Promise<User> {
   const { data, error } = await getDb()
     .from("users")
-    .update({ digest_subscribed: subscribed })
+    .update({ digest_frequency_days: frequencyDays })
     .eq("id", userId)
     .select()
     .maybeSingle();
@@ -476,14 +490,15 @@ export async function markDigestSent(
 }
 
 /**
- * List every user currently subscribed to the digest. The cron endpoint
- * iterates this set. Returns an empty array when nobody is subscribed.
+ * List every user currently subscribed to the digest (frequency > 0).
+ * The cron endpoint iterates this set and checks per-user timing.
+ * Returns an empty array when nobody is subscribed.
  */
 export async function listSubscribedUsers(): Promise<User[]> {
   const { data, error } = await getDb()
     .from("users")
     .select("*")
-    .eq("digest_subscribed", true);
+    .not("digest_frequency_days", "is", null);
   if (error) throw new Error(`Auth: ${error.message}`);
   return (data ?? []).map((row) => rowToUser(row));
 }

@@ -29,6 +29,7 @@ import { adminDigestCronRouter } from "./routes/adminDigestRoutes.js";
 import projectRoutes from "./routes/projectRoutes.js";
 import projectDraftRoutes from "./routes/projectDraftRoutes.js";
 import feedbackRoutes from "./routes/feedbackRoutes.js";
+import waitlistRoutes from "./routes/waitlistRoutes.js";
 import {
   digestCronRouter,
   digestUnsubscribeRouter,
@@ -151,6 +152,9 @@ app.use("/search", searchRoutes);
 // the operator. See civic-hub/src/modules/civic.feedback.
 app.use("/feedback", feedbackRoutes);
 
+// Beta waitlist — public endpoint for people to request access.
+app.use("/waitlist", waitlistRoutes);
+
 // Meeting summaries (Slice 6):
 //   /meeting-summary/:id    — public read of published summaries
 app.use("/meeting-summary", meetingSummaryRoutes);
@@ -223,6 +227,7 @@ app.get("/", (_req, res) => {
       "GET /link-preview?url=X": "Fetch (cached) OpenGraph preview for a URL",
       "GET /search?q=X": "Full-text search across all process types (public)",
       "POST /feedback": "Submit product feedback (anonymous or authed; honeypot-gated)",
+      "POST /waitlist": "Join the beta waitlist (public; honeypot-gated)",
       "POST /internal/digest/run": "Cron-triggered daily email digest (CRON_SECRET bearer)",
       "GET /unsubscribe/digest?token=X": "Unsubscribe from the daily digest",
       "PATCH /user/settings/digest": "Toggle digest subscription (authed)",

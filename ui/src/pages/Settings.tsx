@@ -8,7 +8,7 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { setDigestSubscription } from "../services/api";
+import { setDigestFrequency } from "../services/api";
 import hub from "../config/hub";
 import {
   deleteAccount as deleteAccountApi,
@@ -20,7 +20,8 @@ import "./Settings.css";
 export default function Settings() {
   const { user, logout, loading } = useAuth();
   const navigate = useNavigate();
-  const [subscribed, setSubscribed] = useState<boolean | null>(null);
+  // "loading" = haven't fetched yet, number = frequency in days, null = unsubscribed
+  const [frequency, setFrequency] = useState<number | null | "loading">("loading");
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -34,7 +35,7 @@ export default function Settings() {
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
   // Pull the current subscription state from the server on mount.
-  // /auth/me returns the full User, which includes digest_subscribed
+  // /auth/me returns the full User, which includes digest_frequency_days
   // after Slice 5. We refetch instead of trusting the cached context so
   // the toggle reflects any out-of-band changes (e.g. the user clicked
   // an unsubscribe link in another tab).
@@ -45,7 +46,7 @@ export default function Settings() {
     if (!token) return;
     getMe(token)
       .then(({ user: u }) => {
-        setSubscribed(u.digest_subscribed);
+        setFrequency(u.digest_frequency_days);
       })
       .catch((err: Error) => {
         setError(`Could not load settings: ${err.message}`);
@@ -81,17 +82,33 @@ export default function Settings() {
     }
   }
 
-  async function onToggle(next: boolean) {
+  const FREQUENCY_OPTIONS: { value: string; label: string }[] = [
+    { value: "1", label: "Daily" },
+    { value: "3", label: "Every 3 days" },
+    { value: "7", label: "Weekly" },
+    { value: "14", label: "Every 2 weeks" },
+    { value: "30", label: "Monthly" },
+    { value: "off", label: "Unsubscribed" },
+  ];
+
+  function frequencyLabel(days: number | null): string {
+    if (days === null) return "Unsubscribed";
+    const opt = FREQUENCY_OPTIONS.find((o) => o.value === String(days));
+    return opt ? opt.label : `Every ${days} days`;
+  }
+
+  async function onFrequencyChange(value: string) {
+    const next = value === "off" ? null : parseInt(value, 10);
     setSaving(true);
     setMessage(null);
     setError(null);
     try {
-      const res = await setDigestSubscription(next);
-      setSubscribed(res.digest_subscribed);
+      const res = await setDigestFrequency(next);
+      setFrequency(res.digest_frequency_days);
       setMessage(
-        res.digest_subscribed
-          ? "Subscribed. You'll receive a daily digest whenever there's new civic activity."
-          : "Unsubscribed. You won't receive the daily digest.",
+        res.digest_frequency_days !== null
+          ? `Saved. You'll receive a digest ${frequencyLabel(res.digest_frequency_days).toLowerCase()}.`
+          : "Unsubscribed. You won't receive the digest.",
       );
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not save setting");
@@ -131,29 +148,40 @@ export default function Settings() {
         {error && <p className="form-error">{error}</p>}
 
         <section className="settings-panel">
-          <h3>Daily email digest</h3>
+          <h3>Email digest</h3>
           <p className="form-hint">
-            Once a day, we send a summary of new votes, published results,
-            civic briefs, and announcements. If there's nothing new, we
-            don't send anything. You can unsubscribe any time from the
-            link in every email or with the toggle below.
+            We send a summary of new votes, published results, and
+            announcements. If there's nothing new, we don't send anything.
+            Choose how often you'd like to hear from us.
           </p>
 
-          <label className="settings-toggle">
-            <input
-              type="checkbox"
-              checked={subscribed ?? false}
-              onChange={(e) => onToggle(e.target.checked)}
-              disabled={subscribed === null || saving}
-            />
-            <span className="settings-toggle-label">
-              {subscribed === null
-                ? "Loading…"
-                : subscribed
-                  ? "Subscribed — daily digest on"
-                  : "Unsubscribed — daily digest off"}
-            </span>
+          <label className="form-label" htmlFor="digest-frequency">
+            Digest frequency
           </label>
+          <select
+            id="digest-frequency"
+            className="form-select"
+            value={
+              frequency === "loading"
+                ? ""
+                : frequency === null
+                  ? "off"
+                  : String(frequency)
+            }
+            onChange={(e) => onFrequencyChange(e.target.value)}
+            disabled={frequency === "loading" || saving}
+          >
+            {frequency === "loading" && (
+              <option value="" disabled>
+                Loading...
+              </option>
+            )}
+            {FREQUENCY_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
 
           {message && <p className="settings-message">{message}</p>}
         </section>
