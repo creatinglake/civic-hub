@@ -762,6 +762,12 @@ export interface VoteContextSnapshot {
   options: Array<{ option_id: string; option_label: string }>;
   starts_at: string | null;
   ends_at: string | null;
+  content?: {
+    core_question?: string;
+    sections?: Array<{ title: string; body: string | string[] }>;
+    key_tradeoff?: string;
+    links?: Array<{ label: string; url: string }>;
+  } | null;
 }
 
 export interface VoteResultsContent {

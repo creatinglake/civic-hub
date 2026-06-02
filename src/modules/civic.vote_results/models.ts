@@ -43,6 +43,17 @@ export interface VoteContextSnapshot {
   options: Array<{ option_id: string; option_label: string }>;
   starts_at: string | null;
   ends_at: string | null;
+  /**
+   * Structured content from the original vote (Background, Key
+   * considerations, etc.). Optional because records created before
+   * this addition don't carry it.
+   */
+  content?: {
+    core_question?: string;
+    sections?: Array<{ title: string; body: string | string[] }>;
+    key_tradeoff?: string;
+    links?: Array<{ label: string; url: string }>;
+  } | null;
 }
 
 export interface VoteResultsContent {
@@ -176,6 +187,17 @@ export interface CreateVoteResultsFromVoteInput {
    * starts with actual resident voices, not an empty textarea.
    */
   comments?: string[];
+  /**
+   * Structured content from the original vote (Background, Key
+   * considerations, etc.). Snapshotted into vote_context so the
+   * published results page shows the full vote context.
+   */
+  vote_content?: {
+    core_question?: string;
+    sections?: Array<{ title: string; body: string | string[] }>;
+    key_tradeoff?: string;
+    links?: Array<{ label: string; url: string }>;
+  } | null;
 }
 
 /** Partial content update used by PATCH /admin/vote-results/:id. */

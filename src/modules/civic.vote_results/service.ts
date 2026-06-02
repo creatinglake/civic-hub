@@ -64,6 +64,7 @@ function generateVoteResultsContent(
     options: input.vote_options,
     starts_at: input.vote_starts_at,
     ends_at: input.vote_ends_at,
+    content: input.vote_content ?? null,
   };
   return {
     title: input.vote_title,

@@ -109,6 +109,7 @@ async function spawnVoteResultsFromClosedVote(
       vote_options: voteOptions,
       vote_starts_at: voteState.voting_opens_at,
       vote_ends_at: voteState.voting_closes_at,
+      vote_content: voteProcess.content ?? null,
       tally: closeResult.tally,
       total_votes: closeResult.total_votes,
       comments,

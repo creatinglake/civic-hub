@@ -141,6 +141,52 @@ export default function VoteResultsPage() {
                 ))}
               </div>
             )}
+
+            {/* Structured content sections (Background, Key
+                considerations, etc.) snapshotted from the original vote. */}
+            {ctx.content?.sections && ctx.content.sections.length > 0 && (
+              <div className="vote-results-content-sections">
+                {ctx.content.sections.map((section, i) => (
+                  <div key={i} className="vote-results-content-block">
+                    <h3 className="vote-results-subheading">{section.title}</h3>
+                    {Array.isArray(section.body) ? (
+                      <ul className="vote-results-options-list">
+                        {section.body.map((item, j) => (
+                          <li key={j}>{item}</li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <div className="vote-results-description">
+                        {section.body.split(/\n\n+/).map((para, j) => (
+                          <p key={j}>{para}</p>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {ctx.content?.links && ctx.content.links.length > 0 && (
+              <div className="vote-results-content-block">
+                <h3 className="vote-results-subheading">Related links</h3>
+                <ul className="vote-results-options-list">
+                  {ctx.content.links.map((link, i) => (
+                    <li key={i}>
+                      <a
+                        href={link.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-link"
+                      >
+                        {link.label}
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
             {ctx.options.length > 0 && (
               <>
                 <h3 className="vote-results-subheading">Options on the ballot</h3>
