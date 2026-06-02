@@ -125,7 +125,12 @@ export default function Process() {
         {isVote && process.status === "active" && (process as VoteState).closes_at && (
           <span>Vote closes on {formatDate((process as VoteState).closes_at!)}</span>
         )}
-        {isVote && process.status === "closed" && <span>Voting closed</span>}
+        {isVote && process.status === "closed" && (process as VoteState).closes_at && (
+          <span>Vote closed on {formatDate((process as VoteState).closes_at!)}</span>
+        )}
+        {isVote && process.status === "closed" && !(process as VoteState).closes_at && (
+          <span>Voting closed</span>
+        )}
         {isVote && process.status === "finalized" && <span>Voting finalized</span>}
       </div>
 

@@ -46,7 +46,12 @@ export default function ProcessCard({ process }: Props) {
         {isVotable && process.closes_at && (
           <span>Closes {formatShortDate(process.closes_at)}</span>
         )}
-        {isDone && <span>{process.status === "finalized" ? "Finalized" : "Closed"}</span>}
+        {isDone && process.closes_at && (
+          <span>Closed {formatShortDate(process.closes_at)}</span>
+        )}
+        {isDone && !process.closes_at && (
+          <span>{process.status === "finalized" ? "Finalized" : "Closed"}</span>
+        )}
         {process.status === "draft" && <span>Draft</span>}
       </div>
     </div>

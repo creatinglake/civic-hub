@@ -250,11 +250,55 @@ export async function executeAction(
   return { process, result };
 }
 
+// --- Auto-close expired votes ----------------------------------------------
+
+/**
+ * Lazy auto-close: if a vote's voting_closes_at has passed and it's
+ * still "active", run the close action. This triggers the full close
+ * flow (tally, vote-results spawning, events) without needing a cron.
+ * Called from the read paths so the UI always sees the correct state.
+ */
+async function autoCloseIfExpired(process: Process): Promise<Process> {
+  if (
+    process.definition.type !== "civic.vote" ||
+    process.status !== "active"
+  ) {
+    return process;
+  }
+
+  const state = process.state as Record<string, unknown>;
+  const closesAt = state.voting_closes_at as string | undefined;
+  if (!closesAt) return process;
+
+  if (new Date() <= new Date(closesAt)) return process;
+
+  // Vote has expired — close it via the normal action flow.
+  try {
+    console.log(
+      `[auto-close] Vote ${process.id} expired at ${closesAt}, closing now.`,
+    );
+    const { process: updated } = await executeAction(process.id, {
+      type: "process.close",
+      actor: "system:auto-close",
+      payload: {},
+    });
+    return updated;
+  } catch (err) {
+    // If close fails (e.g. already closed by a race), log and return
+    // the original process so the read still works.
+    const msg = err instanceof Error ? err.message : "unknown error";
+    console.warn(`[auto-close] Failed to close vote ${process.id}: ${msg}`);
+    return process;
+  }
+}
+
 // --- UI read layer ---------------------------------------------------------
 
 export async function listProcessSummaries(): Promise<Record<string, unknown>[]> {
   const all = await getAllProcesses();
-  return all.map((p) => {
+  // Auto-close any expired votes before returning summaries.
+  const resolved = await Promise.all(all.map(autoCloseIfExpired));
+  return resolved.map((p) => {
     const handler = getProcessHandler(p.definition.type);
     if (handler) return handler.getSummary(p);
     return {
@@ -272,8 +316,11 @@ export async function getProcessState(
   processId: string,
   actor?: string,
 ): Promise<Record<string, unknown> | undefined> {
-  const process = await getProcess(processId);
+  let process = await getProcess(processId);
   if (!process) return undefined;
+
+  // Auto-close if the vote has expired.
+  process = await autoCloseIfExpired(process);
 
   const handler = getProcessHandler(process.definition.type);
   if (handler) return handler.getReadModel(process, actor);

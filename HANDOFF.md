@@ -13,6 +13,24 @@ Updated after every Claude Code session. Records what was built, what's incomple
 
 ---
 
+## Vote Auto-Close + Status Display — 2026-06-02
+
+**Status:** Complete.
+
+### What was built
+
+Votes that pass their `voting_closes_at` date now auto-close on the next read request (lazy evaluation). The full close flow runs: tally computed, vote results process spawned, events emitted.
+
+- `src/services/processService.ts` — Added `autoCloseIfExpired()` function called from `getProcessState()` and `listProcessSummaries()`. When a vote's `voting_closes_at` has passed and status is still "active", it runs `executeAction("process.close")` automatically.
+- `ui/src/pages/Process.tsx` — Shows "Vote closed on {date}" instead of just "Voting closed" when the close date is available.
+- `ui/src/components/ProcessCard.tsx` — Shows "Closed {date}" instead of just "Closed" on vote cards.
+
+### How it works
+
+No cron needed. When any user views the feed, votes list, or a vote detail page, the read path checks if any active votes have expired. If so, it closes them on the spot — same as if an admin had manually triggered `process.close`. The vote results process is spawned and appears in the admin queue at `/admin/vote-results` for review and approval.
+
+---
+
 ## Beta Gating + Digest Frequency — 2026-06-01
 
 **Status:** Complete. Not yet deployed — requires DB migrations and env var activation.
