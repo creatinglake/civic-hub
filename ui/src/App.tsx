@@ -59,6 +59,8 @@ function AppContent() {
         <Nav />
         <main className="page-shell">
           <Routes>
+            <Route path="/welcome" element={<Welcome />} />
+            <Route path="/about" element={<About />} />
             <Route path="/privacy" element={<Privacy />} />
             <Route path="/terms" element={<Terms />} />
             <Route path="/code-of-conduct" element={<CodeOfConduct />} />
