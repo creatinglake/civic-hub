@@ -245,10 +245,12 @@ export function createPolisDeliberationHandler(
     getSummary(process) {
       const state = process.state as unknown as PolisDeliberationState;
       return {
+        id: process.id,
         process_id: process.id,
         type: PROCESS_TYPE,
         title: (process as any).title ?? state.topic,
         topic: state.topic,
+        status: process.status,
         lifecycle: process.status,
         participant_count:
           state.summary?.participation_stats.total_participants ?? 0,

@@ -46,7 +46,7 @@ Hit the Express backend directly via fetch, no browser. Fast, high coverage.
 - **Run:** `npm run test`
 - **Config:** `civic-hub/vitest.config.ts`
 - **Helpers:** `civic-hub/tests/fixtures/helpers.ts`
-- **Covers:** process CRUD, event feed, auth flow, proposals, search, health/discovery, cron endpoints
+- **Covers:** process CRUD, event feed, auth flow, proposals, search, health/discovery, cron endpoints, deliberation routes
 
 ### E2E User Flow Tests (Playwright)
 Open the real UI in Chromium and simulate resident interactions.
@@ -54,7 +54,7 @@ Open the real UI in Chromium and simulate resident interactions.
 - **Location:** `civic-hub/tests/e2e/`
 - **Run:** `npm run test:e2e`
 - **Config:** `civic-hub/playwright.config.ts`
-- **Covers:** critical user journeys — navigation, feed, votes, search
+- **Covers:** critical user journeys — navigation, feed, votes, search, conversations
 - **Note:** Each test dismisses the intro popup via localStorage before running.
 
 ---
@@ -124,8 +124,33 @@ Each row tracks a user flow, which layer covers it, and which slice introduced i
 | Updates: creator posts update, shows in timeline | | | C | Needs test |
 | Updates: non-creator cannot post updates | | | C | Needs test |
 | Feed: project events render with correct pills | | | C | Needs test |
+| Feed: project comment/sentiment events suppressed | | | C | Needs test |
 | Projects tab visible in FeedVotesTabs | | | C | Needs test |
 | Projects link visible in nav drawer | | | C | Needs test |
+| Project drafting: banner image picker visible with suggestion note | | | C | Needs test |
+| Project drafting: banner image upload persists to draft | | | C | Needs test |
+| Project drafting: banner image carries through to submitted project | | | C | Needs test |
+| /project/:id displays banner image when present | | | C | Needs test |
+| Conversations tab visible in FeedVotesTabs | | | D | Needs test |
+| Conversations link visible in nav drawer | | | D | Needs test |
+| /deliberations page renders with CTA card | | | D | Needs test |
+| CTA card says "Community Conversations" with description | | | D | Needs test |
+| Admin sees "+ Create a conversation" button on CTA | | | D | Needs test |
+| Active conversations section lists active deliberations | | | D | Needs test |
+| Active deliberation shows Participate and Opinion Groups tabs | | | D | Needs test |
+| Participate tab shows statement card with vote controls | | | D | Needs test |
+| Participate tab requires authentication (requireResident) | | | D | Needs test |
+| Vote on statement (agree/disagree/pass) updates UI | | | D | Needs test |
+| Submit new statement appears in conversation | | | D | Needs test |
+| Opinion Groups tab shows cluster cards | | | D | Needs test |
+| Completed deliberation shows summary with stats | | | D | Needs test |
+| Completed deliberation shows consensus statements | | | D | Needs test |
+| Completed deliberation shows opinion groups | | | D | Needs test |
+| Draft conversations visible to admin only | | | D | Needs test |
+| Admin can start a draft conversation | | | D | Needs test |
+| Host form titled "Host a conversation" | | | D | Needs test |
+| Mock data serves statements for seed- conversations | | | D | Needs test |
+| Mock data serves cluster state for seed- conversations | | | D | Needs test |
 
 ### Admin Flows
 
@@ -137,6 +162,10 @@ Each row tracks a user flow, which layer covers it, and which slice introduced i
 | Admin: moderation actions | | | — | Needs test |
 | Admin: hub settings | | | — | Needs test |
 | Admin: post announcement | | | — | Needs test |
+| Admin: create conversation (POST /deliberations) | | | D | Needs test |
+| Admin: start conversation (POST /deliberations/:id/start) | | | D | Needs test |
+| Admin: close conversation (POST /deliberations/:id/close) | | | D | Needs test |
+| Admin: regenerate summary (POST /deliberations/:id/regenerate-summary) | | | D | Needs test |
 
 ### API-Only Flows
 
@@ -197,6 +226,18 @@ Each row tracks a user flow, which layer covers it, and which slice introduced i
 | POST /projects/drafts/:id/assistant returns project-specific guidance | | C | Needs test |
 | POST /projects/drafts/:id/review checks CoC for projects | | C | Needs test |
 | POST /projects/drafts/:id/submit creates project | | C | Needs test |
+| GET /deliberations returns deliberation list | | D | Needs test |
+| GET /deliberations/:id returns deliberation detail | | D | Needs test |
+| GET /deliberations/:id/clusters returns cluster state | | D | Needs test |
+| POST /deliberations requires admin auth | | D | Needs test |
+| POST /deliberations/:id/start requires admin auth | | D | Needs test |
+| POST /deliberations/:id/close requires admin auth | | D | Needs test |
+| POST /deliberations/:id/participate/vote requires resident auth | | D | Needs test |
+| POST /deliberations/:id/participate/statement requires resident auth | | D | Needs test |
+| GET /deliberations/:id/participate/next requires resident auth | | D | Needs test |
+| Mock layer: seed- conversation returns mock statements | | D | Needs test |
+| Mock layer: seed- conversation returns mock clusters | | D | Needs test |
+| Mock layer: real conversation ID passes through to Polis adapter | | D | Needs test |
 
 ---
 
@@ -222,4 +263,4 @@ The goal: before any push to `main`, every row in this table should have at leas
 
 ---
 
-*Last updated: 2026-05-24*
+*Last updated: 2026-06-12*

@@ -20,3 +20,5 @@ scripts/*.d.ts
 # Vite scaffolding we don't use
 ui/README.md
 ui/src/assets/
+.vercel
+.env*
