@@ -10,6 +10,7 @@ import proposalProcess from "./proposalProcess.js";
 import voteResultsProcess from "./voteResultsProcess.js";
 import announcementProcess from "./announcementProcess.js";
 import meetingSummaryProcess from "./meetingSummaryProcess.js";
+import { bootDeliberation } from "./deliberationBoot.js";
 
 // civic.vote_results + civic.announcement + civic.meeting_summary are
 // registered here but can be omitted by hubs that don't want those
@@ -32,6 +33,7 @@ const processRegistry: Record<string, ProcessHandler> = {
   "civic.vote_results": voteResultsProcess,
   "civic.announcement": announcementProcess,
   "civic.meeting_summary": meetingSummaryProcess,
+  "civic.polis_deliberation": bootDeliberation(),
 };
 
 /**

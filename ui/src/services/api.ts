@@ -1304,6 +1304,151 @@ export function search(params: SearchParams): Promise<SearchResultPage> {
   return request("GET", `/search?${sp.toString()}`);
 }
 
+// --- Deliberations (Polis integration) ---
+
+export type VoteDirection = "agree" | "disagree" | "pass";
+
+export interface StatementRecord {
+  id: number;
+  text: string;
+  is_seed: boolean;
+  created: string;
+}
+
+export interface OpinionGroup {
+  id: number;
+  size: number;
+  representative_statements: {
+    text: string;
+    direction: "agree" | "disagree";
+    repness: number;
+  }[];
+}
+
+export interface ConsensusStatement {
+  statement_id: number;
+  text: string;
+  agree_rate: number;
+  vote_count: number;
+}
+
+export interface ClusterState {
+  participant_count: number;
+  statement_count: number;
+  math_tick: number;
+  groups: OpinionGroup[];
+  consensus: {
+    agree: ConsensusStatement[];
+    disagree: ConsensusStatement[];
+  };
+}
+
+export interface DeliberationSummary {
+  process_id: string;
+  type: string;
+  title?: string;
+  topic: string;
+  lifecycle: string;
+  participant_count?: number;
+  summary_status: string;
+}
+
+export interface DeliberationReadModel {
+  process_id: string;
+  type: string;
+  lifecycle: string;
+  topic: string;
+  framing: string;
+  polis_conversation_id: string | null;
+  deadline: string | null;
+  participation_threshold: number | null;
+  summary: DeliberationSummaryData | null;
+  summary_status: string;
+  continued_from_response_id: string | null;
+}
+
+export interface DeliberationSummaryData {
+  summary_text: string;
+  directed_questions: string[];
+  top_consensus_statements: {
+    statement_text: string;
+    agree_rate: number;
+    vote_count: number;
+  }[];
+  opinion_groups: {
+    group_id: number;
+    size: number;
+    representative_statements: {
+      text: string;
+      agreement_within_group: number;
+    }[];
+  }[];
+  participation_stats: {
+    total_participants: number;
+    total_statements: number;
+    total_votes: number;
+    opinion_groups_formed: number;
+  };
+  linked_polis_data_uri: string;
+  methodology: {
+    prompt_version: string;
+    model_used: string;
+    generated_at: string;
+  };
+}
+
+export function listDeliberations(): Promise<DeliberationSummary[]> {
+  return request("GET", "/deliberations");
+}
+
+export function getDeliberation(processId: string): Promise<DeliberationReadModel> {
+  return request("GET", `/deliberations/${processId}`);
+}
+
+export function getDeliberationClusters(processId: string): Promise<ClusterState> {
+  return request("GET", `/deliberations/${processId}/clusters`);
+}
+
+export function deliberationVote(
+  processId: string,
+  statementId: number,
+  vote: VoteDirection,
+): Promise<{ ok: boolean }> {
+  return request("POST", `/deliberations/${processId}/participate/vote`, {
+    statement_id: statementId,
+    vote,
+  });
+}
+
+export function deliberationSubmitStatement(
+  processId: string,
+  text: string,
+): Promise<{ statement_id: number }> {
+  return request("POST", `/deliberations/${processId}/participate/statement`, {
+    text,
+  });
+}
+
+export function deliberationGetNext(
+  processId: string,
+): Promise<{ statement: StatementRecord | null }> {
+  return request("GET", `/deliberations/${processId}/participate/next`);
+}
+
+export function createDeliberation(input: {
+  topic: string;
+  framing: string;
+  deadline?: string;
+  participation_threshold?: number;
+  seed_statements?: string[];
+}): Promise<unknown> {
+  return request("POST", "/deliberations", input);
+}
+
+export function startDeliberation(processId: string): Promise<unknown> {
+  return request("POST", `/deliberations/${processId}/start`);
+}
+
 // --- Slice 14 — feedback ---
 
 export type FeedbackCategory = "idea" | "bug" | "moderation" | "general";

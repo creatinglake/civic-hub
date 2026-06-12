@@ -28,6 +28,7 @@ import { floydNewsSyncCronRouter } from "./routes/floydNewsSyncRoutes.js";
 import { adminDigestCronRouter } from "./routes/adminDigestRoutes.js";
 import projectRoutes from "./routes/projectRoutes.js";
 import projectDraftRoutes from "./routes/projectDraftRoutes.js";
+import deliberationRoutes from "./routes/deliberationRoutes.js";
 import feedbackRoutes from "./routes/feedbackRoutes.js";
 import waitlistRoutes from "./routes/waitlistRoutes.js";
 import {
@@ -107,6 +108,9 @@ app.use("/projects/drafts", projectDraftRoutes);
 
 // Project endpoints — community project pages with sentiment + comments
 app.use("/projects", projectRoutes);
+
+// Deliberation endpoints — Polis-backed community deliberation
+app.use("/deliberations", deliberationRoutes);
 
 // Proposal endpoints — user-facing proposal submission and endorsement
 app.use("/proposals", proposalRoutes);

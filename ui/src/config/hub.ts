@@ -91,6 +91,12 @@ const hub = {
   demo_mode: import.meta.env.VITE_DEMO_MODE === "true",
   demo_bypass_code: import.meta.env.VITE_DEMO_BYPASS_CODE ?? "",
   beta_mode: import.meta.env.VITE_BETA_MODE === "true",
+  /**
+   * Polis deliberation instance URL. When non-empty, the
+   * "Deliberations" nav item appears and the /deliberations route
+   * embeds the Polis UI in an iframe. Set to "" to disable.
+   */
+  polis_url: import.meta.env.VITE_HUB_POLIS_URL ?? "https://polis.civic.social",
 };
 
 export default hub;

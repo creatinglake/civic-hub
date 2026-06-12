@@ -1,0 +1,88 @@
+/* Space between the CTA card and the content below it */
+.deliberations-cta {
+  margin-bottom: var(--space-lg, 1.5rem);
+}
+
+.deliberations-cta-note {
+  font-size: var(--font-size-xs, 0.75rem);
+  color: var(--color-text-muted, #666);
+}
+
+.deliberations-cta-note a {
+  color: var(--pill-vote-fg, #1e3a5f);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.deliberations-cta-note a:hover {
+  text-decoration: underline;
+}
+
+.deliberations-form-wrapper {
+  max-width: var(--max-width-shell);
+  margin: 0 auto;
+  padding: var(--space-md) var(--space-md) 0;
+}
+
+.deliberations-loading {
+  font-size: var(--font-size-sm, 0.85rem);
+  color: var(--color-text-muted, #888);
+}
+
+.deliberation-draft-card {
+  background: #f9f9f9;
+  border: 1px solid var(--border, #e0e0e0);
+  border-radius: 8px;
+  padding: 0.75rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.draft-card-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+.draft-topic {
+  font-size: 0.95rem;
+  color: var(--color-text, #222);
+  font-weight: 600;
+}
+
+.draft-badge {
+  font-size: 0.75rem;
+  color: #b45309;
+}
+
+.start-deliberation-btn {
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 0.375rem 1rem;
+  background: #16a34a;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.start-deliberation-btn:hover {
+  opacity: 0.9;
+}
+
+.start-deliberation-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.deliberations-empty {
+  font-size: var(--font-size-sm, 0.85rem);
+  color: var(--color-text-muted, #888);
+  font-style: italic;
+}

@@ -1,0 +1,74 @@
+.cluster-card {
+  background: #fff;
+  border: 1px solid var(--border, #e0e0e0);
+  border-radius: 8px;
+  padding: 1.25rem;
+}
+
+.cluster-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+
+.cluster-name {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--color-text, #222);
+}
+
+.cluster-size {
+  font-size: 0.75rem;
+  color: #888;
+}
+
+.cluster-statements {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.cluster-statement-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.cluster-direction {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.cluster-agree {
+  color: #16a34a;
+}
+
+.cluster-disagree {
+  color: #dc2626;
+}
+
+.cluster-statement-text {
+  font-size: 0.85rem;
+  color: var(--color-text, #222);
+  line-height: 1.5;
+}
+
+.cluster-repness-bar {
+  height: 4px;
+  background: #f0f0f0;
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.cluster-repness-fill {
+  height: 100%;
+  background: #1e3a5f;
+  border-radius: 2px;
+  transition: width 0.3s ease;
+}

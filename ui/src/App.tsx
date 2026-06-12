@@ -30,6 +30,7 @@ import CodeOfConduct from "./pages/CodeOfConduct";
 import Feedback from "./pages/Feedback";
 import Welcome from "./pages/Welcome";
 import Projects from "./pages/Projects";
+import Deliberations from "./pages/Deliberations";
 import ProjectDetail from "./pages/ProjectDetail";
 import ProjectDraft from "./pages/ProjectDraft";
 import AdminModeration from "./pages/AdminModeration";
@@ -40,7 +41,7 @@ import "./App.css";
 // Routes that show the hub banner above the nav. Detail/action pages
 // (/process/:id, /propose, etc.) stay compact so task-focused flows are
 // not pushed down by 200px of imagery.
-const BANNER_ROUTES = new Set(["/", "/votes", "/propose", "/projects"]);
+const BANNER_ROUTES = new Set(["/", "/votes", "/propose", "/projects", "/deliberations"]);
 
 function BannerSlot() {
   const { pathname } = useLocation();
@@ -89,6 +90,7 @@ function AppContent() {
           <Route path="/projects" element={<Projects />} />
           <Route path="/projects/new" element={<ProjectDraft />} />
           <Route path="/project/:id" element={<ProjectDetail />} />
+          <Route path="/deliberations" element={<Deliberations />} />
           <Route path="/votes/:id/log" element={<VoteLog />} />
           <Route path="/admin/proposals" element={<AdminProposals />} />
           <Route path="/admin/vote-results" element={<AdminVoteResults />} />

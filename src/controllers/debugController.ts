@@ -24,8 +24,11 @@ import { clearReceipts } from "../modules/civic.receipts/index.js";
 import {
   FLOYD_FLOCK_CAMERA,
   FLOYD_GREEN_BOX,
+  ALL_DELIBERATION_SEEDS,
   type SeedScenario,
+  type DeliberationSeedScenario,
 } from "../debug/seedData.js";
+import { getDb } from "../db/client.js";
 
 // Production Supabase hostnames that MUST NEVER be seeded against.
 // Add a new entry whenever a new production project is provisioned.
@@ -69,6 +72,64 @@ async function runScenario(
     type: process.definition.type,
     title: process.title,
     status: process.status,
+  };
+}
+
+/**
+ * Seed a deliberation process by writing directly to the DB.
+ * Bypasses the action dispatcher (and therefore the Polis API)
+ * so we can create active/completed deliberations with fake data.
+ */
+async function seedDeliberation(
+  scenario: DeliberationSeedScenario,
+): Promise<Record<string, unknown>> {
+  const { process: p, status } = scenario;
+  const now = new Date().toISOString();
+
+  const row = {
+    id: p.id,
+    type: p.definition.type,
+    process_version: p.definition.version,
+    title: p.title,
+    description: p.description,
+    jurisdiction: p.jurisdiction ?? "local",
+    status,
+    content: null,
+    state: p.state as unknown as Record<string, unknown>,
+    hub_id: "civic-hub-local",
+    created_by: p.createdBy,
+    source_proposal_id: null,
+    starts_at: null,
+    ends_at: null,
+    created_at: now,
+    updated_at: now,
+  };
+
+  const { error } = await getDb().from("processes").insert(row);
+  if (error) {
+    throw new Error(`Failed to seed deliberation "${p.title}": ${error.message}`);
+  }
+
+  // Emit a creation event so it shows in the feed
+  await emitEvent({
+    event_type: "civic.process.created",
+    actor: p.createdBy,
+    process_id: p.id,
+    hub_id: "civic-hub-local",
+    jurisdiction: p.jurisdiction ?? "local",
+    data: {
+      process: {
+        type: p.definition.type,
+        title: p.title,
+      },
+    },
+  });
+
+  return {
+    id: p.id,
+    type: p.definition.type,
+    title: p.title,
+    status,
   };
 }
 
@@ -121,6 +182,11 @@ export async function handleSeed(
 
     // Floyd County Flock Camera — proposed vote
     createdProcesses.push(await runScenario(FLOYD_FLOCK_CAMERA));
+
+    // Deliberation / conversation seed data — bypasses Polis API
+    for (const scenario of ALL_DELIBERATION_SEEDS) {
+      createdProcesses.push(await seedDeliberation(scenario));
+    }
 
     const eventCount = await getEventCount();
 
