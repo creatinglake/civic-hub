@@ -22,6 +22,9 @@ const DRAWER_LINKS: ReadonlyArray<{ to: string; label: string; end?: boolean }> 
   { to: "/about", label: "About" },
 ];
 
+// Routes accessible without sign-in during beta mode.
+const BETA_PUBLIC_PATHS = new Set(["/welcome", "/about", "/feedback", "/code-of-conduct", "/privacy", "/terms"]);
+
 // Secondary drawer link — active-input affordance; styled like the
 // primary links (full-weight, regular size), not the muted legal
 // group below it. Slice 14.
@@ -300,20 +303,32 @@ export default function Nav() {
               />
             </div>
             <ul className="civic-nav-drawer-links" role="list">
-              {DRAWER_LINKS.map((l) => (
-                <li key={l.to}>
-                  <NavLink
-                    to={l.to}
-                    end={l.end}
-                    className={({ isActive }) =>
-                      `civic-nav-drawer-link${isActive ? " is-active" : ""}`
-                    }
-                    onClick={() => setDrawerOpen(false)}
-                  >
-                    {l.label}
-                  </NavLink>
-                </li>
-              ))}
+              {DRAWER_LINKS.map((l) => {
+                const gated = hub.beta_mode && !user && !BETA_PUBLIC_PATHS.has(l.to);
+                if (gated) {
+                  return (
+                    <li key={l.to}>
+                      <span className="civic-nav-drawer-link civic-nav-drawer-link-gated">
+                        {l.label}
+                      </span>
+                    </li>
+                  );
+                }
+                return (
+                  <li key={l.to}>
+                    <NavLink
+                      to={l.to}
+                      end={l.end}
+                      className={({ isActive }) =>
+                        `civic-nav-drawer-link${hub.beta_mode && !user ? " civic-nav-drawer-link-public" : ""}${isActive ? " is-active" : ""}`
+                      }
+                      onClick={() => setDrawerOpen(false)}
+                    >
+                      {l.label}
+                    </NavLink>
+                  </li>
+                );
+              })}
               <li className="civic-nav-drawer-divider" role="separator" aria-hidden="true" />
               {DRAWER_SECONDARY_LINKS.map((l) => (
                 <li key={l.to}>
