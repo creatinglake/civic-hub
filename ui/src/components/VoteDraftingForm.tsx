@@ -1,5 +1,6 @@
 import { useCallback, useRef } from "react";
 import type { VoteDraft, DraftSuggestion } from "../services/api";
+import "./DraftingForm.css";
 import "./VoteDraftingForm.css";
 
 interface Props {
@@ -10,6 +11,7 @@ interface Props {
   onSubmit: () => void;
   disabled: boolean;
   reviewLoading?: boolean;
+  reviewFailed?: boolean;
 }
 
 const DURATION_OPTIONS = [
@@ -26,9 +28,13 @@ const PLACEHOLDERS = {
   sources: "Links to relevant information, one per line (optional)",
 };
 
-function getStatusText(draft: VoteDraft): string {
+function getStatusText(draft: VoteDraft, reviewFailed?: boolean): string {
   if (!draft.title.trim()) {
     return "Status: Title is required";
+  }
+
+  if (draft.last_review_result === null && reviewFailed) {
+    return "Status: Review failed — tap Review draft to try again";
   }
 
   if (draft.last_review_result === null) {
@@ -49,8 +55,9 @@ function getStatusText(draft: VoteDraft): string {
   return "Status: Ready to submit";
 }
 
-function getStatusClass(draft: VoteDraft): string {
+function getStatusClass(draft: VoteDraft, reviewFailed?: boolean): string {
   if (!draft.title.trim()) return "status-missing";
+  if (draft.last_review_result === null && reviewFailed) return "status-error";
   if (draft.last_review_result === null) return "status-pending";
   if (draft.draft_modified_since_review) return "status-modified";
   const hasHard = (draft.last_review_result ?? []).some(
@@ -68,6 +75,7 @@ export default function VoteDraftingForm({
   onSubmit,
   disabled,
   reviewLoading,
+  reviewFailed,
 }: Props) {
   const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
@@ -160,8 +168,8 @@ export default function VoteDraftingForm({
       </div>
 
       <div className="drafting-form-footer">
-        <div className={`draft-status ${getStatusClass(draft)}`}>
-          {getStatusText(draft)}
+        <div className={`draft-status ${getStatusClass(draft, reviewFailed)}`}>
+          {getStatusText(draft, reviewFailed)}
         </div>
 
         <div className="draft-actions">

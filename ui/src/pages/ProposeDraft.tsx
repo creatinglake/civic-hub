@@ -58,6 +58,7 @@ export default function ProposeDraft() {
   const [phase, setPhase] = useState<"brainstorm" | "free_form" | "review">("brainstorm");
   const [showConfirm, setShowConfirm] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [reviewFailed, setReviewFailed] = useState(false);
 
   const isMobile = useIsMobile();
 
@@ -148,6 +149,7 @@ export default function ProposeDraft() {
     if (!draft) return;
     setLoading(true);
     setError(null);
+    setReviewFailed(false);
     try {
       const result = await reviewDraft(draft.id);
       setDraft(result.draft);
@@ -169,6 +171,7 @@ export default function ProposeDraft() {
       });
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Unknown error";
+      setReviewFailed(true);
       setMessages((prev) => [
         ...prev,
         { role: "assistant", content: friendlyError(msg) },
@@ -362,6 +365,7 @@ export default function ProposeDraft() {
               onSubmit={handleSubmit}
               disabled={submitting}
               reviewLoading={loading}
+              reviewFailed={reviewFailed}
             />
           </div>
         </div>
@@ -446,6 +450,11 @@ export default function ProposeDraft() {
               This proposal will stay open for{" "}
               {DURATION_LABELS[draft.proposal_duration_ms] ??
                 `${Math.round(draft.proposal_duration_ms / (24 * 60 * 60 * 1000))} days`}.
+            </p>
+
+            <p className="confirm-finality-warning">
+              Once submitted, your proposal cannot be edited. Please make
+              sure everything looks the way you want it before submitting.
             </p>
 
             {draft.assistant_helped && (

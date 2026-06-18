@@ -14,8 +14,8 @@ const TOP_LINKS: ReadonlyArray<{ to: string; label: string; end?: boolean }> = [
 // civic surfaces stay visually distinct from the policy footer pages.
 const DRAWER_LINKS: ReadonlyArray<{ to: string; label: string; end?: boolean }> = [
   { to: "/", label: "Feed", end: true },
-  { to: "/propose", label: "Propose" },
   { to: "/deliberations", label: "Conversations" },
+  { to: "/propose", label: "Propose" },
   { to: "/votes", label: "Votes" },
   { to: "/projects", label: "Projects" },
   { to: "/welcome", label: "Welcome" },

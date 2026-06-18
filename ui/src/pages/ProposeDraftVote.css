@@ -6,3 +6,13 @@
   color: var(--color-text-muted);
   margin: var(--space-sm) 0 0;
 }
+
+.confirm-finality-warning {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  margin: var(--space-md) 0;
+  padding: var(--space-sm) var(--space-md);
+  background: var(--color-surface-alt, #f5f0eb);
+  border-left: 3px solid var(--color-text-muted);
+  border-radius: var(--radius-sm);
+}

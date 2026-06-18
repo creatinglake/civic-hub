@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
+import hub from "../config/hub";
 import {
   listProcesses,
   type ProcessSummary,
@@ -156,8 +157,8 @@ export default function Votes() {
           <h2 className="suggest-vote-cta-title">Got an idea? Suggest a vote.</h2>
           <p className="suggest-vote-cta-body">
             Submit something for the community to consider. With enough
-            citizen support, your suggestion becomes an official Floyd
-            County advisory vote.
+            citizen support, your suggestion becomes an official{" "}
+            {hub.jurisdiction} advisory vote.
           </p>
           <Link to="/votes/new" className="suggest-vote-cta-button">
             + Suggest a vote

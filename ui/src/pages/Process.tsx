@@ -81,7 +81,12 @@ export default function Process() {
       </button>
     </div>
   );
-  if (!process) return <p className="detail-page">Not found.</p>;
+  if (!process) return (
+    <div className="page detail-page">
+      <Link to="/" className="back-link">&larr; Home</Link>
+      <p>Not found.</p>
+    </div>
+  );
 
   const isVote = process.type === "civic.vote";
   const isProposal = process.type === "civic.proposal";

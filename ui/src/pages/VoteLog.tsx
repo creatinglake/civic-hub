@@ -64,7 +64,12 @@ export default function VoteLog() {
 
   if (loading) return <p className="page detail-page">Loading...</p>;
   if (error) return <p className="page detail-page error">Error: {error}</p>;
-  if (!process || !id) return <p className="page detail-page">Not found.</p>;
+  if (!process || !id) return (
+    <div className="page detail-page">
+      <Link to="/votes" className="back-link">&larr; Back to votes</Link>
+      <p>Not found.</p>
+    </div>
+  );
 
   const isAvailable = voteLog?.available ?? false;
 

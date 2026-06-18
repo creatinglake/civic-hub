@@ -80,7 +80,12 @@ export default function ProposalDetail() {
 
   if (loading) return <p className="detail-page">Loading...</p>;
   if (error && !proposal) return <p className="detail-page error">Error: {error}</p>;
-  if (!proposal) return <p className="detail-page">Not found.</p>;
+  if (!proposal) return (
+    <div className="page detail-page">
+      <Link to="/propose" className="back-link">&larr; Back to proposals</Link>
+      <p>Not found.</p>
+    </div>
+  );
 
   return (
     <div className="page detail-page">

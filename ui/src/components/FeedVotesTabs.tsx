@@ -17,8 +17,8 @@ import "./FeedVotesTabs.css";
 
 const TABS: ReadonlyArray<{ to: string; label: string; end?: boolean }> = [
   { to: "/", label: "Feed", end: true },
-  { to: "/propose", label: "Propose" },
   { to: "/deliberations", label: "Conversations" },
+  { to: "/propose", label: "Propose" },
   { to: "/votes", label: "Votes" },
   { to: "/projects", label: "Projects" },
 ];

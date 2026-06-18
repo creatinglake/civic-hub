@@ -85,6 +85,11 @@
   color: var(--color-warning);
 }
 
+.status-error {
+  background: var(--color-warning-bg);
+  color: var(--color-warning);
+}
+
 .status-blocked {
   background: var(--color-error-bg);
   color: var(--color-error);

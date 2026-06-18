@@ -10,6 +10,7 @@ interface Props {
   onSubmit: () => void;
   disabled: boolean;
   reviewLoading?: boolean;
+  reviewFailed?: boolean;
 }
 
 const DURATION_OPTIONS = [
@@ -38,9 +39,13 @@ function getPlaceholder(category: string | null, field: string): string {
   return PLACEHOLDERS[cat]?.[field] ?? PLACEHOLDERS["idea"]?.[field] ?? "";
 }
 
-function getStatusText(draft: ProposalDraft): string {
+function getStatusText(draft: ProposalDraft, reviewFailed?: boolean): string {
   if (!draft.title.trim()) {
     return "Status: 1 required field missing";
+  }
+
+  if (draft.last_review_result === null && reviewFailed) {
+    return "Status: Review failed — tap Review draft to try again";
   }
 
   if (draft.last_review_result === null) {
@@ -61,8 +66,9 @@ function getStatusText(draft: ProposalDraft): string {
   return "Status: Ready to submit";
 }
 
-function getStatusClass(draft: ProposalDraft): string {
+function getStatusClass(draft: ProposalDraft, reviewFailed?: boolean): string {
   if (!draft.title.trim()) return "status-missing";
+  if (draft.last_review_result === null && reviewFailed) return "status-error";
   if (draft.last_review_result === null) return "status-pending";
   if (draft.draft_modified_since_review) return "status-modified";
   const hasHard = (draft.last_review_result ?? []).some(
@@ -80,6 +86,7 @@ export default function DraftingForm({
   onSubmit,
   disabled,
   reviewLoading,
+  reviewFailed,
 }: Props) {
   const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
@@ -200,8 +207,8 @@ export default function DraftingForm({
       </div>
 
       <div className="drafting-form-footer">
-        <div className={`draft-status ${getStatusClass(draft)}`}>
-          {getStatusText(draft)}
+        <div className={`draft-status ${getStatusClass(draft, reviewFailed)}`}>
+          {getStatusText(draft, reviewFailed)}
         </div>
 
         <div className="draft-actions">

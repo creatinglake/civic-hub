@@ -200,6 +200,16 @@
   border-radius: var(--radius-sm);
 }
 
+.confirm-finality-warning {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  margin: var(--space-md) 0;
+  padding: var(--space-sm) var(--space-md);
+  background: var(--color-surface-alt, #f5f0eb);
+  border-left: 3px solid var(--color-text-muted);
+  border-radius: var(--radius-sm);
+}
+
 .confirm-soft-note {
   font-size: var(--font-size-xs);
   color: var(--color-text-subtle);

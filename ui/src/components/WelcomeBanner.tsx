@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import hub from "../config/hub";
 import "./WelcomeBanner.css";
 
 const STORAGE_KEY = "welcome-banner-dismissed-v1";
@@ -35,11 +36,11 @@ export default function WelcomeBanner() {
       <div className="welcome-banner-inner">
         <div className="welcome-banner-content">
           <h2 className="welcome-banner-title">
-            New to the Floyd Civic Hub?
+            New to the {hub.name}?
           </h2>
           <p className="welcome-banner-body">
             Learn what this site is, how it works, and how you can
-            participate in Floyd County civic life.
+            participate in {hub.jurisdiction} civic life.
           </p>
           <Link to="/welcome" className="welcome-banner-button">
             Learn more

@@ -238,6 +238,28 @@ Each row tracks a user flow, which layer covers it, and which slice introduced i
 | Mock layer: seed- conversation returns mock statements | | D | Needs test |
 | Mock layer: seed- conversation returns mock clusters | | D | Needs test |
 | Mock layer: real conversation ID passes through to Polis adapter | | D | Needs test |
+| GET /wordcloud/:id returns word cloud with cloud data | | WC | Needs test |
+| GET /wordcloud/:id returns 404 for missing cloud | | WC | Needs test |
+| GET /wordcloud/:id/cloud returns aggregated cloud data | | WC | Needs test |
+| GET /wordcloud/:id/responses returns submission list | | WC | Needs test |
+| POST /process/:id/action submit inserts wordcloud submission | | WC | Needs test |
+| POST /process/:id/action submit rejects empty text | | WC | Needs test |
+| POST /process/:id/action submit rejects duplicate author | | WC | Needs test |
+| POST /process/:id/action activate transitions draft to active | | WC | Needs test |
+| POST /process/:id/action close transitions active to closed | | WC | Needs test |
+| POST /process/:id/action snapshot emits result event | | WC | Needs test |
+| Word cloud page renders with SVG visualization | | | WC | Needs test |
+| Word cloud submission form visible when status is active | | | WC | Needs test |
+| Word cloud submit response adds to cloud | | | WC | Needs test |
+| Word cloud submit requires auth | | | WC | Needs test |
+| Word cloud one submission per author per prompt enforced | | | WC | Needs test |
+| Word cloud submission respects max length | | | WC | Needs test |
+| Word cloud ranked list toggle shows/hides entries | | | WC | Needs test |
+| Word cloud responses list toggle shows/hides responses | | | WC | Needs test |
+| Word cloud closed status hides submit form | | | WC | Needs test |
+| Beta mode: welcome and about pages accessible without auth | | | Beta | Needs test |
+| Beta mode: gated nav links non-clickable and grayed out | | | Beta | Needs test |
+| Beta mode: public nav links highlighted | | | Beta | Needs test |
 
 ---
 
@@ -263,4 +285,4 @@ The goal: before any push to `main`, every row in this table should have at leas
 
 ---
 
-*Last updated: 2026-06-12*
+*Last updated: 2026-06-18*

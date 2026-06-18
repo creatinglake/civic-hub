@@ -470,7 +470,12 @@ export default function WordCloud() {
         <p className="error">Error: {error}</p>
       </div>
     );
-  if (!wc) return <p className="wordcloud-page">Not found.</p>;
+  if (!wc) return (
+    <div className="page wordcloud-page">
+      <Link to="/" className="back-link">&larr; Home</Link>
+      <p>Not found.</p>
+    </div>
+  );
 
   const isActive = wc.status === "active";
 

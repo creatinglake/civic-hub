@@ -18,6 +18,7 @@ import { useEffect } from "react";
 import { Link } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import hub from "../config/hub";
 import "./LegalPage.css";
 
 interface Props {
@@ -59,7 +60,7 @@ export default function LegalPage({ markdown, title }: Props) {
   // browser tab. We don't reset on unmount — React Router's next page
   // will overwrite it if it cares.
   useEffect(() => {
-    document.title = `${title} · Floyd Civic Hub`;
+    document.title = `${title} · ${hub.name}`;
   }, [title]);
 
   return (

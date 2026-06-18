@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
+import hub from "../config/hub";
 import {
   type CivicEvent,
   type VoteState,
@@ -398,7 +399,7 @@ export default function Feed({ filter, emptyFilteredAction }: Props) {
     return (
       <section className="feed">
         <p className="feed-status">
-          Floyd's civic feed is just getting started. Visit{" "}
+          {hub.jurisdiction}'s civic feed is just getting started. Visit{" "}
           <Link to="/about">About</Link> to learn how this hub works.
         </p>
       </section>

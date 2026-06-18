@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { Link } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import hub from "../config/hub";
 import welcomeMd from "../content/welcome/welcome.md?raw";
 import "../components/LegalPage.css";
 import "./Welcome.css";
@@ -29,7 +30,7 @@ function CustomLink({
 
 export default function Welcome() {
   useEffect(() => {
-    document.title = "Welcome · Floyd Civic Hub";
+    document.title = `Welcome · ${hub.name}`;
   }, []);
 
   return (
