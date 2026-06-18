@@ -34,6 +34,8 @@ import Deliberations from "./pages/Deliberations";
 import ProjectDetail from "./pages/ProjectDetail";
 import ProjectDraft from "./pages/ProjectDraft";
 import AdminModeration from "./pages/AdminModeration";
+import WordCloud from "./pages/WordCloud";
+import CreateWordCloud from "./pages/CreateWordCloud";
 import IntroPopup, { hasSeenIntro } from "./components/IntroPopup";
 import ReAcceptModal from "./components/ReAcceptModal";
 import "./App.css";
@@ -93,6 +95,8 @@ function AppContent() {
           <Route path="/projects/new" element={<ProjectDraft />} />
           <Route path="/project/:id" element={<ProjectDetail />} />
           <Route path="/deliberations" element={<Deliberations />} />
+          <Route path="/wordcloud/new" element={<CreateWordCloud />} />
+          <Route path="/wordcloud/:id" element={<WordCloud />} />
           <Route path="/votes/:id/log" element={<VoteLog />} />
           <Route path="/admin/proposals" element={<AdminProposals />} />
           <Route path="/admin/vote-results" element={<AdminVoteResults />} />

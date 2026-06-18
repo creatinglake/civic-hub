@@ -20,6 +20,7 @@ export type FeedPillKind =
   | "announcement"          // admin-authored announcements (default)
   | "announcement-author"   // non-admin author (Board, committees, etc.)
   | "meeting"
+  | "wordcloud"
   | "project-created"
   | "project-updated"
   | "generic";
@@ -73,6 +74,7 @@ type FeedProcessKind =
   | "civic.brief" // legacy alias — normalize to "civic.vote_results"
   | "civic.announcement"
   | "civic.meeting_summary"
+  | "civic.wordcloud"
   | "civic.project"
   | "generic";
 
@@ -84,8 +86,22 @@ export function eventToPost(
 ): FeedPostView | null {
   switch (event.event_type) {
     case "civic.process.started": {
-      // `started` fires when a process enters active participation. Today
-      // only civic.vote emits this event.
+      const data = event.data as { process?: { type?: string } };
+      const cachedType = getProcessType(event.process_id);
+
+      if (data?.process?.type === "civic.wordcloud" || cachedType === "civic.wordcloud") {
+        const title = getProcessTitle(event.process_id) ?? "Word Cloud";
+        return {
+          id: event.id,
+          title,
+          pillLabel: "Word cloud",
+          pillKind: "wordcloud",
+          summary: summaryFromDescription(getProcessDescription(event.process_id)),
+          timestamp: event.timestamp,
+          href: `/wordcloud/${event.process_id}`,
+        };
+      }
+
       const title = getProcessTitle(event.process_id) ?? "Untitled vote";
       return {
         id: event.id,
@@ -142,6 +158,26 @@ export function eventToPost(
       };
 
       const cachedType = getProcessType(event.process_id);
+
+      // Word cloud snapshot/result
+      if (
+        (data as { wordcloud_snapshot?: unknown; wordcloud_result?: unknown })
+          .wordcloud_snapshot !== undefined ||
+        (data as { wordcloud_snapshot?: unknown; wordcloud_result?: unknown })
+          .wordcloud_result !== undefined ||
+        cachedType === "civic.wordcloud"
+      ) {
+        const title = getProcessTitle(event.process_id) ?? "Word Cloud";
+        return {
+          id: event.id,
+          title,
+          pillLabel: "Word cloud",
+          pillKind: "wordcloud" as const,
+          summary: summaryFromDescription(getProcessDescription(event.process_id)),
+          timestamp: event.timestamp,
+          href: `/wordcloud/${event.process_id}`,
+        };
+      }
 
       // Announcement — pill carries the role-aware label so the title
       // remains pure announcement content.
@@ -441,6 +477,9 @@ function classifyHref(href: string): { kind: "internal"; to: string } | { kind: 
       return { kind: "internal", to: url.pathname };
     }
     if (/^\/meeting-summary\/[^/]+\/?$/.test(url.pathname)) {
+      return { kind: "internal", to: url.pathname };
+    }
+    if (/^\/wordcloud\/[^/]+\/?$/.test(url.pathname)) {
       return { kind: "internal", to: url.pathname };
     }
     if (url.origin === window.location.origin) {

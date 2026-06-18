@@ -112,6 +112,10 @@ app.use("/projects", projectRoutes);
 // Deliberation endpoints — Polis-backed community deliberation
 app.use("/deliberations", deliberationRoutes);
 
+// Word cloud endpoints — lightweight free-text aggregation process
+import wordcloudRoutes from "./routes/wordcloudRoutes.js";
+app.use("/wordcloud", wordcloudRoutes);
+
 // Proposal endpoints — user-facing proposal submission and endorsement
 app.use("/proposals", proposalRoutes);
 

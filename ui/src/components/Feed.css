@@ -118,6 +118,7 @@
 .feed-post--announcement        { border-top-color: var(--pill-announcement-bg); }
 .feed-post--announcement-author { border-top-color: var(--pill-announcement-author-bg); }
 .feed-post--meeting             { border-top-color: var(--pill-meeting-bg); }
+.feed-post--wordcloud           { border-top-color: #e0f2f1; }
 .feed-post--project-created     { border-top-color: #e3f2fd; }
 .feed-post--project-updated     { border-top-color: #e3f2fd; }
 .feed-post--generic             { border-top-color: #6b7280; }
@@ -220,6 +221,7 @@
 .feed-pill--announcement        { background: var(--pill-announcement-bg);        color: var(--pill-announcement-fg); }
 .feed-pill--announcement-author { background: var(--pill-announcement-author-bg); color: var(--pill-announcement-author-fg); }
 .feed-pill--meeting             { background: var(--pill-meeting-bg);             color: var(--pill-meeting-fg); }
+.feed-pill--wordcloud           { background: #e0f2f1;                            color: #00695c; }
 .feed-pill--generic             { background: #6b7280;                            color: #fff; }
 .feed-pill--project-created     { background: #e3f2fd;                            color: #1565c0; }
 .feed-pill--project-updated     { background: #e3f2fd;                            color: #1565c0; }

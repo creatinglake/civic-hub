@@ -8,6 +8,7 @@ import {
   getMeetingSummary,
   getProcessState,
   getPublicVoteResults,
+  getWordcloud,
 } from "../services/api";
 import FeedPost, {
   eventToPost,
@@ -41,6 +42,7 @@ type ProcessKind =
   | "civic.vote_results"
   | "civic.announcement"
   | "civic.meeting_summary"
+  | "civic.wordcloud"
   | "generic";
 
 interface ProcessMeta {
@@ -89,7 +91,11 @@ interface ProcessMeta {
  *     indefinitely so old events keep working without rewriting.
  */
 function kindFromEvent(event: CivicEvent): ProcessKind | null {
-  if (event.event_type === "civic.process.started") return "civic.vote";
+  if (event.event_type === "civic.process.started") {
+    const data = event.data as { process?: { type?: string } };
+    if (data?.process?.type === "civic.wordcloud") return "civic.wordcloud";
+    return "civic.vote";
+  }
   if (event.event_type === "civic.process.result_published") {
     const data = event.data as {
       brief_id?: unknown;
@@ -98,7 +104,10 @@ function kindFromEvent(event: CivicEvent): ProcessKind | null {
       announcement?: unknown;
       meeting_summary?: unknown;
       summary_id?: unknown;
+      wordcloud_snapshot?: unknown;
+      wordcloud_result?: unknown;
     };
+    if (data?.wordcloud_snapshot !== undefined || data?.wordcloud_result !== undefined) return "civic.wordcloud";
     if (data?.announcement !== undefined) return "civic.announcement";
     if (data?.meeting_summary !== undefined || typeof data?.summary_id === "string") {
       return "civic.meeting_summary";
@@ -256,6 +265,13 @@ export default function Feed({ filter, emptyFilteredAction }: Props) {
             maxStartSeconds: maxStart,
           };
         });
+      } else if (kind === "civic.wordcloud") {
+        lookup = getWordcloud(id).then((wc) => ({
+          type: "civic.wordcloud" as const,
+          title: wc.title,
+          description: wc.description,
+          totalVotes: wc.submission_count,
+        }));
       } else if (kind === "generic") {
         lookup = getProcessState(id).then((state) => ({
           type: "generic" as const,
@@ -463,6 +479,12 @@ function buildEngagement(
       const dur = formatDuration(meta.maxStartSeconds ?? null);
       if (dur) parts.push(dur);
       return parts.join(" · ");
+    }
+    case "wordcloud": {
+      const n = meta.totalVotes ?? 0;
+      if (n === 0) return "Share what's on your mind — be the first to respond";
+      const noun = n === 1 ? "response" : "responses";
+      return `${formatCount(n)} ${noun} so far`;
     }
     case "project-created":
     case "project-updated":

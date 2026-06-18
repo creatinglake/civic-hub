@@ -13,6 +13,125 @@ Updated after every Claude Code session. Records what was built, what's incomple
 
 ---
 
+## Civic Word Cloud — Slice 4 (Admin Creation UI) — 2026-06-18
+
+**Status:** Complete. Admins can create and activate word clouds from a form at `/wordcloud/new`.
+
+### What was built
+
+- `ui/src/pages/CreateWordCloud.tsx` — Admin-gated form (title, description, prompt text). Creates a process via `POST /process`, immediately activates via `POST /process/:id/action`. Redirects to the new word cloud page on success.
+- `ui/src/pages/CreateWordCloud.css` — Styles matching the PostAnnouncement pattern (max-width 720px, shared form classes).
+- `ui/src/services/api.ts` — Added `createWordcloudProcess()` helper that chains create + activate calls.
+- `ui/src/App.tsx` — Added `/wordcloud/new` route (placed before `/:id` to avoid param capture).
+
+### No new backend code
+Reuses existing `POST /process` (admin-gated via `requireAdmin` middleware) and the process action dispatch loop. The `createWordcloudState()` factory in the wordcloud module handles state initialization; `process.activate` dispatches to `activateWordcloud()`.
+
+---
+
+## Civic Word Cloud — Slice 3 (Hub Integration) — 2026-06-18
+
+**Status:** Complete. Word clouds now appear in the main feed and are filterable.
+
+### What was built
+
+**Feed integration:**
+- `Feed.tsx` — Added `"civic.wordcloud"` to `ProcessKind`, `kindFromEvent()` discrimination (checks `data.process.type`), metadata fetch via `getWordcloud()`, engagement line ("N responses so far")
+- `FeedPost.tsx` — Added `"wordcloud"` to `FeedPillKind`, `eventToPost()` handling for `civic.process.started` and `civic.process.result_published` word cloud events, `/wordcloud/:id` href override (bypasses legacy action_url), internal route classification
+- `FeedFilter.tsx` — Added `"wordcloud"` filter key, "Word clouds" filter pill, predicate for word cloud events
+- `Feed.css` / `FeedFilter.css` — Teal pill color (#e0f2f1 bg / #00695c text) and card border
+
+**Event action_url fix:**
+- `modules/civic.wordcloud/index.ts` — All emit calls now pass `action_url_path: /wordcloud/:id` so future events link correctly
+- `modules/civic.wordcloud/models.ts` — Added `action_url_path` to `EmitEventFn` type
+- Snapshot/close events use `wordcloud_snapshot` / `wordcloud_result` data keys for feed discrimination
+
+**Word cloud improvements (from earlier this session):**
+- Aggregation simplified to unigrams only (no n-grams) — cleaner, more coherent cloud
+- SVG-based spiral layout with mixed horizontal/vertical orientations, no overlaps
+- Tighter packing (3px padding, 0.58 char width, 2500 spiral steps)
+- Backend cap of 50 words max
+- `GET /wordcloud/:id/responses` endpoint + responses list UI below the cloud
+- 60 seeded test submissions
+
+### What's incomplete (Slice 4+)
+- Admin creation UI (currently seed/API only)
+- Hide/restore moderation for submissions
+- Cross-process AI moderation layer
+- Embeddable widget / America 250 standalone mode
+
+---
+
+## Civic Word Cloud — Slices 1 + 2 (Complete) — 2026-06-17
+
+**Status:** Complete. Module, handler, API routes, and UI page all built and verified with seeded data.
+
+### What was built
+
+New `civic.wordcloud` process type — a lightweight, non-deliberative civic process where residents submit short free-text answers to prompts and the answers aggregate into a live word cloud.
+
+**Module** (`src/modules/civic.wordcloud/`):
+- `models.ts` — Types: `WordcloudProcessState`, `WordcloudSubmission`, `CloudEntry`, `PromptCloud`, etc.
+- `index.ts` — Service functions: `createWordcloudState`, `activateWordcloud`, `submitResponse`, `snapshotWordcloud`, `closeWordcloud`, `buildClouds`, `getSubmissionCount`
+- `aggregation.ts` — Tokenizer, vendored Porter2 stemmer, stop-word filtering, n-gram extraction (1–3 grams), frequency aggregation with dedup per submission
+- `stopwords.ts` — Common English stop words
+
+**Handler** (`src/processes/wordcloudProcess.ts`):
+- Implements `ProcessHandler` interface
+- Actions: `process.activate` (draft→active), `process.submit` (record submission), `process.snapshot` (publish current cloud), `process.close` (active→closed + final result)
+- Registered in `src/processes/registry.ts`
+- `PROCESS_DESCRIPTOR` declares the lifecycle: `draft → active → closed` (per ADR-003)
+
+**Migration** (`supabase/migrations/20260617000000_wordcloud_submissions.sql`):
+- `wordcloud_submissions` table with process_id FK, prompt_id, author_id, body, device_token, moderation columns
+- Unique index enforcing one submission per author per prompt (partial — excludes anonymous)
+- Applied to both dev and production Supabase (prod has the empty table — harmless until feature deploys)
+
+**API routes** (`src/controllers/wordcloudController.ts`, `src/routes/wordcloudRoutes.ts`):
+- `GET /wordcloud/:id` — full read model with cloud data, prompts, config, metadata
+- `GET /wordcloud/:id/cloud` — lightweight cloud-only endpoint for refreshing after submission
+- Mounted in `src/app.ts`
+
+**UI page** (`ui/src/pages/WordCloud.tsx`, `WordCloud.css`):
+- Word cloud visualization with 6 size classes (frequency-based) and 6 civic color classes
+- Ranked list toggle for accessible companion view
+- Submission form with character counter, auth gate via `useRequireAuth()`
+- Per-prompt sections (supports multi-prompt word clouds)
+- Cloud auto-refreshes after submission without full page reload
+- Route: `/wordcloud/:id` in `App.tsx`
+
+**API client** (`ui/src/services/api.ts`):
+- Added `getWordcloud()`, `getWordcloudCloud()`, `submitWordcloudResponse()` functions
+- Added types: `WordcloudCloudEntry`, `WordcloudPromptCloud`, `WordcloudState`
+
+**Seed script** (`scripts/seedWordcloud.ts`):
+- Creates a test word cloud "What do you love about Floyd?" with 15 sample submissions
+
+**Architecture decision** (`decisions/003-flexible-process-lifecycles.md`):
+- Formalizes that the spec's 5-state lifecycle is a recommended vocabulary, not mandatory for all plugins
+- Word cloud uses `draft → active → closed` subset
+
+### Key design decisions
+- Evergreen mode: stays `active` indefinitely; admin can manually snapshot or close
+- One submission per user per prompt (enforced by DB unique index)
+- Per-submission events use `meta.visibility: "restricted"` — raw citizen text stays out of the public feed
+- Aggregation computed on-read from DB (not materialized) — fine at Floyd scale
+- No moderation for now — placeholder for future cross-process AI moderation layer
+- Vendored Porter2 stemmer (zero dependencies)
+- `getReadModel()` stays sync (metadata only); cloud data served by dedicated async endpoints
+
+### What's incomplete (Slice 3+)
+- Hub UI integration (show word clouds in main process list / feed)
+- Hide/restore moderation (will follow civic.input pattern)
+- AI moderation at ingestion (future, cross-process)
+- Embeddable widget + America 250 mode (future)
+- Admin creation UI (currently seed/API only)
+
+### Open questions
+- None blocking
+
+---
+
 ## Vote Auto-Close + Status Display — 2026-06-02
 
 **Status:** Complete.

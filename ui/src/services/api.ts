@@ -1470,3 +1470,100 @@ export function submitFeedback(
 ): Promise<{ message: string; submission_id?: string }> {
   return request("POST", "/feedback", input);
 }
+
+// --- Word Cloud ---
+
+export interface WordcloudCloudEntry {
+  text: string;
+  count: number;
+}
+
+export interface WordcloudPromptCloud {
+  prompt_id: string;
+  prompt_text: string;
+  entries: WordcloudCloudEntry[];
+  total_submissions: number;
+}
+
+export interface WordcloudState {
+  id: string;
+  type: "civic.wordcloud";
+  title: string;
+  description: string;
+  status: string;
+  prompts: Array<{ id: string; text: string; max_length?: number }>;
+  lifecycle_mode: "fixed" | "evergreen";
+  config: {
+    max_submission_length: number;
+    display_threshold: number;
+  };
+  submission_count: number;
+  clouds: WordcloudPromptCloud[];
+  jurisdiction: string;
+  created_at: string;
+  created_by: string;
+}
+
+export function getWordcloud(id: string): Promise<WordcloudState> {
+  return request("GET", `/wordcloud/${id}`);
+}
+
+export function getWordcloudCloud(
+  id: string,
+): Promise<{
+  id: string;
+  status: string;
+  submission_count: number;
+  clouds: WordcloudPromptCloud[];
+}> {
+  return request("GET", `/wordcloud/${id}/cloud`);
+}
+
+export interface WordcloudResponse {
+  id: string;
+  body: string;
+  submitted_at: string;
+  prompt_id: string;
+}
+
+export function getWordcloudResponses(
+  id: string,
+  promptId?: string,
+): Promise<{ responses: WordcloudResponse[] }> {
+  const qs = promptId ? `?prompt_id=${promptId}` : "";
+  return request("GET", `/wordcloud/${id}/responses${qs}`);
+}
+
+export async function createWordcloudProcess(input: {
+  title: string;
+  description: string;
+  promptText: string;
+}): Promise<{ id: string }> {
+  const promptId = `prompt-${Date.now()}`;
+  const process = await request<{ id: string }>("POST", "/process", {
+    definition: { type: "civic.wordcloud" },
+    title: input.title,
+    description: input.description,
+    state: {
+      prompts: [{ id: promptId, text: input.promptText }],
+      lifecycle_mode: "evergreen",
+    },
+  });
+  await request("POST", `/process/${process.id}/action`, {
+    type: "process.activate",
+    payload: {},
+  });
+  return process;
+}
+
+export function submitWordcloudResponse(
+  processId: string,
+  promptId: string,
+  text: string,
+): Promise<ActionResult> {
+  return request("POST", `/process/${processId}/action`, {
+    type: "process.submit",
+    actor: "unused",
+    payload: { prompt_id: promptId, text },
+  });
+}

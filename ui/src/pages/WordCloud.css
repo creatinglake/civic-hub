@@ -1,0 +1,294 @@
+/* Word Cloud page styles */
+
+.wordcloud-page {
+  max-width: var(--max-width-shell, 720px);
+  margin: 0 auto;
+  padding: var(--space-md, 1rem);
+}
+
+.wordcloud-header {
+  margin-bottom: var(--space-lg, 1.5rem);
+}
+
+.wordcloud-header h1 {
+  font-size: var(--font-size-xl, 1.5rem);
+  margin: 0 0 0.25rem;
+}
+
+.wordcloud-description {
+  color: var(--color-text-muted, #666);
+  font-size: var(--font-size-sm, 0.9rem);
+  margin: 0.25rem 0 0;
+}
+
+.wordcloud-meta {
+  display: flex;
+  gap: 1rem;
+  font-size: var(--font-size-xs, 0.75rem);
+  color: var(--color-text-subtle, #999);
+  margin-top: 0.5rem;
+}
+
+.wordcloud-status {
+  display: inline-block;
+  font-size: var(--font-size-xs, 0.75rem);
+  font-weight: 600;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  margin-left: 0.5rem;
+  vertical-align: middle;
+}
+
+.wordcloud-status.status-active {
+  background: var(--color-success-bg, #e8f5e9);
+  color: var(--color-success, #2e7d32);
+}
+
+.wordcloud-status.status-draft {
+  background: var(--color-surface-muted, #f5f5f5);
+  color: var(--color-text-muted, #888);
+}
+
+.wordcloud-status.status-closed {
+  background: var(--color-error-bg, #fce4ec);
+  color: var(--color-error, #c62828);
+}
+
+/* --- Prompt section --- */
+
+.wordcloud-prompt-section {
+  margin-bottom: var(--space-xl, 2rem);
+}
+
+.wordcloud-prompt-text {
+  font-size: var(--font-size-lg, 1.15rem);
+  font-weight: 600;
+  margin: 0 0 var(--space-md, 1rem);
+  color: var(--color-text, #222);
+}
+
+/* --- Cloud visualization --- */
+
+.wordcloud-cloud {
+  min-height: 120px;
+  border: 1px solid var(--color-border, #e0e0e0);
+  border-radius: 12px;
+  background: var(--color-surface, #fff);
+  margin-bottom: var(--space-md, 1rem);
+  overflow: hidden;
+}
+
+.wordcloud-cloud-empty {
+  display: block;
+  color: var(--color-text-subtle, #999);
+  font-size: var(--font-size-sm, 0.9rem);
+  font-style: italic;
+  text-align: center;
+  width: 100%;
+  padding: var(--space-xl, 2rem) 0;
+}
+
+.wordcloud-svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.wordcloud-svg text {
+  transition: opacity 0.15s;
+  cursor: default;
+}
+
+.wordcloud-svg text:hover {
+  opacity: 0.65;
+}
+
+/* --- Ranked list (accessible companion) --- */
+
+.wordcloud-ranked-toggle {
+  background: none;
+  border: none;
+  color: var(--color-primary, #1e3a5f);
+  font-size: var(--font-size-sm, 0.85rem);
+  cursor: pointer;
+  padding: 0;
+  margin-bottom: var(--space-sm, 0.5rem);
+  text-decoration: underline;
+}
+
+.wordcloud-ranked-list {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 var(--space-md, 1rem);
+  border: 1px solid var(--color-border, #e0e0e0);
+  border-radius: 8px;
+  background: var(--color-surface, #fff);
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.wordcloud-ranked-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.4rem 0.75rem;
+  font-size: var(--font-size-sm, 0.85rem);
+  border-bottom: 1px solid var(--color-border, #f0f0f0);
+}
+
+.wordcloud-ranked-item:last-child {
+  border-bottom: none;
+}
+
+.wordcloud-ranked-word {
+  color: var(--color-text, #222);
+}
+
+.wordcloud-ranked-count {
+  color: var(--color-text-muted, #888);
+  font-size: var(--font-size-xs, 0.75rem);
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- Responses list --- */
+
+.wordcloud-responses {
+  margin-top: var(--space-md, 1rem);
+}
+
+.wordcloud-responses-list {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 var(--space-md, 1rem);
+  border: 1px solid var(--color-border, #e0e0e0);
+  border-radius: 8px;
+  background: var(--color-surface, #fff);
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.wordcloud-response-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 1rem;
+  padding: 0.6rem 0.75rem;
+  font-size: var(--font-size-sm, 0.9rem);
+  border-bottom: 1px solid var(--color-border, #f0f0f0);
+}
+
+.wordcloud-response-item:last-child {
+  border-bottom: none;
+}
+
+.wordcloud-response-body {
+  color: var(--color-text, #222);
+  flex: 1;
+}
+
+.wordcloud-response-empty {
+  color: var(--color-text-subtle, #999);
+  font-style: italic;
+}
+
+.wordcloud-response-date {
+  color: var(--color-text-subtle, #999);
+  font-size: var(--font-size-xs, 0.75rem);
+  white-space: nowrap;
+}
+
+/* --- Submission form --- */
+
+.wordcloud-form {
+  margin-top: var(--space-md, 1rem);
+  padding: var(--space-md, 1rem);
+  border: 1px solid var(--color-border, #e0e0e0);
+  border-radius: 8px;
+  background: var(--color-surface, #fff);
+}
+
+.wordcloud-form-label {
+  display: block;
+  font-size: var(--font-size-sm, 0.9rem);
+  font-weight: 500;
+  margin-bottom: 0.35rem;
+  color: var(--color-text, #222);
+}
+
+.wordcloud-form-input {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  font-size: var(--font-size-base, 1rem);
+  border: 1px solid var(--color-border, #ccc);
+  border-radius: 6px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.wordcloud-form-input:focus {
+  border-color: var(--color-primary, #1e3a5f);
+}
+
+.wordcloud-form-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: flex-end;
+  margin-top: 0.35rem;
+}
+
+.wordcloud-form-row .wordcloud-form-input {
+  flex: 1;
+}
+
+.wordcloud-form-char-count {
+  font-size: var(--font-size-xs, 0.75rem);
+  color: var(--color-text-subtle, #999);
+  text-align: right;
+  margin-top: 0.2rem;
+}
+
+.wordcloud-form-char-count.over-limit {
+  color: var(--color-error, #c62828);
+  font-weight: 600;
+}
+
+.wordcloud-submit-btn {
+  padding: 0.5rem 1.25rem;
+  font-size: var(--font-size-sm, 0.9rem);
+  font-weight: 600;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  background: var(--color-primary, #1e3a5f);
+  color: #fff;
+  transition: background 0.15s;
+  white-space: nowrap;
+}
+
+.wordcloud-submit-btn:hover:not(:disabled) {
+  background: var(--color-primary-hover, #15304f);
+}
+
+.wordcloud-submit-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.wordcloud-form-success {
+  font-size: var(--font-size-sm, 0.9rem);
+  color: var(--color-success, #2e7d32);
+  padding: 0.5rem 0;
+}
+
+.wordcloud-form-error {
+  font-size: var(--font-size-sm, 0.85rem);
+  color: var(--color-error, #c62828);
+  margin-top: 0.35rem;
+}
+
+.wordcloud-submission-count {
+  font-size: var(--font-size-xs, 0.75rem);
+  color: var(--color-text-subtle, #999);
+  text-align: center;
+  margin-top: 0.25rem;
+}
