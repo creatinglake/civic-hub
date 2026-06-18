@@ -243,7 +243,7 @@ function SubmitForm({
     if (!text.trim()) return;
 
     if (!actorId) {
-      requireAuth();
+      requireAuth(() => {});
       return;
     }
 
