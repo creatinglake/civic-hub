@@ -21,8 +21,7 @@ export type FeedFilterKey =
   | "vote"
   | "announcement"
   | "vote_results"
-  | "meeting_summary"
-  | "wordcloud";
+  | "meeting_summary";
 
 export interface FeedFilterChoice {
   key: FeedFilterKey;
@@ -49,11 +48,6 @@ const CHOICES: FeedFilterChoice[] = [
     label: `${hub.governing_body_short} meeting summaries`,
     pillClass: "feed-filter-pill--meeting",
   },
-  {
-    key: "wordcloud",
-    label: "Word clouds",
-    pillClass: "feed-filter-pill--wordcloud",
-  },
 ];
 
 const PARAM = "type";
@@ -63,8 +57,7 @@ function isFilterKey(v: string | null): v is FeedFilterKey {
     v === "vote" ||
     v === "announcement" ||
     v === "vote_results" ||
-    v === "meeting_summary" ||
-    v === "wordcloud"
+    v === "meeting_summary"
   );
 }
 
@@ -145,7 +138,7 @@ export function buildFilterPredicate(
   return (event) => {
     if (event.event_type === "civic.process.started") {
       const data = event.data as { process?: { type?: string } };
-      if (data?.process?.type === "civic.wordcloud") return key === "wordcloud";
+      if (data?.process?.type === "civic.wordcloud") return false;
       return key === "vote";
     }
     if (event.event_type === "civic.process.result_published") {
@@ -160,7 +153,7 @@ export function buildFilterPredicate(
         wordcloud_result?: unknown;
       };
       if (data.wordcloud_snapshot !== undefined || data.wordcloud_result !== undefined) {
-        return key === "wordcloud";
+        return false;
       }
       if (data.announcement !== undefined) return key === "announcement";
       if (
