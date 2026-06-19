@@ -1,107 +1,100 @@
 /*
  * Civic Hub — theme tokens.
  *
- * Semantic design tokens exposed as CSS custom properties on :root.
- * The long-term intent is that hub operators can override these at the
- * root level (via an uploaded theme file or a data-theme attribute) to
- * re-skin a hub without touching component code.
+ * Bridge layer: imports the shared Civic.Social design system and maps
+ * its --ds-* tokens to the --color-* / --font-* / --space-* names that
+ * civic-hub component CSS already references. This avoids a mass rename
+ * of every component stylesheet while still pulling all visual decisions
+ * from the single source of truth in shared/design-system.
  *
- * Rules for adding to this file:
- *   - Name semantically (e.g. --color-primary, NOT --color-blue) so
- *     the meaning can be redefined without breaking components.
- *   - Components reference tokens exclusively — no hardcoded colors,
- *     font names, or magic pixel values in component styles.
+ * Hub-specific tokens (post-type pill colors, layout widths) that don't
+ * exist in the design system stay defined locally at the bottom.
  */
+
+@import "@civic-social/design-system/all.css";
 
 :root {
   /* --- Color: surfaces --- */
-  --color-bg: #f8f7f4;
-  --color-surface: #ffffff;
-  --color-surface-alt: #f0eeea;
-  --color-surface-muted: #eae8e4;
-  --color-border: #ddd9d3;
-  --color-border-strong: #c8c3bb;
-  --color-border-hover: #8a8580;
+  --color-bg: var(--ds-color-bg-page);
+  --color-surface: var(--ds-color-bg-surface);
+  --color-surface-alt: var(--ds-color-bg-surface-alt);
+  --color-surface-muted: var(--ds-color-bg-muted);
+  --color-border: var(--ds-color-border-default);
+  --color-border-strong: var(--ds-color-border-strong);
+  --color-border-hover: var(--ds-color-ink-400);
 
   /* --- Color: text --- */
-  --color-text: #1c1917;
-  --color-text-muted: #57534e;
-  --color-text-subtle: #8a8580;
-  --color-text-faint: #a8a29e;
+  --color-text: var(--ds-color-text-default);
+  --color-text-muted: var(--ds-color-text-muted);
+  --color-text-subtle: var(--ds-color-text-subtle);
+  --color-text-faint: var(--ds-color-ink-300);
 
   /* --- Color: primary / accents --- */
-  --color-primary: #2a6b5a;
-  --color-primary-text: #ffffff;
-  --color-primary-hover: #1f5447;
-  --color-primary-ink: #1a3f36;
+  --color-primary: var(--ds-color-action-primary);
+  --color-primary-text: var(--ds-color-text-inverse);
+  --color-primary-hover: var(--ds-color-action-primary-hover);
+  --color-primary-ink: var(--ds-color-primary-950);
 
-  /* Brand accent — civic green-slate for identity, headings, wordmark. */
-  --color-brand: #1a3f36;
+  /* Brand accent — used for identity labels, headings, wordmark. */
+  --color-brand: var(--ds-color-primary-700);
 
   /* --- Color: links --- */
-  --color-link: #1a3f36;
+  --color-link: var(--ds-color-text-link);
 
   /* --- Color: focus ring --- */
-  --color-focus: #2a6b5a;
+  --color-focus: var(--ds-color-border-focus);
 
   /* --- Color: status --- */
-  --color-success: #1a7a3d;
-  --color-success-bg: #e6f4ea;
-  --color-error: #b91c1c;
-  --color-error-bg: #fce4ec;
-  --color-warning: #b45309;
-  --color-warning-bg: #fef3c7;
+  --color-success: var(--ds-color-success-700);
+  --color-success-bg: var(--ds-color-success-100);
+  --color-error: var(--ds-color-danger-700);
+  --color-error-bg: var(--ds-color-danger-100);
+  --color-warning: var(--ds-color-warning-700);
+  --color-warning-bg: var(--ds-color-warning-100);
 
-  /* --- Color: post-type pills --- */
-  --pill-vote-bg: #dfeee8;                  --pill-vote-fg: #1a3f36;
-  --pill-results-bg: #d2e5dc;              --pill-results-fg: #143530;
-  --pill-vote-results-bg: #d0e8e0;          --pill-vote-results-fg: #0f5a45;
-  --pill-announcement-bg: #f5e1cc;          --pill-announcement-fg: #7a3014;
-  --pill-announcement-author-bg: #e4ddf0;   --pill-announcement-author-fg: #3a2c5e;
-  --pill-meeting-bg: #d6ebd6;               --pill-meeting-fg: #0f4a26;
+  /* --- Color: post-type pills (hub-specific) --- */
+  --pill-vote-bg: var(--ds-color-primary-100);       --pill-vote-fg: var(--ds-color-primary-800);
+  --pill-results-bg: var(--ds-color-primary-200);     --pill-results-fg: var(--ds-color-primary-950);
+  --pill-vote-results-bg: var(--ds-color-primary-100); --pill-vote-results-fg: var(--ds-color-primary-700);
+  --pill-announcement-bg: var(--ds-color-accent-100);  --pill-announcement-fg: var(--ds-color-accent-800);
+  --pill-announcement-author-bg: #e4ddf0;              --pill-announcement-author-fg: #3a2c5e;
+  --pill-meeting-bg: var(--ds-color-success-100);      --pill-meeting-fg: var(--ds-color-success-700);
 
   /* --- Typography --- */
-  --font-body:
-    "Inter Variable", "Inter", -apple-system, BlinkMacSystemFont,
-    "Segoe UI", Roboto, sans-serif;
-  --font-heading:
-    "Manrope Variable", "Manrope", -apple-system, BlinkMacSystemFont,
-    "Segoe UI", Roboto, sans-serif;
+  --font-body: var(--ds-font-family-sans);
+  --font-heading: var(--ds-font-family-display);
 
-  --font-size-xs: 0.75rem;     /* 12px — meta, pills */
-  --font-size-sm: 0.875rem;    /* 14px — body secondary */
-  --font-size-base: 1rem;      /* 16px — body */
-  --font-size-lg: 1.125rem;    /* 18px — small headings, summary */
-  --font-size-xl: 1.25rem;     /* 20px — h3 */
-  --font-size-2xl: 1.5rem;     /* 24px — h2, feed post title */
-  --font-size-3xl: 2rem;       /* 32px — h1 */
-  --font-size-4xl: 2.75rem;    /* 44px — hero */
+  --font-size-xs: var(--ds-font-size-xs);
+  --font-size-sm: var(--ds-font-size-sm);
+  --font-size-base: var(--ds-font-size-base);
+  --font-size-lg: var(--ds-font-size-lg);
+  --font-size-xl: var(--ds-font-size-xl);
+  --font-size-2xl: var(--ds-font-size-2xl);
+  --font-size-3xl: var(--ds-font-size-3xl);
+  --font-size-4xl: var(--ds-font-size-4xl);
 
-  --line-height-tight: 1.2;
-  --line-height-normal: 1.5;
-  --line-height-relaxed: 1.65;
-
-  /* Legacy aliases (older components reference these names). Kept so
-     existing component CSS continues to read the unified palette. */
-  --line-height-base: var(--line-height-normal);
+  --line-height-tight: var(--ds-line-height-tight);
+  --line-height-normal: var(--ds-line-height-normal);
+  --line-height-relaxed: var(--ds-line-height-relaxed);
+  --line-height-base: var(--ds-line-height-normal);
 
   /* --- Spacing scale --- */
-  --space-xs: 0.25rem;
-  --space-sm: 0.5rem;
-  --space-md: 1rem;
-  --space-lg: 1.5rem;
-  --space-xl: 2rem;
+  --space-xs: var(--ds-space-1);
+  --space-sm: var(--ds-space-2);
+  --space-md: var(--ds-space-4);
+  --space-lg: var(--ds-space-6);
+  --space-xl: var(--ds-space-8);
 
   /* --- Radii --- */
-  --radius-sm: 4px;
-  --radius-md: 8px;
-  --radius-pill: 9999px;
+  --radius-sm: var(--ds-radius-sm);
+  --radius-md: var(--ds-radius-md);
+  --radius-pill: var(--ds-radius-pill);
 
   /* --- Elevation --- */
-  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.04);
-  --shadow-popover: 0 8px 24px rgba(0, 0, 0, 0.12);
+  --shadow-card: var(--ds-shadow-sm);
+  --shadow-popover: var(--ds-shadow-lg);
 
-  /* --- Layout --- */
+  /* --- Layout (hub-specific) --- */
   --max-width-shell: 1100px;
   --max-width-feed: 640px;
 }
