@@ -13,6 +13,32 @@ Updated after every Claude Code session. Records what was built, what's incomple
 
 ---
 
+## Step 2 Punch-List — UX Polish & Tester Bug Fix — 2026-06-19
+
+**Status:** Complete. Pushed to production.
+
+### What was built
+
+**Nav reorder:** Drawer and tab strip now read Feed → Conversations → Propose → Votes → Projects (was Feed → Propose → Conversations). Matches the understand → decide → do participation flow.
+
+**Not-found back links:** Process, ProposalDetail, VoteLog, and WordCloud pages now show a back link instead of a bare "Not found." paragraph when the resource doesn't exist.
+
+**Creation finality warnings:** Both the proposal and vote submission confirmation modals now include a callout: "Once submitted, your [proposal/vote] cannot be edited. Please make sure everything looks the way you want it before submitting."
+
+**Floyd-string config sweep:** Replaced 6 hardcoded "Floyd Civic Hub" / "Floyd County" strings with `hub.name` / `hub.jurisdiction` from the hub config system. Affected: WelcomeBanner, LegalPage, Feed, Votes, Welcome page titles.
+
+**Review failure UX fix (tester bug):** When the mandatory Claude API review step fails (timeout, rate limit, missing key), the drafting status bar now shows "Review failed — tap Review draft to try again" in warning colors. Previously the only feedback was a chat message in the assistant panel — invisible on mobile where the panel is behind a FAB. Applied to both proposal and vote drafting flows. Also fixed VoteDraftingForm missing its DraftingForm.css import (status styles wouldn't load on direct navigation to `/votes/new`).
+
+**Test tracker:** Added wordcloud and beta mode test rows to TESTING.md.
+
+### What's incomplete (remaining Step 2)
+
+- Color scheme refresh (M)
+- Board of Supervisors attribution clarity (M)
+- Threshold default config (S)
+
+---
+
 ## Civic Word Cloud — Slice 4 (Admin Creation UI) — 2026-06-18
 
 **Status:** Complete. Admins can create and activate word clouds from a form at `/wordcloud/new`.
