@@ -1505,10 +1505,12 @@ export interface WordcloudState {
   jurisdiction: string;
   created_at: string;
   created_by: string;
+  has_submitted: boolean;
 }
 
-export function getWordcloud(id: string): Promise<WordcloudState> {
-  return request("GET", `/wordcloud/${id}`);
+export function getWordcloud(id: string, actor?: string): Promise<WordcloudState> {
+  const qs = actor ? `?actor=${encodeURIComponent(actor)}` : "";
+  return request("GET", `/wordcloud/${id}${qs}`);
 }
 
 export function getWordcloudCloud(

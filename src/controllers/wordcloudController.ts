@@ -97,6 +97,18 @@ export async function handleGetWordcloud(
     const clouds = await buildClouds(process.id, state);
     const submissionCount = await getSubmissionCount(process.id);
 
+    const actor = req.query.actor as string | undefined;
+    let hasSubmitted = false;
+    if (actor) {
+      const { count, error: countErr } = await getDb()
+        .from("wordcloud_submissions")
+        .select("id", { count: "exact", head: true })
+        .eq("process_id", id)
+        .eq("author_id", actor)
+        .is("hidden_at", null);
+      if (!countErr && (count ?? 0) > 0) hasSubmitted = true;
+    }
+
     res.json({
       id: process.id,
       type: "civic.wordcloud",
@@ -111,6 +123,7 @@ export async function handleGetWordcloud(
       jurisdiction: process.jurisdiction,
       created_at: process.createdAt,
       created_by: process.createdBy,
+      has_submitted: hasSubmitted,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";

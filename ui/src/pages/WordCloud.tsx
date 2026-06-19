@@ -195,13 +195,14 @@ function RankedList({ entries }: { entries: WordcloudCloudEntry[] }) {
   if (entries.length === 0) return null;
 
   return (
-    <div>
+    <div className="wordcloud-accordion">
       <button
-        className="wordcloud-ranked-toggle"
+        className="wordcloud-accordion-toggle"
         onClick={() => setOpen(!open)}
         aria-expanded={open}
       >
-        {open ? "Hide ranked list" : "Show ranked list"}
+        <span>Show word rank</span>
+        <span className={`wordcloud-accordion-chevron${open ? " open" : ""}`}>&#9662;</span>
       </button>
       {open && (
         <ol className="wordcloud-ranked-list" aria-label="Ranked word list">
@@ -339,13 +340,14 @@ function ResponsesList({
   }, [open, processId, promptId, refreshKey]);
 
   return (
-    <div className="wordcloud-responses">
+    <div className="wordcloud-accordion">
       <button
-        className="wordcloud-ranked-toggle"
+        className="wordcloud-accordion-toggle"
         onClick={() => setOpen(!open)}
         aria-expanded={open}
       >
-        {open ? "Hide responses" : "Show all responses"}
+        <span>Show all responses</span>
+        <span className={`wordcloud-accordion-chevron${open ? " open" : ""}`}>&#9662;</span>
       </button>
       {open && (
         <ul className="wordcloud-responses-list" aria-label="Community responses">
@@ -372,6 +374,7 @@ function PromptSection({
   prompt,
   cloud,
   isActive,
+  hasSubmitted,
   maxLength,
   onSubmitted,
   refreshKey,
@@ -380,11 +383,12 @@ function PromptSection({
   prompt: { id: string; text: string; max_length?: number };
   cloud: WordcloudPromptCloud | undefined;
   isActive: boolean;
+  hasSubmitted: boolean;
   maxLength: number;
   onSubmitted: () => void;
   refreshKey: number;
 }) {
-  const [revealed, setRevealed] = useState(!isActive);
+  const [revealed, setRevealed] = useState(!isActive || hasSubmitted);
   const entries = cloud?.entries ?? [];
   const effectiveMax = prompt.max_length ?? maxLength;
   const totalSubmissions = cloud?.total_submissions ?? 0;
@@ -426,8 +430,6 @@ function PromptSection({
         </p>
       )}
 
-      {revealed && <RankedList entries={entries} />}
-
       {isActive && revealed && (
         <SubmitForm
           processId={processId}
@@ -445,6 +447,8 @@ function PromptSection({
           refreshKey={refreshKey}
         />
       )}
+
+      {revealed && <RankedList entries={entries} />}
     </section>
   );
 }
@@ -453,6 +457,7 @@ export default function WordCloud() {
   const { id } = useParams<{ id: string }>();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const { actorId } = useAuth();
   const isOnboarding = searchParams.get("onboarding") === "1";
   const [wc, setWc] = useState<WordcloudState | null>(null);
   const [loading, setLoading] = useState(true);
@@ -462,7 +467,7 @@ export default function WordCloud() {
   const fetchData = useCallback(async () => {
     if (!id) return;
     try {
-      const data = await getWordcloud(id);
+      const data = await getWordcloud(id, actorId ?? undefined);
       setWc(data);
       setError(null);
     } catch (err) {
@@ -470,11 +475,12 @@ export default function WordCloud() {
     } finally {
       setLoading(false);
     }
-  }, [id]);
+  }, [id, actorId]);
 
   const refreshCloud = useCallback(async () => {
     if (!id) return;
     setRefreshKey((k) => k + 1);
+    setWc((prev) => prev ? { ...prev, has_submitted: true } : prev);
     try {
       const data = await getWordcloudCloud(id);
       setWc((prev) =>
@@ -529,7 +535,7 @@ export default function WordCloud() {
         </Link>
       )}
 
-      {isOnboarding && (
+      {isOnboarding && !wc.has_submitted && (
         <div className="wordcloud-onboarding-banner">
           <h2>Welcome! You're all set.</h2>
           <p>
@@ -567,6 +573,7 @@ export default function WordCloud() {
             prompt={prompt}
             cloud={cloud}
             isActive={isActive}
+            hasSubmitted={wc.has_submitted}
             maxLength={wc.config.max_submission_length}
             onSubmitted={refreshCloud}
             refreshKey={refreshKey}
