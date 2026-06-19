@@ -205,8 +205,8 @@ function RankedList({ entries }: { entries: WordcloudCloudEntry[] }) {
         onClick={() => setOpen(!open)}
         aria-expanded={open}
       >
-        <span>Show word rank</span>
-        <span className={`wordcloud-accordion-chevron${open ? " open" : ""}`}>&#9662;</span>
+        <span>Word rank</span>
+        <span className={`wordcloud-accordion-chevron${open ? " open" : ""}`} />
       </button>
       {open && (
         <ol className="wordcloud-ranked-list" aria-label="Ranked word list">
@@ -350,8 +350,8 @@ function ResponsesList({
         onClick={() => setOpen(!open)}
         aria-expanded={open}
       >
-        <span>Show all responses</span>
-        <span className={`wordcloud-accordion-chevron${open ? " open" : ""}`}>&#9662;</span>
+        <span>All responses</span>
+        <span className={`wordcloud-accordion-chevron${open ? " open" : ""}`} />
       </button>
       {open && (
         <ul className="wordcloud-responses-list" aria-label="Community responses">

@@ -171,13 +171,19 @@
 }
 
 .wordcloud-accordion-chevron {
-  font-size: 0.7rem;
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid var(--color-text-muted, #888);
+  border-bottom: 2px solid var(--color-text-muted, #888);
+  transform: rotate(45deg);
   transition: transform 0.2s ease;
-  color: var(--color-text-muted, #888);
+  margin-bottom: 2px;
 }
 
 .wordcloud-accordion-chevron.open {
-  transform: rotate(180deg);
+  transform: rotate(-135deg);
+  margin-bottom: -2px;
 }
 
 /* --- Ranked list (accessible companion) --- */
