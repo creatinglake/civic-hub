@@ -224,11 +224,13 @@ function SubmitForm({
   promptId,
   maxLength,
   onSubmitted,
+  onRevealed,
 }: {
   processId: string;
   promptId: string;
   maxLength: number;
   onSubmitted: () => void;
+  onRevealed: () => void;
 }) {
   const { actorId } = useAuth();
   const { showAuthModal, closeAuthModal, handleAuthComplete, requireAuth } =
@@ -255,6 +257,7 @@ function SubmitForm({
       setSubmitted(true);
       setText("");
       onSubmitted();
+      onRevealed();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to submit");
     } finally {
@@ -381,38 +384,67 @@ function PromptSection({
   onSubmitted: () => void;
   refreshKey: number;
 }) {
+  const [revealed, setRevealed] = useState(!isActive);
   const entries = cloud?.entries ?? [];
   const effectiveMax = prompt.max_length ?? maxLength;
+  const totalSubmissions = cloud?.total_submissions ?? 0;
 
   return (
     <section className="wordcloud-prompt-section">
       <h2 className="wordcloud-prompt-text">{prompt.text}</h2>
 
-      <CloudViz entries={entries} />
+      {isActive && !revealed && (
+        <SubmitForm
+          processId={processId}
+          promptId={prompt.id}
+          maxLength={effectiveMax}
+          onSubmitted={onSubmitted}
+          onRevealed={() => setRevealed(true)}
+        />
+      )}
 
-      {cloud && (
+      <div className={`wordcloud-cloud-wrapper${revealed ? " wordcloud-cloud-revealed" : ""}`}>
+        <CloudViz entries={entries} />
+        {!revealed && (
+          <div className="wordcloud-cloud-overlay">
+            <p className="wordcloud-cloud-overlay-cta">
+              Add yours to reveal the cloud
+            </p>
+            {totalSubmissions > 0 && (
+              <p className="wordcloud-cloud-overlay-count">
+                {totalSubmissions} {totalSubmissions === 1 ? "person has" : "people have"} shared so far
+              </p>
+            )}
+          </div>
+        )}
+      </div>
+
+      {revealed && cloud && (
         <p className="wordcloud-submission-count">
           {cloud.total_submissions}{" "}
           {cloud.total_submissions === 1 ? "response" : "responses"}
         </p>
       )}
 
-      <RankedList entries={entries} />
+      {revealed && <RankedList entries={entries} />}
 
-      {isActive && (
+      {isActive && revealed && (
         <SubmitForm
           processId={processId}
           promptId={prompt.id}
           maxLength={effectiveMax}
           onSubmitted={onSubmitted}
+          onRevealed={() => {}}
         />
       )}
 
-      <ResponsesList
-        processId={processId}
-        promptId={prompt.id}
-        refreshKey={refreshKey}
-      />
+      {revealed && (
+        <ResponsesList
+          processId={processId}
+          promptId={prompt.id}
+          refreshKey={refreshKey}
+        />
+      )}
     </section>
   );
 }
