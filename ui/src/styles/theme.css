@@ -11,7 +11,9 @@
  * exist in the design system stay defined locally at the bottom.
  */
 
-@import "@civic-social/design-system/all.css";
+@import "./design-system/tokens.css";
+@import "./design-system/base.css";
+@import "./design-system/components.css";
 
 :root {
   /* --- Color: surfaces --- */

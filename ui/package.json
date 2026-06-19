@@ -10,7 +10,6 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@civic-social/design-system": "file:../../shared/design-system",
     "@fontsource-variable/inter": "^5.2.8",
     "@fontsource-variable/libre-franklin": "^5",
     "@fontsource-variable/manrope": "^5.2.8",
