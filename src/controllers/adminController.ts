@@ -18,6 +18,7 @@ import {
 import { emitProposalConverted } from "../modules/civic.proposals/events.js";
 import { createProcess } from "../services/processService.js";
 import { getAuthUser } from "../middleware/auth.js";
+import { getSupportThreshold } from "../services/hubSettings.js";
 
 /**
  * GET /admin/proposals — list proposals for admin review.
@@ -134,7 +135,7 @@ export async function handleConvertProposal(
       state: {
         options: options ?? ["Yes", "No"],
         activation_mode: "proposal_required",
-        support_threshold: support_threshold ?? 5,
+        support_threshold: support_threshold ?? await getSupportThreshold(),
         voting_duration_ms: voting_duration_ms ?? 7 * 24 * 60 * 60 * 1000,
         // Reference back to the original proposal
         source_proposal_id: proposalId,

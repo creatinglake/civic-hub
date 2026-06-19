@@ -1080,6 +1080,7 @@ export interface AdminSettings {
   announcement_authors: AnnouncementAuthor[];
   beta_allowlist: string[];
   waitlist: WaitlistEntry[];
+  support_threshold: number;
 }
 
 export function adminGetSettings(): Promise<AdminSettings> {

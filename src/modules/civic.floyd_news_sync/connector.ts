@@ -40,7 +40,7 @@ export function parseRssFeed(rawXml: string): FloydNewsEntry[] {
     const pub_date_iso = parseRfc822ToIso(pubDateText);
 
     entries.push({
-      title,
+      title: decodeEntities(title),
       share_url: link,
       // Wix RSS sometimes wraps the description in CDATA with HTML
       // formatting; cheerio's text() unwraps both. Strip residual tags
@@ -119,22 +119,32 @@ export function parseRfc822ToIso(rfc822: string): string | null {
 }
 
 /**
- * Defensive HTML strip — Wix descriptions sometimes include inline
- * markup (`<br/>`, `<p>`, etc.) even when the displayed content is
- * plain text. Removes tags, decodes a small set of common entities,
- * and collapses whitespace. Anything more aggressive (e.g. running a
- * full HTML parser) is overkill for the short snippets RSS carries.
+ * Decode HTML entities (named and numeric) in a string. Cheerio's
+ * xmlMode doesn't auto-decode entities in text nodes, so RSS titles
+ * like "Public Hearing &#38; Board" come through with raw entities.
  */
-function stripHtml(s: string): string {
+function decodeEntities(s: string): string {
   if (!s) return "";
   return s
-    .replace(/<[^>]+>/g, " ")
+    .replace(/&#(\d+);/g, (_m, code) => String.fromCharCode(Number(code)))
+    .replace(/&#x([0-9a-fA-F]+);/g, (_m, hex) => String.fromCharCode(parseInt(hex, 16)))
     .replace(/&nbsp;/g, " ")
     .replace(/&amp;/g, "&")
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")
     .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
+    .replace(/&apos;/g, "'");
+}
+
+/**
+ * Defensive HTML strip — Wix descriptions sometimes include inline
+ * markup (`<br/>`, `<p>`, etc.) even when the displayed content is
+ * plain text. Removes tags, decodes entities, and collapses whitespace.
+ */
+function stripHtml(s: string): string {
+  if (!s) return "";
+  return decodeEntities(s)
+    .replace(/<[^>]+>/g, " ")
     .replace(/\s+/g, " ")
     .trim();
 }

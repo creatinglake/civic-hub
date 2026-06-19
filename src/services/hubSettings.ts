@@ -19,6 +19,7 @@ export const SETTING_KEYS = {
   VOTE_RESULTS_RECIPIENT_EMAILS: "brief_recipient_emails",
   ANNOUNCEMENT_AUTHORS: "announcement_authors",
   BETA_ALLOWLIST: "beta_allowlist",
+  SUPPORT_THRESHOLD: "support_threshold",
 } as const;
 
 export type SettingKey = (typeof SETTING_KEYS)[keyof typeof SETTING_KEYS];
@@ -255,4 +256,26 @@ export async function lookupAuthorLabel(
     if (a.email.toLowerCase() === lower) return a.label;
   }
   return null;
+}
+
+// --- Support threshold ---
+
+const HARDCODED_DEFAULT_THRESHOLD = 5;
+
+export async function getSupportThreshold(): Promise<number> {
+  const stored = await getSetting(SETTING_KEYS.SUPPORT_THRESHOLD);
+  if (stored !== null) {
+    const n = parseInt(stored, 10);
+    if (!Number.isNaN(n) && n >= 1) return n;
+  }
+  return HARDCODED_DEFAULT_THRESHOLD;
+}
+
+export async function setSupportThreshold(
+  value: number,
+  updatedBy: string | null,
+): Promise<number> {
+  const clamped = Math.max(1, Math.round(value));
+  await setSetting(SETTING_KEYS.SUPPORT_THRESHOLD, String(clamped), updatedBy);
+  return clamped;
 }

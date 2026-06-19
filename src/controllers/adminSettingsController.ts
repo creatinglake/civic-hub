@@ -23,6 +23,8 @@ import {
   getBetaAllowlist,
   setBetaAllowlist,
   getWaitlist,
+  getSupportThreshold,
+  setSupportThreshold,
 } from "../services/hubSettings.js";
 import { getAuthUser } from "../middleware/auth.js";
 
@@ -31,6 +33,7 @@ interface SettingsResponse {
   announcement_authors: AnnouncementAuthor[];
   beta_allowlist: string[];
   waitlist: WaitlistEntry[];
+  support_threshold: number;
 }
 
 async function loadSettings(): Promise<SettingsResponse> {
@@ -39,6 +42,7 @@ async function loadSettings(): Promise<SettingsResponse> {
     announcement_authors: await getAnnouncementAuthors(),
     beta_allowlist: await getBetaAllowlist(),
     waitlist: await getWaitlist(),
+    support_threshold: await getSupportThreshold(),
   };
 }
 
@@ -64,6 +68,7 @@ export async function handlePatchSettings(
       brief_recipient_emails?: unknown;
       announcement_authors?: unknown;
       beta_allowlist?: unknown;
+      support_threshold?: unknown;
     };
 
     if (body.brief_recipient_emails !== undefined) {
@@ -109,6 +114,17 @@ export async function handlePatchSettings(
         (e): e is string => typeof e === "string",
       );
       await setBetaAllowlist(input, actor);
+    }
+
+    if (body.support_threshold !== undefined) {
+      const n = Number(body.support_threshold);
+      if (!Number.isFinite(n) || n < 1) {
+        res.status(400).json({
+          error: "support_threshold must be a number >= 1.",
+        });
+        return;
+      }
+      await setSupportThreshold(n, actor);
     }
 
     res.json(await loadSettings());

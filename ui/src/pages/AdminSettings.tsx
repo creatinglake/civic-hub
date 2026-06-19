@@ -29,6 +29,11 @@ export default function AdminSettings() {
   const [savingAuthors, setSavingAuthors] = useState(false);
   const [authorsMessage, setAuthorsMessage] = useState<string | null>(null);
 
+  // --- Support threshold ---
+  const [threshold, setThreshold] = useState(5);
+  const [savingThreshold, setSavingThreshold] = useState(false);
+  const [thresholdMessage, setThresholdMessage] = useState<string | null>(null);
+
   // --- Beta allowlist ---
   const [allowlistText, setAllowlistText] = useState("");
   const [savingAllowlist, setSavingAllowlist] = useState(false);
@@ -43,6 +48,7 @@ export default function AdminSettings() {
       .then((s) => {
         setRecipientsText(s.brief_recipient_emails.join(", "));
         setAuthors(s.announcement_authors);
+        setThreshold(s.support_threshold);
         setAllowlistText(s.beta_allowlist.join(", "));
         setWaitlist(s.waitlist);
         setLoaded(true);
@@ -86,6 +92,22 @@ export default function AdminSettings() {
 
   function removeAuthor(i: number) {
     setAuthors((cur) => cur.filter((_, idx) => idx !== i));
+  }
+
+  async function saveThreshold() {
+    setSavingThreshold(true);
+    setThresholdMessage(null);
+    try {
+      const saved = await adminPatchSettings({ support_threshold: threshold });
+      setThreshold(saved.support_threshold);
+      setThresholdMessage(`Saved. New proposals need ${saved.support_threshold} endorsement${saved.support_threshold !== 1 ? "s" : ""} to become official votes.`);
+    } catch (err) {
+      setThresholdMessage(
+        err instanceof Error ? err.message : "Failed to save threshold",
+      );
+    } finally {
+      setSavingThreshold(false);
+    }
   }
 
   async function saveAllowlist() {
@@ -262,6 +284,43 @@ export default function AdminSettings() {
             </button>
             {authorsMessage && (
               <span className="admin-settings-message">{authorsMessage}</span>
+            )}
+          </div>
+        </section>
+
+        {/* --- Support threshold --- */}
+        <section className="admin-settings-panel">
+          <h3>Proposal endorsement threshold</h3>
+          <label className="form-label" htmlFor="support-threshold">
+            Endorsements needed
+          </label>
+          <p className="form-hint">
+            How many community endorsements a proposed vote needs before it
+            becomes an official vote. Applies to new proposals — existing ones
+            keep their original threshold.
+          </p>
+          <input
+            id="support-threshold"
+            className="form-input"
+            type="number"
+            min={1}
+            max={100}
+            value={threshold}
+            onChange={(e) => setThreshold(Math.max(1, parseInt(e.target.value) || 1))}
+            disabled={!loaded || savingThreshold}
+            style={{ maxWidth: "120px" }}
+          />
+          <div className="admin-settings-actions">
+            <button
+              type="button"
+              className="admin-convert-button"
+              onClick={saveThreshold}
+              disabled={!loaded || savingThreshold}
+            >
+              {savingThreshold ? "Saving…" : "Save threshold"}
+            </button>
+            {thresholdMessage && (
+              <span className="admin-settings-message">{thresholdMessage}</span>
             )}
           </div>
         </section>

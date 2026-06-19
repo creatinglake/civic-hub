@@ -56,7 +56,7 @@ export const PROCESS_DESCRIPTOR = {
     { name: "process.close", from: ["active"], to: "closed", description: "End the voting window; aggregation runs immediately" },
   ],
   config_schema: {
-    support_threshold: { type: "number", default: 3, description: "Endorsements required before activation" },
+    support_threshold: { type: "number", default: 5, description: "Endorsements required before activation" },
     voting_duration_ms: { type: "number", default: 259200000, description: "Voting window duration in milliseconds (default: 3 days)" },
     activation_mode: { type: "string", enum: ["direct", "proposal_required"], default: "direct", description: "Controls which lifecycle path is available" },
   },
@@ -73,7 +73,7 @@ export const PROCESS_DESCRIPTOR = {
 
 /** Default voting window: 3 days */
 const DEFAULT_VOTING_DURATION_MS = 3 * 24 * 60 * 60 * 1000;
-const DEFAULT_SUPPORT_THRESHOLD = 3;
+const DEFAULT_SUPPORT_THRESHOLD = 5;
 
 // --- Factory ---
 

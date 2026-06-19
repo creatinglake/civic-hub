@@ -13,29 +13,42 @@ Updated after every Claude Code session. Records what was built, what's incomple
 
 ---
 
-## Step 2 Punch-List — UX Polish & Tester Bug Fix — 2026-06-19
+## Step 2 Completion + Design System + Onboarding — 2026-06-19
 
-**Status:** Complete. Pushed to production.
+**Status:** Complete. Pushed to production. Vercel build fixed.
 
 ### What was built
 
-**Nav reorder:** Drawer and tab strip now read Feed → Conversations → Propose → Votes → Projects (was Feed → Propose → Conversations). Matches the understand → decide → do participation flow.
+**BoS display names (attribution clarity):**
+- Added nullable `display_name TEXT` column to users table (migration `20260619000000_add_display_name.sql`, applied to prod Supabase).
+- `PATCH /auth/me` endpoint accepts `{ display_name }` to set/clear a user's public name.
+- Announcement creation stamps `author_display_name` from the creating user's `display_name` field.
+- Feed cards show `author_display_name` above the summary when present (e.g. "Jane Doe").
+- Announcement detail page shows combined attribution: "Posted by Jane Doe, Board member".
 
-**Not-found back links:** Process, ProposalDetail, VoteLog, and WordCloud pages now show a back link instead of a bare "Not found." paragraph when the resource doesn't exist.
+**Word cloud onboarding flow:**
+- After a new user completes signup (email OTP → residency affirmation), if `VITE_HUB_ONBOARDING_WORDCLOUD_ID` is set, they redirect to `/wordcloud/:id?onboarding=1`.
+- Word cloud page detects `?onboarding=1`: shows a welcome banner ("Welcome! You're all set.") and a skip-to-feed button instead of the normal back link.
+- Configured via `hub.ts` config (`onboarding_wordcloud_id`).
 
-**Creation finality warnings:** Both the proposal and vote submission confirmation modals now include a callout: "Once submitted, your [proposal/vote] cannot be edited. Please make sure everything looks the way you want it before submitting."
+**Design system adoption:**
+- Vendored shared design system CSS (`tokens.css`, `base.css`, `components.css`) into `ui/src/styles/design-system/` (Vercel deploys only the civic-hub repo, not the monorepo — `file:../../shared/design-system` doesn't resolve).
+- `theme.css` rewritten as a bridge layer: imports `--ds-*` tokens and maps them to the `--color-*` / `--font-*` / `--space-*` names component CSS already uses. No component CSS files needed renaming.
+- Added Libre Franklin (`@fontsource-variable/libre-franklin`) for headings. Inter for body text. Manrope for wordmark.
+- Hub-specific tokens (pill colors, layout widths) stay local in `theme.css`.
+- Civic Indigo primary (#2A4E84), Terracotta accent (#C37B51).
 
-**Floyd-string config sweep:** Replaced 6 hardcoded "Floyd Civic Hub" / "Floyd County" strings with `hub.name` / `hub.jurisdiction` from the hub config system. Affected: WelcomeBanner, LegalPage, Feed, Votes, Welcome page titles.
+**Vercel build fix:**
+- Removed stale `../../shared/design-system` entry from `ui/package-lock.json` that caused `npm install` to fail on Vercel (commit `f5d7523`).
 
-**Review failure UX fix (tester bug):** When the mandatory Claude API review step fails (timeout, rate limit, missing key), the drafting status bar now shows "Review failed — tap Review draft to try again" in warning colors. Previously the only feedback was a chat message in the assistant panel — invisible on mobile where the panel is behind a FAB. Applied to both proposal and vote drafting flows. Also fixed VoteDraftingForm missing its DraftingForm.css import (status styles wouldn't load on direct navigation to `/votes/new`).
+### Previous Step 2 items (completed in prior session)
 
-**Test tracker:** Added wordcloud and beta mode test rows to TESTING.md.
+Nav reorder, not-found back links, creation finality warnings, Floyd-string config sweep, review failure UX fix — all previously shipped.
 
-### What's incomplete (remaining Step 2)
+### What's incomplete
 
-- Color scheme refresh (M)
-- Board of Supervisors attribution clarity (M)
-- Threshold default config (S)
+- **Smoke test:** API integration tests (`npm run test`) and E2E tests (`npm run test:e2e`) require a local `.env` with Supabase credentials to run. `.env.local` (from Vercel CLI) is missing `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`. Manual smoke test against production recommended.
+- **Threshold default config (S):** Not yet addressed.
 
 ---
 

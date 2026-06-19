@@ -30,8 +30,10 @@ interface ProposalState {
   [key: string]: unknown;
 }
 
-/** Default support threshold before promotion to vote */
-const DEFAULT_SUPPORT_THRESHOLD = 3;
+/** Fallback when no hub setting or input override is provided. The admin
+ *  panel stores the canonical value in hub_settings.support_threshold;
+ *  callers that create proposals should read it and pass it via input. */
+const DEFAULT_SUPPORT_THRESHOLD = 5;
 
 // --- Handler implementation ---
 
