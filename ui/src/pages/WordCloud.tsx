@@ -131,22 +131,24 @@ function hashCode(s: string): number {
 
 function CloudViz({ entries }: { entries: WordcloudCloudEntry[] }) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const [dims, setDims] = useState({ width: 600, height: 400 });
+  const [dims, setDims] = useState<{ width: number; height: number } | null>(null);
 
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
     const ro = new ResizeObserver(([entry]) => {
       const { width } = entry.contentRect;
-      setDims({ width, height: Math.max(300, Math.min(width * 0.65, 500)) });
+      if (width > 0) {
+        setDims({ width, height: Math.max(300, Math.min(width * 0.65, 500)) });
+      }
     });
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
 
   const placed = useMemo(
-    () => layoutWords(entries, dims.width, dims.height),
-    [entries, dims.width, dims.height],
+    () => dims ? layoutWords(entries, dims.width, dims.height) : [],
+    [entries, dims],
   );
 
   if (entries.length === 0) {
@@ -161,30 +163,32 @@ function CloudViz({ entries }: { entries: WordcloudCloudEntry[] }) {
 
   return (
     <div className="wordcloud-cloud" ref={containerRef} role="img" aria-label="Word cloud visualization">
-      <svg
-        width={dims.width}
-        height={dims.height}
-        viewBox={`0 0 ${dims.width} ${dims.height}`}
-        className="wordcloud-svg"
-      >
-        {placed.map((w) => (
-          <text
-            key={w.text}
-            x={w.x}
-            y={w.y}
-            fontSize={w.fontSize}
-            fill={w.color}
-            textAnchor="middle"
-            dominantBaseline="central"
-            fontWeight={w.fontSize >= 32 ? 700 : w.fontSize >= 24 ? 600 : 400}
-            fontFamily="'Inter', 'Segoe UI', system-ui, sans-serif"
-            transform={w.rotate ? `rotate(90, ${w.x}, ${w.y})` : undefined}
-          >
-            <title>{`${w.text} — ${w.count} ${w.count === 1 ? "mention" : "mentions"}`}</title>
-            {w.text}
-          </text>
-        ))}
-      </svg>
+      {dims && (
+        <svg
+          width={dims.width}
+          height={dims.height}
+          viewBox={`0 0 ${dims.width} ${dims.height}`}
+          className="wordcloud-svg"
+        >
+          {placed.map((w) => (
+            <text
+              key={w.text}
+              x={w.x}
+              y={w.y}
+              fontSize={w.fontSize}
+              fill={w.color}
+              textAnchor="middle"
+              dominantBaseline="central"
+              fontWeight={w.fontSize >= 32 ? 700 : w.fontSize >= 24 ? 600 : 400}
+              fontFamily="'Inter', 'Segoe UI', system-ui, sans-serif"
+              transform={w.rotate ? `rotate(90, ${w.x}, ${w.y})` : undefined}
+            >
+              <title>{`${w.text} — ${w.count} ${w.count === 1 ? "mention" : "mentions"}`}</title>
+              {w.text}
+            </text>
+          ))}
+        </svg>
+      )}
     </div>
   );
 }
