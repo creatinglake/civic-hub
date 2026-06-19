@@ -182,6 +182,12 @@ export default function AuthModal({ onComplete, onDismiss }: Props) {
       // before reaching this point, no login() ever happened.
       if (pendingAuth) {
         login(tokenToUse, nextUser, pendingAuth.role, pendingAuth.author_label);
+        // First-time signup — route to the onboarding word cloud if configured.
+        const wcId = hub.onboarding_wordcloud_id;
+        if (wcId) {
+          window.location.href = `/wordcloud/${wcId}?onboarding=1`;
+          return;
+        }
       } else {
         updateUser(nextUser);
       }

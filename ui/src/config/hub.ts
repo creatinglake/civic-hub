@@ -97,6 +97,8 @@ const hub = {
    * embeds the Polis UI in an iframe. Set to "" to disable.
    */
   polis_url: import.meta.env.VITE_HUB_POLIS_URL ?? "https://polis.civic.social",
+  onboarding_wordcloud_id:
+    import.meta.env.VITE_HUB_ONBOARDING_WORDCLOUD_ID ?? "",
 };
 
 export default hub;

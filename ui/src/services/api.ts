@@ -885,6 +885,7 @@ export interface Announcement {
   image_alt: string | null;
   author_id: string;
   author_role: AnnouncementAuthorRole;
+  author_display_name: string | null;
   created_at: string;
   last_edited_at: string | null;
   edit_count: number;
@@ -916,6 +917,7 @@ export interface AnnouncementSummary {
   image_url: string | null;
   image_alt: string | null;
   author_role: AnnouncementAuthorRole;
+  author_display_name: string | null;
   created_at: string;
   last_edited_at: string | null;
   edit_count: number;

@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useRef, useMemo } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useSearchParams, useNavigate } from "react-router-dom";
 import {
   getWordcloud,
   submitWordcloudResponse,
@@ -419,6 +419,9 @@ function PromptSection({
 
 export default function WordCloud() {
   const { id } = useParams<{ id: string }>();
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const isOnboarding = searchParams.get("onboarding") === "1";
   const [wc, setWc] = useState<WordcloudState | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -481,9 +484,28 @@ export default function WordCloud() {
 
   return (
     <div className="wordcloud-page">
-      <Link to="/" className="back-link back-link-sticky">
-        &larr; Back
-      </Link>
+      {isOnboarding ? (
+        <button
+          className="wordcloud-skip-btn"
+          onClick={() => navigate("/")}
+        >
+          Skip &rarr;
+        </button>
+      ) : (
+        <Link to="/" className="back-link back-link-sticky">
+          &larr; Back
+        </Link>
+      )}
+
+      {isOnboarding && (
+        <div className="wordcloud-onboarding-banner">
+          <h2>Welcome! You're all set.</h2>
+          <p>
+            Before you explore, we'd love to hear from you. This is optional
+            — add a word or phrase below, or skip to the feed.
+          </p>
+        </div>
+      )}
 
       <div className="wordcloud-header">
         <h1>

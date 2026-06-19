@@ -47,6 +47,7 @@ export interface AnnouncementProcessState {
   content: AnnouncementContent;
   author_id: string;
   author_role: AnnouncementAuthorRole;
+  author_display_name: string | null;
   created_at: string;       // ISO 8601
   last_edited_at: string | null;
   edit_count: number;
@@ -152,6 +153,7 @@ export interface CreateAnnouncementInput {
   links?: AnnouncementLink[];
   author_id: string;
   author_role: AnnouncementAuthorRole;
+  author_display_name?: string | null;
   image_url?: string | null;
   image_alt?: string | null;
   /**

@@ -13,6 +13,7 @@ import {
   verifyCode,
   affirmResidency,
   acceptLegalTerms,
+  updateDisplayName,
   deleteAccount,
   getUserFromToken,
   logout,
@@ -166,6 +167,42 @@ export async function handleAcceptTos(
   }
   try {
     const updated = await acceptLegalTerms(user.id, version.trim());
+    res.json({ user: updated });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Unknown error";
+    res.status(400).json({ error: message });
+  }
+}
+
+/**
+ * PATCH /auth/me
+ * Header: Authorization: Bearer <token>
+ * Body: { display_name: string | null }
+ */
+export async function handleUpdateProfile(
+  req: Request,
+  res: Response,
+): Promise<void> {
+  const token = extractToken(req);
+  if (!token) {
+    res.status(401).json({ error: "Authentication required" });
+    return;
+  }
+  const user = await getUserFromToken(token);
+  if (!user) {
+    res.status(401).json({ error: "Invalid or expired session" });
+    return;
+  }
+  const { display_name } = (req.body ?? {}) as { display_name?: unknown };
+  if (display_name !== null && typeof display_name !== "string") {
+    res.status(400).json({ error: "display_name must be a string or null" });
+    return;
+  }
+  try {
+    const updated = await updateDisplayName(
+      user.id,
+      typeof display_name === "string" ? display_name : null,
+    );
     res.json({ user: updated });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";

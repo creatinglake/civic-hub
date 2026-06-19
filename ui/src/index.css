@@ -21,10 +21,10 @@
   --success-bg: var(--color-success-bg);
   --danger-color: var(--color-error);
   --danger-bg: var(--color-error-bg);
-  --bar-color: #5c6bc0;
+  --bar-color: var(--color-primary);
   --bar-track: var(--color-surface-muted);
-  --accent-color: #2a7d4f;
-  --accent-hover: #1f5e3b;
+  --accent-color: var(--color-primary);
+  --accent-hover: var(--color-primary-hover);
 }
 
 /* --- Reset --- */

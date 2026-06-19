@@ -45,6 +45,7 @@ export interface FeedPostView {
   summary: string;
   timestamp: string; // ISO 8601
   href: string;
+  authorName?: string | null;
   imageUrl?: string | null;
   imageAlt?: string | null;
   /**
@@ -130,6 +131,7 @@ export function eventToPost(
           id?: string;
           title?: string;
           author_role?: string;
+          author_display_name?: string | null;
           /**
            * Slice 13 — provenance for synced-from-external announcements.
            * When `source.origin === "floyd-news"`, the card was ingested
@@ -214,6 +216,7 @@ export function eventToPost(
         // MUST stay in sync with the digest-side helper in
         // civic-hub/src/modules/civic.digest/service.ts.
         const pillLabel = abbreviateGovernment(normalized);
+        const authorDisplayName = data.announcement?.author_display_name ?? null;
         return {
           id: event.id,
           title,
@@ -230,6 +233,7 @@ export function eventToPost(
           ),
           timestamp: event.timestamp,
           href: event.action_url,
+          authorName: authorDisplayName,
         };
       }
 
@@ -516,6 +520,9 @@ export default function FeedPost({ post }: Props) {
           <h2 className="feed-post-title">{post.title}</h2>
           <span className={pillClass}>{post.pillLabel}</span>
         </div>
+        {post.authorName && (
+          <p className="feed-post-author">{post.authorName}</p>
+        )}
         {post.summary && <p className="feed-post-summary">{post.summary}</p>}
         {post.engagement && (
           <p className="feed-post-engagement">{post.engagement}</p>

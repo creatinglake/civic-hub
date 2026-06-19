@@ -85,6 +85,9 @@ export default function AnnouncementPage() {
   // normalize for display. Everything else renders verbatim.
   const roleLabel =
     announcement.author_role === "board" ? "Board member" : announcement.author_role;
+  const authorAttribution = announcement.author_display_name
+    ? `${announcement.author_display_name}, ${roleLabel}`
+    : roleLabel;
   const isAdminLabel = roleLabel === "Admin";
   const canEdit =
     isAdmin || (!!user?.id && user.id === announcement.author_id);
@@ -138,7 +141,7 @@ export default function AnnouncementPage() {
         </p>
         <h1>{announcement.title}</h1>
         <p className="announcement-meta">
-          Posted by {roleLabel}{" "}
+          Posted by {authorAttribution}{" "}
           <time
             dateTime={announcement.created_at}
             title={absoluteTime(announcement.created_at)}

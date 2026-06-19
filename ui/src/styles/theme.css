@@ -15,53 +15,50 @@
 
 :root {
   /* --- Color: surfaces --- */
-  --color-bg: #fafaf7;
+  --color-bg: #f8f7f4;
   --color-surface: #ffffff;
-  --color-surface-alt: #f3f3ee;
-  --color-surface-muted: #f0f0f0;
-  --color-border: #e5e5e0;
-  --color-border-strong: #d4d4ce;
-  --color-border-hover: #999;
+  --color-surface-alt: #f0eeea;
+  --color-surface-muted: #eae8e4;
+  --color-border: #ddd9d3;
+  --color-border-strong: #c8c3bb;
+  --color-border-hover: #8a8580;
 
   /* --- Color: text --- */
-  --color-text: #1a1a1a;
-  --color-text-muted: #595959;
-  --color-text-subtle: #8a8a8a;
-  --color-text-faint: #8a8a8a;
+  --color-text: #1c1917;
+  --color-text-muted: #57534e;
+  --color-text-subtle: #8a8580;
+  --color-text-faint: #a8a29e;
 
   /* --- Color: primary / accents --- */
-  --color-primary: #2c7be5;
+  --color-primary: #2a6b5a;
   --color-primary-text: #ffffff;
-  --color-primary-hover: #1a68d1;
-  --color-primary-ink: #1e3a5f;
+  --color-primary-hover: #1f5447;
+  --color-primary-ink: #1a3f36;
 
-  /* Brand accent — deeper, civic-feeling blue for identity labels. */
-  --color-brand: #1e3a5f;
+  /* Brand accent — civic green-slate for identity, headings, wordmark. */
+  --color-brand: #1a3f36;
+
+  /* --- Color: links --- */
+  --color-link: #1a3f36;
 
   /* --- Color: focus ring --- */
-  --color-focus: #2c7be5;
+  --color-focus: #2a6b5a;
 
   /* --- Color: status --- */
-  --color-success: #16a34a;
-  --color-success-bg: #e8f5e9;
-  --color-error: #c62828;
+  --color-success: #1a7a3d;
+  --color-success-bg: #e6f4ea;
+  --color-error: #b91c1c;
   --color-error-bg: #fce4ec;
-  --color-warning: #d97706;
+  --color-warning: #b45309;
   --color-warning-bg: #fef3c7;
 
-  /* --- Color: post-type pills ---
-     Slice 8.5 renamed --pill-brief-* to --pill-vote-results-* in line
-     with the civic.brief → civic.vote_results module rename. The hex
-     values are unchanged so the visual color family is preserved. */
-  --pill-vote-bg: #e0ecfc;                  --pill-vote-fg: #1e3a5f;
-  --pill-results-bg: #d6e4f7;               --pill-results-fg: #15325a;
-  --pill-vote-results-bg: #d4ede8;          --pill-vote-results-fg: #0f5a55;
-  --pill-announcement-bg: #fbe5d3;          --pill-announcement-fg: #8c3210;
-  /* Slice 9 — announcements posted by configured authors (Board members,
-     committees) get a distinct lavender to read separately from
-     admin-authored posts. */
-  --pill-announcement-author-bg: #e8e0f4;   --pill-announcement-author-fg: #3a2c5e;
-  --pill-meeting-bg: #d9ecd9;               --pill-meeting-fg: #0f4a26;
+  /* --- Color: post-type pills --- */
+  --pill-vote-bg: #dfeee8;                  --pill-vote-fg: #1a3f36;
+  --pill-results-bg: #d2e5dc;              --pill-results-fg: #143530;
+  --pill-vote-results-bg: #d0e8e0;          --pill-vote-results-fg: #0f5a45;
+  --pill-announcement-bg: #f5e1cc;          --pill-announcement-fg: #7a3014;
+  --pill-announcement-author-bg: #e4ddf0;   --pill-announcement-author-fg: #3a2c5e;
+  --pill-meeting-bg: #d6ebd6;               --pill-meeting-fg: #0f4a26;
 
   /* --- Typography --- */
   --font-body:

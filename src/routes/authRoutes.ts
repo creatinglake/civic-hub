@@ -14,6 +14,7 @@ import {
   handleVerify,
   handleAffirmResidency,
   handleAcceptTos,
+  handleUpdateProfile,
   handleDeleteAccount,
   handleGetMe,
   handleLogout,
@@ -26,6 +27,7 @@ router.post("/verify", handleVerify);
 router.post("/residency", handleAffirmResidency);
 router.post("/accept-tos", handleAcceptTos);
 router.get("/me", handleGetMe);
+router.patch("/me", handleUpdateProfile);
 router.delete("/me", handleDeleteAccount);
 router.post("/logout", handleLogout);
 

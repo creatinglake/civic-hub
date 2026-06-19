@@ -57,6 +57,7 @@ function rowToUser(row: Record<string, unknown>): User {
     tos_accepted_at: row.tos_accepted_at
       ? String(row.tos_accepted_at)
       : null,
+    display_name: row.display_name ? String(row.display_name) : null,
   };
 }
 
@@ -448,7 +449,27 @@ export async function deleteAccount(
   if (error) throw new Error(`Auth: ${error.message}`);
 }
 
-// --- Dev/test utilities ---
+/**
+ * Update the user's public display name. Used by admins to set
+ * individual names on Board / committee accounts so announcements
+ * carry personal attribution ("Jane Doe, Board member") rather than
+ * just the role label.
+ */
+export async function updateDisplayName(
+  userId: string,
+  displayName: string | null,
+): Promise<User> {
+  const value = displayName?.trim() || null;
+  const { data, error } = await getDb()
+    .from("users")
+    .update({ display_name: value })
+    .eq("id", userId)
+    .select()
+    .maybeSingle();
+  if (error) throw new Error(`Auth: ${error.message}`);
+  if (!data) throw new Error("User not found");
+  return rowToUser(data);
+}
 
 // --- Digest subscription (Slice 5) ---
 

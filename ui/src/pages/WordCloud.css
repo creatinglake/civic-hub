@@ -292,3 +292,42 @@
   text-align: center;
   margin-top: 0.25rem;
 }
+
+/* Onboarding mode */
+
+.wordcloud-onboarding-banner {
+  background: var(--color-success-bg, #e6f4ea);
+  border: 1px solid var(--color-primary, #2a6b5a);
+  border-radius: var(--radius-md, 8px);
+  padding: var(--space-md, 1rem) var(--space-lg, 1.5rem);
+  margin-bottom: var(--space-lg, 1.5rem);
+}
+
+.wordcloud-onboarding-banner h2 {
+  margin: 0 0 var(--space-xs, 0.25rem);
+  font-size: var(--font-size-lg, 1.125rem);
+  color: var(--color-primary-ink, #1a3f36);
+}
+
+.wordcloud-onboarding-banner p {
+  margin: 0;
+  font-size: var(--font-size-sm, 0.875rem);
+  color: var(--color-text-muted, #57534e);
+  line-height: var(--line-height-normal, 1.5);
+}
+
+.wordcloud-skip-btn {
+  display: inline-block;
+  background: none;
+  border: none;
+  font-family: var(--font-body);
+  font-size: var(--font-size-sm, 0.875rem);
+  color: var(--color-text-muted, #57534e);
+  cursor: pointer;
+  padding: var(--space-xs, 0.25rem) 0;
+  margin-bottom: var(--space-sm, 0.5rem);
+}
+
+.wordcloud-skip-btn:hover {
+  color: var(--color-primary, #2a6b5a);
+}

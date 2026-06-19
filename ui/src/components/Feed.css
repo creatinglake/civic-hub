@@ -156,6 +156,14 @@
   min-width: 0;
 }
 
+.feed-post-author {
+  margin: 0 0 var(--space-xs);
+  font-family: var(--font-body);
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  color: var(--color-text-muted);
+}
+
 .feed-post-summary {
   margin: 0 0 var(--space-sm);
   font-family: var(--font-body);

@@ -26,7 +26,7 @@ import {
   saveProcessState,
 } from "../services/processService.js";
 import { getAuthUser, isAdminEmail } from "../middleware/auth.js";
-import { getUserFromToken } from "../modules/civic.auth/index.js";
+import { getUserFromToken, getUser } from "../modules/civic.auth/index.js";
 import { extractUrls } from "../modules/civic.link_preview/index.js";
 import { warmPreviewsInBackground } from "../services/linkPreviewCache.js";
 
@@ -112,6 +112,7 @@ export async function handleCreateAnnouncement(
         body: body.body,
         author_id: user.id,
         author_role: authorLabel,
+        author_display_name: (await getUser(user.id))?.display_name ?? null,
         links: links ?? [],
         image_url,
         image_alt,

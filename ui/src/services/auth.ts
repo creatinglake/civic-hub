@@ -47,6 +47,7 @@ export interface AuthUser {
    */
   tos_version_accepted: string | null;
   tos_accepted_at: string | null;
+  display_name: string | null;
 }
 
 /**
