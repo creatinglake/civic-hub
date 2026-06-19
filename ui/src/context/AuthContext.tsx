@@ -69,9 +69,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setAuthorLabel(author_label ?? null);
           setToken(stored);
         })
-        .catch(() => {
-          // Invalid/expired token — clear it
-          clearToken();
+        .catch((err) => {
+          const status = (err as { status?: number }).status;
+          if (status === 401 || status === 403) {
+            clearToken();
+          } else {
+            setToken(stored);
+          }
         })
         .finally(() => setLoading(false));
     } else {

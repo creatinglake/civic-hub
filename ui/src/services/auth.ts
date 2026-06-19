@@ -5,6 +5,14 @@
 
 const API_BASE = import.meta.env.DEV ? "http://localhost:3000" : "/api";
 
+class AuthError extends Error {
+  status: number;
+  constructor(message: string, status: number) {
+    super(message);
+    this.status = status;
+  }
+}
+
 async function request<T>(method: string, path: string, body?: unknown, token?: string): Promise<T> {
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   if (token) {
@@ -19,7 +27,7 @@ async function request<T>(method: string, path: string, body?: unknown, token?: 
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }));
-    throw new Error(err.error ?? `Request failed: ${res.status}`);
+    throw new AuthError(err.error ?? `Request failed: ${res.status}`, res.status);
   }
 
   return res.json();
