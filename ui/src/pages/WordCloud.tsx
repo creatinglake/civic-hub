@@ -389,6 +389,10 @@ function PromptSection({
   refreshKey: number;
 }) {
   const [revealed, setRevealed] = useState(!isActive || hasSubmitted);
+
+  useEffect(() => {
+    if (hasSubmitted) setRevealed(true);
+  }, [hasSubmitted]);
   const entries = cloud?.entries ?? [];
   const effectiveMax = prompt.max_length ?? maxLength;
   const totalSubmissions = cloud?.total_submissions ?? 0;
