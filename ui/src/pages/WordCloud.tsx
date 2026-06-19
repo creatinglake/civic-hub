@@ -461,7 +461,7 @@ export default function WordCloud() {
   const { id } = useParams<{ id: string }>();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const { actorId } = useAuth();
+  const { actorId, loading: authLoading } = useAuth();
   const isOnboarding = searchParams.get("onboarding") === "1";
   const [wc, setWc] = useState<WordcloudState | null>(null);
   const [loading, setLoading] = useState(true);
@@ -469,7 +469,7 @@ export default function WordCloud() {
   const [refreshKey, setRefreshKey] = useState(0);
 
   const fetchData = useCallback(async () => {
-    if (!id) return;
+    if (!id || authLoading) return;
     try {
       const data = await getWordcloud(id, actorId ?? undefined);
       setWc(data);
@@ -479,7 +479,7 @@ export default function WordCloud() {
     } finally {
       setLoading(false);
     }
-  }, [id, actorId]);
+  }, [id, actorId, authLoading]);
 
   const refreshCloud = useCallback(async () => {
     if (!id) return;
