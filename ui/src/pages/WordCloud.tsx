@@ -405,7 +405,7 @@ function PromptSection({
     <section className="wordcloud-prompt-section">
       <h2 className="wordcloud-prompt-text">{prompt.text}</h2>
 
-      {isActive && !revealed && (
+      {isActive && !hasSubmitted && !revealed && (
         <SubmitForm
           processId={processId}
           promptId={prompt.id}
@@ -436,16 +436,6 @@ function PromptSection({
           {cloud.total_submissions}{" "}
           {cloud.total_submissions === 1 ? "response" : "responses"}
         </p>
-      )}
-
-      {isActive && revealed && (
-        <SubmitForm
-          processId={processId}
-          promptId={prompt.id}
-          maxLength={effectiveMax}
-          onSubmitted={onSubmitted}
-          onRevealed={() => {}}
-        />
       )}
 
       {revealed && (
