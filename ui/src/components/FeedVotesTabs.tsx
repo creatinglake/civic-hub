@@ -32,14 +32,13 @@ export default function FeedVotesTabs() {
     if (pathname === "/") return;
     const el = navRef.current;
     if (!el) return;
-    window.scrollTo({ top: 0, behavior: "instant" });
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        const navH = parseInt(getComputedStyle(document.documentElement).getPropertyValue("--nav-h")) || 61;
-        const top = el.getBoundingClientRect().top + window.scrollY - navH;
-        if (top > 0) window.scrollTo({ top, behavior: "instant" });
-      });
-    });
+    if ("scrollRestoration" in history) history.scrollRestoration = "manual";
+    const timer = setTimeout(() => {
+      const navH = parseInt(getComputedStyle(document.documentElement).getPropertyValue("--nav-h")) || 61;
+      const top = el.getBoundingClientRect().top + window.scrollY - navH;
+      if (top > 0) window.scrollTo({ top, behavior: "instant" });
+    }, 50);
+    return () => clearTimeout(timer);
   }, [pathname]);
 
   return (
