@@ -34,9 +34,11 @@ export default function FeedVotesTabs() {
     if (!el) return;
     window.scrollTo({ top: 0, behavior: "instant" });
     requestAnimationFrame(() => {
-      const navH = parseInt(getComputedStyle(document.documentElement).getPropertyValue("--nav-h")) || 61;
-      const top = el.getBoundingClientRect().top + window.scrollY - navH;
-      if (top > 0) window.scrollTo({ top, behavior: "instant" });
+      requestAnimationFrame(() => {
+        const navH = parseInt(getComputedStyle(document.documentElement).getPropertyValue("--nav-h")) || 61;
+        const top = el.getBoundingClientRect().top + window.scrollY - navH;
+        if (top > 0) window.scrollTo({ top, behavior: "instant" });
+      });
     });
   }, [pathname]);
 

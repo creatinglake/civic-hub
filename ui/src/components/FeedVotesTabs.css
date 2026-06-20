@@ -27,7 +27,7 @@
   gap: var(--space-lg);
   margin: 0;
   padding: 0;
-  align-items: stretch;
+  align-items: center;
 }
 
 .feed-votes-tab {
@@ -38,12 +38,10 @@
   font-family: var(--font-body);
   font-size: var(--font-size-base);
   font-weight: 500;
+  line-height: 1;
   color: var(--color-text-muted);
   text-decoration: none;
   border-bottom: 2px solid transparent;
-  /* Negative margin pulls the tab's bottom border down to overlap the
-     strip's own bottom border, so the active underline replaces it
-     rather than sitting on top. */
   margin-bottom: -1px;
   transition: color 0.15s ease, border-color 0.15s ease;
 }

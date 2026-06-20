@@ -596,6 +596,10 @@
   padding: 0 1.5rem 2rem;
 }
 
+.section:first-of-type {
+  padding-top: var(--space-lg, 1.5rem);
+}
+
 .section-title {
   font-size: 1.15rem;
   margin: 0 0 1rem;
