@@ -62,3 +62,20 @@
   outline-offset: 2px;
   border-radius: var(--radius-sm);
 }
+
+/* Vertical divider after Feed to visually separate it */
+.feed-votes-tab-divider {
+  position: relative;
+  padding-right: var(--space-lg);
+}
+
+.feed-votes-tab-divider::after {
+  content: "";
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 1px;
+  height: 20px;
+  background: var(--color-border, #e0e0e0);
+}

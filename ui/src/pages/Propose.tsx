@@ -45,33 +45,23 @@ export default function Propose() {
       <HubInfo />
       <FeedVotesTabs />
 
-      <section className="suggest-vote-cta propose-cta">
-        <div className="suggest-vote-cta-inner propose-cta-inner">
-          <h2 className="suggest-vote-cta-title propose-cta-title">
-            Got something on your mind?
-          </h2>
-          <p className="suggest-vote-cta-body">
-            Share an <span className="keyword-idea">idea</span> or raise a{" "}
-            <span className="keyword-concern">concern</span> for the community
-            to consider. Your proposal goes live after a quick review.
-          </p>
-          <Link to="/propose/new" className="suggest-vote-cta-button propose-cta-button">
-            + Propose something
-          </Link>
-        </div>
-      </section>
-
       {loading && <p className="section">Loading...</p>}
       {error && <p className="section error">Failed to load: {error}</p>}
 
       {!loading && !error && (
         <>
           <section className="section">
-            <h2 className="section-title">Community Proposals</h2>
-            <p className="section-description">
-              Ideas and concerns raised by community members. Support
-              the ones you care about.
-            </p>
+            <div className="section-header-row">
+              <div>
+                <h2 className="section-title">Community Proposals</h2>
+                <p className="section-description">
+                  Ideas and concerns raised by community members.
+                </p>
+              </div>
+              <Link to="/propose/new" className="section-action-btn propose-action-btn">
+                + Propose something
+              </Link>
+            </div>
             {activeProposals.length === 0 ? (
               <p className="empty-state-inline">
                 No proposals yet.{" "}

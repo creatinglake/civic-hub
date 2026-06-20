@@ -12,11 +12,12 @@
 // Votes) live below the tab strip on each page so they only appear
 // when relevant.
 
-import { NavLink } from "react-router-dom";
+import { useRef, useEffect } from "react";
+import { NavLink, useLocation } from "react-router-dom";
 import "./FeedVotesTabs.css";
 
-const TABS: ReadonlyArray<{ to: string; label: string; end?: boolean }> = [
-  { to: "/", label: "Feed", end: true },
+const TABS: ReadonlyArray<{ to: string; label: string; end?: boolean; dividerAfter?: boolean }> = [
+  { to: "/", label: "Feed", end: true, dividerAfter: true },
   { to: "/deliberations", label: "Conversations" },
   { to: "/propose", label: "Propose" },
   { to: "/votes", label: "Votes" },
@@ -24,11 +25,25 @@ const TABS: ReadonlyArray<{ to: string; label: string; end?: boolean }> = [
 ];
 
 export default function FeedVotesTabs() {
+  const navRef = useRef<HTMLElement>(null);
+  const { pathname } = useLocation();
+
+  useEffect(() => {
+    if (pathname === "/") return;
+    const el = navRef.current;
+    if (!el) return;
+    requestAnimationFrame(() => {
+      const navH = parseInt(getComputedStyle(document.documentElement).getPropertyValue("--nav-h")) || 61;
+      const top = el.getBoundingClientRect().top + window.scrollY - navH;
+      if (top > 0) window.scrollTo({ top, behavior: "instant" });
+    });
+  }, [pathname]);
+
   return (
-    <nav className="feed-votes-tabs" aria-label="Primary content">
+    <nav className="feed-votes-tabs" ref={navRef} aria-label="Primary content">
       <ul className="feed-votes-tabs-list">
         {TABS.map((t) => (
-          <li key={t.to}>
+          <li key={t.to} className={t.dividerAfter ? "feed-votes-tab-divider" : undefined}>
             <NavLink
               to={t.to}
               end={t.end}

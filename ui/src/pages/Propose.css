@@ -1,24 +1,45 @@
-/* Propose listing page — overrides for the CTA card to use a
-   warm green accent instead of the vote-blue palette. */
+/* Propose listing page */
 
-.suggest-vote-cta.propose-cta {
-  padding-bottom: 1.5rem;
+/* --- Compact header row with inline action button --- */
+
+.section-header-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-md);
+  margin-bottom: var(--space-md);
 }
 
-.propose-cta-inner {
-  background: #e8f5e9;
-  border-color: #2e7d32;
+.section-header-row .section-title {
+  margin-bottom: 0;
 }
 
-.propose-cta-title {
-  color: #2e7d32;
+.section-header-row .section-description {
+  margin-top: var(--space-xs, 0.25rem);
 }
 
-.propose-cta-button {
+.section-action-btn {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: var(--space-xs, 0.25rem) var(--space-md, 1rem);
+  border-radius: var(--radius-pill, 999px);
+  font-family: var(--font-body);
+  font-size: var(--font-size-sm, 0.875rem);
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background 0.15s ease;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.propose-action-btn {
   background: #2e7d32;
+  color: #fff;
 }
 
-.propose-cta-button:hover {
+.propose-action-btn:hover {
   background: #1b5e20;
 }
 
@@ -61,4 +82,15 @@
 .status-archived {
   background: var(--color-surface-muted, #f3f4f6);
   color: var(--color-text-muted, #6b7280);
+}
+
+@media (max-width: 480px) {
+  .section-header-row {
+    flex-direction: column;
+    gap: var(--space-sm);
+  }
+
+  .section-action-btn {
+    align-self: flex-start;
+  }
 }
