@@ -1,23 +1,4 @@
-.suggest-vote-cta.projects-cta {
-  padding-bottom: 1.5rem;
-}
-
-.projects-cta-inner {
-  background: #e3f2fd;
-  border-color: #1565c0;
-}
-
-.projects-cta-title {
-  color: #1565c0;
-}
-
-.projects-cta-button {
-  background: #1565c0;
-}
-
-.projects-cta-button:hover {
-  background: #0d47a1;
-}
+/* Projects listing page */
 
 .project-card {
   padding: var(--space-sm) var(--space-md);

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import hub from "../config/hub";
 import {
@@ -52,40 +52,12 @@ export default function Votes() {
     setParams(updated, { replace: true });
   }
 
-  const restoredRef = useRef(false);
-
-  const saveScroll = useCallback(() => {
-    sessionStorage.setItem("votes_scroll_y", String(window.scrollY));
-  }, []);
-
-  useEffect(() => {
-    let timer: ReturnType<typeof setTimeout>;
-    const handler = () => {
-      clearTimeout(timer);
-      timer = setTimeout(saveScroll, 100);
-    };
-    window.addEventListener("scroll", handler, { passive: true });
-    return () => {
-      clearTimeout(timer);
-      window.removeEventListener("scroll", handler);
-    };
-  }, [saveScroll]);
-
   useEffect(() => {
     listProcesses()
       .then(setProcesses)
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
   }, []);
-
-  useEffect(() => {
-    if (loading || restoredRef.current) return;
-    restoredRef.current = true;
-    const saved = sessionStorage.getItem("votes_scroll_y");
-    if (saved) {
-      requestAnimationFrame(() => window.scrollTo(0, parseInt(saved, 10)));
-    }
-  }, [loading]);
 
   const activeVotes = processes
     .filter((p): p is VoteSummary =>
@@ -147,27 +119,21 @@ export default function Votes() {
           state comes from the URL via NavLink. */}
       <FeedVotesTabs />
 
-      {/* Slice 12 — pinned suggest-a-vote CTA at the top of the Votes
-          page. Higher visual weight than the inline "Be the first..."
-          link it replaces, because suggesting a vote is the primary
-          creative action on this page. The body copy doubles as a
-          gentle explainer about how proposals turn into votes. */}
-      <section className="suggest-vote-cta">
-        <div className="suggest-vote-cta-inner">
-          <h2 className="suggest-vote-cta-title">Got an idea? Suggest a vote.</h2>
-          <p className="suggest-vote-cta-body">
-            Submit something for the community to consider. With enough
-            citizen support, your suggestion becomes an official{" "}
-            {hub.jurisdiction} advisory vote.
-          </p>
-          <Link to="/votes/new" className="suggest-vote-cta-button">
+      <section className="section">
+        <div className="section-header-row">
+          <div>
+            <h2 className="section-title">Community Votes</h2>
+            <p className="section-description">
+              Official and proposed advisory votes for {hub.jurisdiction}.
+            </p>
+          </div>
+          <Link to="/votes/new" className="section-action-btn votes-action-btn">
             + Suggest a vote
           </Link>
         </div>
       </section>
 
-      {/* Slice 12 — pill filter row. Mirrors the home-feed pattern;
-          state lives in `?status=`. */}
+
       <nav className="votes-filter" aria-label="Filter votes by status">
         <ul className="votes-filter-list">
           {FILTER_CHOICES.map((c) => {

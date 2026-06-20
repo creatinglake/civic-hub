@@ -134,6 +134,81 @@
   }
 }
 
+/* --- Compact section header with inline action button --- */
+
+.section-header-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-md);
+  margin-bottom: var(--space-md);
+}
+
+.section-header-row .section-title {
+  margin-bottom: 0;
+}
+
+.section-header-row .section-description {
+  margin-top: var(--space-xs, 0.25rem);
+}
+
+.section-action-btn {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: var(--space-xs, 0.25rem) var(--space-md, 1rem);
+  border: none;
+  border-radius: var(--radius-pill, 999px);
+  font-family: var(--font-body);
+  font-size: var(--font-size-sm, 0.875rem);
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.15s ease;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.section-action-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.votes-action-btn {
+  background: var(--pill-vote-fg, #1e3a5f);
+  color: #fff;
+}
+.votes-action-btn:hover {
+  background: var(--color-primary-hover, #14304a);
+}
+
+.projects-action-btn {
+  background: #1565c0;
+  color: #fff;
+}
+.projects-action-btn:hover {
+  background: #0d47a1;
+}
+
+.deliberations-action-btn {
+  background: var(--pill-vote-fg, #1e3a5f);
+  color: #fff;
+}
+.deliberations-action-btn:hover {
+  background: var(--color-primary-hover, #14304a);
+}
+
+@media (max-width: 480px) {
+  .section-header-row {
+    flex-direction: column;
+    gap: var(--space-sm);
+  }
+  .section-action-btn {
+    align-self: flex-start;
+  }
+}
+
 /* --- Votes-page filter pills (mirror of FeedFilter, scoped) --- */
 
 .votes-filter {

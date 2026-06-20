@@ -87,30 +87,23 @@ export default function Deliberations() {
       <HubInfo />
       <FeedVotesTabs />
 
-      <section className="suggest-vote-cta deliberations-cta">
-        <div className="suggest-vote-cta-inner deliberations-cta-inner">
-          <h2 className="suggest-vote-cta-title">
-            Community Conversations
-          </h2>
-          <p className="suggest-vote-cta-body">
-            These conversations and deliberations help discover community
-            sentiment and consensus. Add your own perspective, vote on
-            statements, and see opinion groups form in real time — with
-            clear results showing where the community stands.
-          </p>
-          {isAdmin ? (
+      <section className="section">
+        <div className="section-header-row">
+          <div>
+            <h2 className="section-title">Community Conversations</h2>
+            <p className="section-description">
+              Vote on statements and see where the community stands.
+            </p>
+          </div>
+          {isAdmin && (
             <button
               type="button"
-              className="suggest-vote-cta-button"
+              className="section-action-btn deliberations-action-btn"
               onClick={() => setShowForm(true)}
               disabled={showForm}
             >
               + Create a conversation
             </button>
-          ) : (
-            <span className="deliberations-cta-note">
-              Powered by <a href="https://pol.is" target="_blank" rel="noopener noreferrer">Polis</a>
-            </span>
           )}
         </div>
       </section>

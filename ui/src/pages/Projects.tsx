@@ -30,32 +30,23 @@ export default function Projects() {
       <HubInfo />
       <FeedVotesTabs />
 
-      <section className="suggest-vote-cta projects-cta">
-        <div className="suggest-vote-cta-inner projects-cta-inner">
-          <h2 className="suggest-vote-cta-title projects-cta-title">
-            Working on something for the community?
-          </h2>
-          <p className="suggest-vote-cta-body">
-            Share a project you're building or organizing. Get community
-            support, post updates, and keep people in the loop.
-          </p>
-          <Link to="/projects/new" className="suggest-vote-cta-button projects-cta-button">
-            + Start a project
-          </Link>
-        </div>
-      </section>
-
       {loading && <p className="section">Loading...</p>}
       {error && <p className="section error">Failed to load: {error}</p>}
 
       {!loading && !error && (
         <>
           <section className="section">
-            <h2 className="section-title">Community Projects</h2>
-            <p className="section-description">
-              Projects and initiatives organized by community members.
-              Show your support or get involved.
-            </p>
+            <div className="section-header-row">
+              <div>
+                <h2 className="section-title">Community Projects</h2>
+                <p className="section-description">
+                  Projects and initiatives organized by community members.
+                </p>
+              </div>
+              <Link to="/projects/new" className="section-action-btn projects-action-btn">
+                + Start a project
+              </Link>
+            </div>
             {activeProjects.length === 0 ? (
               <p className="empty-state-inline">
                 No projects yet.{" "}

@@ -27,6 +27,7 @@
   gap: var(--space-lg);
   margin: 0;
   padding: 0;
+  align-items: stretch;
 }
 
 .feed-votes-tab {
