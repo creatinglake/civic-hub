@@ -33,12 +33,22 @@ export default function FeedVotesTabs() {
     const el = navRef.current;
     if (!el) return;
     if ("scrollRestoration" in history) history.scrollRestoration = "manual";
-    const timer = setTimeout(() => {
-      const navH = parseInt(getComputedStyle(document.documentElement).getPropertyValue("--nav-h")) || 61;
+
+    const navH = parseInt(getComputedStyle(document.documentElement).getPropertyValue("--nav-h")) || 61;
+
+    const tryScroll = () => {
       const top = el.getBoundingClientRect().top + window.scrollY - navH;
-      if (top > 0) window.scrollTo({ top, behavior: "instant" });
-    }, 50);
-    return () => clearTimeout(timer);
+      if (top > 0 && document.documentElement.scrollHeight > window.innerHeight) {
+        window.scrollTo({ top, behavior: "instant" });
+        return true;
+      }
+      return false;
+    };
+
+    const timers = [0, 100, 300, 600].map((ms) =>
+      setTimeout(() => tryScroll(), ms),
+    );
+    return () => timers.forEach(clearTimeout);
   }, [pathname]);
 
   return (
