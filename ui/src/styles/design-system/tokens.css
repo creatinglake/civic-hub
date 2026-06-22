@@ -40,7 +40,7 @@
      to feel intentional. Cards are pure white so they pop off the page.
      ------------------------------------------------------------------------- */
   --ds-color-paper-0:   #FFFFFF;   /* elevated card, modal */
-  --ds-color-paper-50:  #F5F3EF;   /* page background — warm parchment to lift white cards */
+  --ds-color-paper-50:  #F8F6F3;   /* page background — light warm parchment to lift white cards */
   --ds-color-paper-100: #F4F1EA;   /* alt surface, hover */
   --ds-color-paper-200: #E8E2D4;   /* active surface */
 

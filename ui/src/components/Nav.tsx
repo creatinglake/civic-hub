@@ -208,10 +208,10 @@ export default function Nav() {
               className={`civic-nav-feedback${onFeedbackPage ? " is-active" : ""}`}
               aria-label="Give feedback"
             >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2Zm0 14H5.2L4 17.2V4h16v12Z" fill="currentColor"/>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M12 2C6.48 2 2 5.58 2 10c0 2.24 1.12 4.26 2.94 5.7L4 22l4.73-2.84C9.78 19.7 10.86 20 12 20c5.52 0 10-3.58 10-8s-4.48-8-10-8Z" fill="currentColor"/>
               </svg>
-              <span className="civic-nav-feedback-label">Feedback</span>
+              Feedback
             </Link>
 
             {user ? (
