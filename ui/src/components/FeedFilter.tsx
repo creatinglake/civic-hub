@@ -134,7 +134,6 @@ export function buildFilterPredicate(
   if (key === "all") return undefined;
   return (event) => {
     if (event.event_type === "civic.process.started") {
-      const data = event.data as { process?: { type?: string } };
       return key === "activity";
     }
     if (event.event_type === "civic.process.result_published") {
