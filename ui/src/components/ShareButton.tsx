@@ -35,22 +35,22 @@ export default function ShareButton({
     return () => document.removeEventListener("mousedown", close);
   }, [menuOpen]);
 
-  async function handleShare() {
+  const hasNativeShare =
+    typeof navigator !== "undefined" &&
+    typeof navigator.share === "function";
+
+  function handleShare() {
     setError(null);
-
-    if (
-      typeof navigator !== "undefined" &&
-      typeof navigator.share === "function"
-    ) {
-      try {
-        await navigator.share({ title, text, url: fullUrl });
-        return;
-      } catch (err) {
-        if (err instanceof DOMException && err.name === "AbortError") return;
-      }
-    }
-
     setMenuOpen((prev) => !prev);
+  }
+
+  async function handleNativeShare() {
+    setMenuOpen(false);
+    try {
+      await navigator.share({ title, text, url: fullUrl });
+    } catch {
+      // user dismissed — silent
+    }
   }
 
   async function handleCopy() {
@@ -117,6 +117,16 @@ export default function ShareButton({
             </svg>
             Share on Facebook
           </button>
+          {hasNativeShare && (
+            <button type="button" className="share-menu-item" onClick={handleNativeShare}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <circle cx="12" cy="12" r="1" />
+                <circle cx="19" cy="12" r="1" />
+                <circle cx="5" cy="12" r="1" />
+              </svg>
+              More options…
+            </button>
+          )}
         </div>
       )}
 
