@@ -42,7 +42,7 @@
 }
 
 .hub-info {
-  padding: var(--space-lg) var(--space-md) var(--space-xl);
+  padding: var(--space-lg) var(--space-md) var(--space-md);
 }
 
 /* Mobile: shorter banner so `object-fit: cover` actually crops the

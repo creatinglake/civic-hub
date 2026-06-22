@@ -52,6 +52,7 @@ function BannerSlot() {
   return <HubBanner />;
 }
 
+
 function AppContent() {
   const [showIntro, setShowIntro] = useState(() => !hasSeenIntro());
   const { user, loading } = useAuth();
