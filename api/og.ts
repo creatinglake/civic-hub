@@ -26,16 +26,22 @@ const SITE_URL = (
 
 let cachedIndexHtml: string | null = null;
 
-function getIndexHtml(): string {
+function getIndexHtml(): string | null {
   if (cachedIndexHtml) return cachedIndexHtml;
   // Vercel's outputDirectory is ui/dist — the serverless function runs
   // from .vercel/output/functions/api/og.func/ but static assets are
   // at the deployment root. Try several candidate paths that cover
   // local dev and Vercel's production layout.
   const candidates = [
+    // Vercel includeFiles places files relative to the project root
+    // inside the function bundle at the same relative path
+    resolve("/var/task", "ui", "dist", "index.html"),
+    resolve("/var/task/user", "ui", "dist", "index.html"),
+    resolve(__dirname, "ui", "dist", "index.html"),
     resolve(__dirname, "..", "ui", "dist", "index.html"),
     resolve(__dirname, "..", "..", "ui", "dist", "index.html"),
     resolve(__dirname, "..", "index.html"),
+    resolve(__dirname, "index.html"),
   ];
   for (const p of candidates) {
     try {
@@ -45,7 +51,7 @@ function getIndexHtml(): string {
       // try next
     }
   }
-  throw new Error("index.html not found");
+  return null;
 }
 
 function escapeHtml(s: string): string {
@@ -208,14 +214,28 @@ export default async function handler(
   }
 
   // Not a crawler (or data fetch failed) — serve the SPA.
-  try {
-    const html = getIndexHtml();
+  const html = getIndexHtml();
+  if (html) {
     res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
     res.end(html);
-  } catch {
-    // Fallback: redirect to the same path (Vercel's default SPA
-    // rewrite will catch it on the next hop).
-    res.writeHead(302, { Location: pathname });
-    res.end();
+  } else {
+    // index.html not found on disk — fetch it from the CDN. The
+    // file is served by Vercel's static layer at /index.html (the
+    // catch-all rewrite). We fetch it once and cache for subsequent
+    // requests to avoid repeated round-trips.
+    try {
+      const cdnRes = await fetch(`${SITE_URL}/index.html`);
+      if (cdnRes.ok) {
+        cachedIndexHtml = await cdnRes.text();
+        res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+        res.end(cachedIndexHtml);
+      } else {
+        res.writeHead(502, { "Content-Type": "text/plain" });
+        res.end("Could not load application.");
+      }
+    } catch {
+      res.writeHead(502, { "Content-Type": "text/plain" });
+      res.end("Could not load application.");
+    }
   }
 }
