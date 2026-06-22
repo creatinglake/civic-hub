@@ -33,15 +33,11 @@ function getIndexHtml(): string | null {
   // at the deployment root. Try several candidate paths that cover
   // local dev and Vercel's production layout.
   const candidates = [
-    // Vercel includeFiles places files relative to the project root
-    // inside the function bundle at the same relative path
     resolve("/var/task", "ui", "dist", "index.html"),
     resolve("/var/task/user", "ui", "dist", "index.html"),
-    resolve(__dirname, "ui", "dist", "index.html"),
-    resolve(__dirname, "..", "ui", "dist", "index.html"),
-    resolve(__dirname, "..", "..", "ui", "dist", "index.html"),
-    resolve(__dirname, "..", "index.html"),
-    resolve(__dirname, "index.html"),
+    resolve("/vercel/path0", "ui", "dist", "index.html"),
+    "/var/task/ui/dist/index.html",
+    "/var/task/index.html",
   ];
   for (const p of candidates) {
     try {
