@@ -47,11 +47,15 @@ export async function handleSubmitFeedback(
   // identification falls back to anonymous — keeps the endpoint open
   // to non-signed-in users.
   let userId: string | null = null;
+  let resolvedEmail = email;
   const auth = req.headers.authorization;
   if (auth && auth.startsWith("Bearer ")) {
     const token = auth.slice(7);
     const user = await getUserFromToken(token);
-    if (user) userId = user.id;
+    if (user) {
+      userId = user.id;
+      if (!resolvedEmail) resolvedEmail = user.email;
+    }
   }
 
   const userAgentHeader = req.headers["user-agent"];
@@ -62,7 +66,7 @@ export async function handleSubmitFeedback(
       category: category as never, // service-level validation will reject invalids
       message,
       name,
-      email,
+      email: resolvedEmail,
       user_id: userId,
       user_agent: userAgent,
     });
