@@ -1,66 +1,35 @@
-import { useState, useRef, useEffect } from "react";
+import { useState } from "react";
 import "./ShareButton.css";
 
 export interface ShareButtonProps {
   title: string;
   url?: string;
   shareText?: string;
-  label?: string;
-  variant?: "default" | "ghost";
 }
 
 export default function ShareButton({
   title,
   url,
   shareText,
-  label = "Share",
-  variant = "default",
 }: ShareButtonProps) {
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [menuOpen, setMenuOpen] = useState(false);
-  const wrapperRef = useRef<HTMLDivElement>(null);
 
   const fullUrl = url ?? (typeof window !== "undefined" ? window.location.href : "");
   const text = shareText ?? title;
-
-  useEffect(() => {
-    if (!menuOpen) return;
-    function close(e: MouseEvent) {
-      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
-        setMenuOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", close);
-    return () => document.removeEventListener("mousedown", close);
-  }, [menuOpen]);
 
   const hasNativeShare =
     typeof navigator !== "undefined" &&
     typeof navigator.share === "function";
 
-  function handleShare() {
-    setError(null);
-    setMenuOpen((prev) => !prev);
-  }
-
-  async function handleNativeShare() {
-    setMenuOpen(false);
-    try {
-      await navigator.share({ title, text, url: fullUrl });
-    } catch {
-      // user dismissed — silent
-    }
-  }
-
   async function handleCopy() {
+    setError(null);
     try {
       await navigator.clipboard.writeText(fullUrl);
       setCopied(true);
-      setMenuOpen(false);
       window.setTimeout(() => setCopied(false), 2500);
     } catch {
-      setError("Couldn't copy the link. Try selecting the URL in the address bar.");
+      setError("Couldn't copy the link.");
       window.setTimeout(() => setError(null), 4000);
     }
   }
@@ -68,72 +37,67 @@ export default function ShareButton({
   function handleFacebook() {
     const fbUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(fullUrl)}`;
     window.open(fbUrl, "_blank", "noopener,noreferrer,width=600,height=400");
-    setMenuOpen(false);
   }
 
-  const buttonClass =
-    variant === "ghost" ? "share-button share-button-ghost" : "share-button";
+  async function handleNativeShare() {
+    try {
+      await navigator.share({ title, text, url: fullUrl });
+    } catch {
+      // user dismissed
+    }
+  }
 
   return (
-    <div className="share-button-wrapper" ref={wrapperRef}>
+    <div className="share-row">
       <button
         type="button"
-        className={buttonClass}
-        onClick={handleShare}
-        aria-label={`Share: ${title}`}
+        className="share-icon-btn share-icon-btn--copy"
+        onClick={handleCopy}
+        aria-label={copied ? "Link copied" : "Copy link"}
+        title={copied ? "Link copied!" : "Copy link"}
       >
-        <svg
-          width="16"
-          height="16"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          aria-hidden="true"
-        >
-          <circle cx="18" cy="5" r="3" />
-          <circle cx="6" cy="12" r="3" />
-          <circle cx="18" cy="19" r="3" />
-          <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
-          <line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
-        </svg>
-        <span>{copied ? "Link copied" : label}</span>
+        {copied ? (
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <polyline points="20 6 9 17 4 12" />
+          </svg>
+        ) : (
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+            <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+          </svg>
+        )}
       </button>
 
-      {menuOpen && (
-        <div className="share-menu">
-          <button type="button" className="share-menu-item" onClick={handleCopy}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
-              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-            </svg>
-            Copy link
-          </button>
-          <button type="button" className="share-menu-item" onClick={handleFacebook}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-              <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
-            </svg>
-            Share on Facebook
-          </button>
-          {hasNativeShare && (
-            <button type="button" className="share-menu-item" onClick={handleNativeShare}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <circle cx="12" cy="12" r="1" />
-                <circle cx="19" cy="12" r="1" />
-                <circle cx="5" cy="12" r="1" />
-              </svg>
-              More options…
-            </button>
-          )}
-        </div>
+      <button
+        type="button"
+        className="share-icon-btn share-icon-btn--facebook"
+        onClick={handleFacebook}
+        aria-label="Share on Facebook"
+        title="Share on Facebook"
+      >
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+          <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
+        </svg>
+      </button>
+
+      {hasNativeShare && (
+        <button
+          type="button"
+          className="share-icon-btn share-icon-btn--more"
+          onClick={handleNativeShare}
+          aria-label="More sharing options"
+          title="More sharing options"
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
+            <polyline points="16 6 12 2 8 6" />
+            <line x1="12" y1="2" x2="12" y2="15" />
+          </svg>
+        </button>
       )}
 
       {error && (
-        <p className="share-button-error" role="alert">
-          {error}
-        </p>
+        <span className="share-row-error" role="alert">{error}</span>
       )}
     </div>
   );
