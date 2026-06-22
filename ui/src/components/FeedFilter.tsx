@@ -18,10 +18,9 @@ import "./FeedFilter.css";
 
 export type FeedFilterKey =
   | "all"
-  | "vote"
   | "announcement"
-  | "activity"
-  | "meeting_summary";
+  | "meeting_summary"
+  | "activity";
 
 export interface FeedFilterChoice {
   key: FeedFilterKey;
@@ -32,21 +31,20 @@ export interface FeedFilterChoice {
 
 const CHOICES: FeedFilterChoice[] = [
   { key: "all", label: "All", pillClass: "feed-filter-pill--all" },
-  { key: "vote", label: "Votes", pillClass: "feed-filter-pill--vote" },
   {
     key: "announcement",
     label: "Announcements",
     pillClass: "feed-filter-pill--announcement",
   },
   {
-    key: "activity",
-    label: "Activity",
-    pillClass: "feed-filter-pill--activity",
-  },
-  {
     key: "meeting_summary",
     label: `${hub.governing_body_short} meeting summaries`,
     pillClass: "feed-filter-pill--meeting",
+  },
+  {
+    key: "activity",
+    label: "Activity",
+    pillClass: "feed-filter-pill--activity",
   },
 ];
 
@@ -54,10 +52,9 @@ const PARAM = "type";
 
 function isFilterKey(v: string | null): v is FeedFilterKey {
   return (
-    v === "vote" ||
     v === "announcement" ||
-    v === "activity" ||
-    v === "meeting_summary"
+    v === "meeting_summary" ||
+    v === "activity"
   );
 }
 
@@ -138,8 +135,7 @@ export function buildFilterPredicate(
   return (event) => {
     if (event.event_type === "civic.process.started") {
       const data = event.data as { process?: { type?: string } };
-      if (data?.process?.type === "civic.wordcloud") return key === "activity";
-      return key === "vote";
+      return key === "activity";
     }
     if (event.event_type === "civic.process.result_published") {
       const data = event.data as {

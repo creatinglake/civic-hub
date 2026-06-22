@@ -71,11 +71,9 @@
 
 /* Inactive: pill bg as background, normal text color. Matches the
  * resting Slice 8 pill look on cards. */
-.feed-filter-pill--vote.feed-filter-pill { background: var(--pill-vote-bg); color: var(--pill-vote-fg); border-color: transparent; }
-.feed-filter-pill--activity.feed-filter-pill { background: var(--pill-vote-results-bg); color: var(--pill-vote-results-fg); border-color: transparent; }
 .feed-filter-pill--announcement.feed-filter-pill { background: var(--pill-announcement-bg); color: var(--pill-announcement-fg); border-color: transparent; }
 .feed-filter-pill--meeting.feed-filter-pill { background: var(--pill-meeting-bg); color: var(--pill-meeting-fg); border-color: transparent; }
-.feed-filter-pill--wordcloud.feed-filter-pill { background: #e0f2f1; color: #00695c; border-color: transparent; }
+.feed-filter-pill--activity.feed-filter-pill { background: var(--pill-vote-results-bg); color: var(--pill-vote-results-fg); border-color: transparent; }
 
 /* Active: invert — pill fg as background, light text. Reads as
  * "currently selected" against the inactive siblings. */
@@ -84,8 +82,6 @@
   border-color: transparent;
 }
 .feed-filter-pill--all.is-active { background: var(--color-text); }
-.feed-filter-pill--vote.is-active { background: var(--pill-vote-fg); }
-.feed-filter-pill--activity.is-active { background: var(--pill-vote-results-fg); }
 .feed-filter-pill--announcement.is-active { background: var(--pill-announcement-fg); }
 .feed-filter-pill--meeting.is-active { background: var(--pill-meeting-fg); }
-.feed-filter-pill--wordcloud.is-active { background: #00695c; }
+.feed-filter-pill--activity.is-active { background: var(--pill-vote-results-fg); }
