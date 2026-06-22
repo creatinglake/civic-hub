@@ -5,10 +5,21 @@
   "functions": {
     "api/index.ts": {
       "maxDuration": 300
+    },
+    "api/og.ts": {
+      "includeFiles": "ui/dist/index.html"
     }
   },
   "rewrites": [
     { "source": "/api/:path*", "destination": "/api" },
+    { "source": "/process/:id*", "destination": "/api/og" },
+    { "source": "/proposal/:id*", "destination": "/api/og" },
+    { "source": "/project/:id*", "destination": "/api/og" },
+    { "source": "/deliberation/:id*", "destination": "/api/og" },
+    { "source": "/vote-results/:id*", "destination": "/api/og" },
+    { "source": "/meeting-summary/:id*", "destination": "/api/og" },
+    { "source": "/announcement/:id*", "destination": "/api/og" },
+    { "source": "/wordcloud/:id*", "destination": "/api/og" },
     { "source": "/(.*)", "destination": "/index.html" }
   ],
   "crons": [
