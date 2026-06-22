@@ -91,22 +91,22 @@ export default function DeliberationPanel({ processId }: Props) {
   return (
     <div className="deliberation-panel">
       <div className="deliberation-panel-header">
-        <div>
-          <h3 className="deliberation-topic">{process.topic}</h3>
-          <p className="deliberation-framing">{process.framing}</p>
-        </div>
-        <div className="deliberation-meta">
-          {process.deadline && (
-            <span className="deliberation-deadline">
-              Ends {new Date(process.deadline).toLocaleDateString()}
-            </span>
-          )}
-          {process.participation_threshold && (
-            <span className="deliberation-threshold">
-              Goal: {process.participation_threshold} participants
-            </span>
-          )}
-        </div>
+        <h3 className="deliberation-topic">{process.topic}</h3>
+        {(process.deadline || process.participation_threshold) && (
+          <div className="deliberation-meta">
+            {process.deadline && (
+              <span className="deliberation-deadline">
+                Ends {new Date(process.deadline).toLocaleDateString()}
+              </span>
+            )}
+            {process.participation_threshold && (
+              <span className="deliberation-threshold">
+                Goal: {process.participation_threshold} participants
+              </span>
+            )}
+          </div>
+        )}
+        <p className="deliberation-framing">{process.framing}</p>
       </div>
 
       <div className="deliberation-tabs">
