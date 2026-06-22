@@ -75,7 +75,7 @@
 .feed-votes-tab-divider::after {
   content: "";
   position: absolute;
-  right: 0;
+  right: calc(-0.5 * var(--space-lg));
   top: 50%;
   transform: translateY(-50%);
   width: 1px;
