@@ -209,7 +209,7 @@ export default function Nav() {
               aria-label="Give feedback"
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                <path d="M12 2C6.48 2 2 5.58 2 10c0 2.24 1.12 4.26 2.94 5.7L4 22l4.73-2.84C9.78 19.7 10.86 20 12 20c5.52 0 10-3.58 10-8s-4.48-8-10-8Z" fill="currentColor"/>
+                <path d="M18 1l-4 4H6C4.9 5 4 5.9 4 7v4c0 1.1.9 2 2 2h2l-2.6 5.2a1 1 0 0 0 .9 1.4h.1a1 1 0 0 0 .9-.5L10.6 13H14l4 4h2V1h-2Zm0 14.5L15.5 13H6V7h9.5L18 4.5v11Z" fill="currentColor"/>
               </svg>
               Feedback
             </Link>
