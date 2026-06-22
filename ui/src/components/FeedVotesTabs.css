@@ -66,16 +66,19 @@
   border-radius: var(--radius-sm);
 }
 
-/* Vertical divider after Feed to visually separate it */
+/* Vertical divider after Feed to visually separate it.
+   The divider sits at the midpoint of the gap between Feed and
+   Conversations — achieved by splitting the extra margin evenly
+   on both sides so ::after lands dead-center. */
 .feed-votes-tab-divider {
   position: relative;
-  margin-right: var(--space-lg);
+  padding-right: calc(var(--space-lg) / 2);
 }
 
 .feed-votes-tab-divider::after {
   content: "";
   position: absolute;
-  right: calc(-0.5 * var(--space-lg));
+  right: 0;
   top: 50%;
   transform: translateY(-50%);
   width: 1px;

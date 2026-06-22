@@ -5,6 +5,7 @@ import {
   type PublicMeetingSummary,
 } from "../services/api";
 import { relativeTime, absoluteTime } from "../components/FeedPost";
+import ShareButton from "../components/ShareButton";
 import "./MeetingSummary.css";
 
 export default function MeetingSummaryPage() {
@@ -57,6 +58,13 @@ export default function MeetingSummaryPage() {
 
   return (
     <article className="page meeting-summary-page">
+      <div className="process-share-row">
+        <ShareButton
+          title={summary.meeting_title}
+          shareText={`Meeting summary: ${summary.meeting_title}`}
+        />
+      </div>
+
       <header className="meeting-header">
         <p className="meeting-eyebrow">Meeting summary</p>
         <h1>

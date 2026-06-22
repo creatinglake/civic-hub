@@ -1,23 +1,18 @@
 import { useState, useEffect, useCallback } from "react";
+import { Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import type { DeliberationSummary, DeliberationReadModel } from "../services/api";
+import type { DeliberationSummary } from "../services/api";
 import {
   listDeliberations,
-  getDeliberation,
   startDeliberation,
 } from "../services/api";
 import HubInfo from "../components/HubInfo";
-import DeliberationPanel from "../components/deliberation/DeliberationPanel";
-import CompletedDeliberation from "../components/deliberation/CompletedDeliberation";
 import HostDeliberationForm from "../components/deliberation/HostDeliberationForm";
 import "./Deliberations.css";
 
 export default function Deliberations() {
   const { isAdmin } = useAuth();
   const [processes, setProcesses] = useState<DeliberationSummary[]>([]);
-  const [completedDetails, setCompletedDetails] = useState<
-    Map<string, DeliberationReadModel>
-  >(new Map());
   const [showForm, setShowForm] = useState(false);
   const [loading, setLoading] = useState(true);
   const [startingId, setStartingId] = useState<string | null>(null);
@@ -26,20 +21,6 @@ export default function Deliberations() {
     try {
       const procs = await listDeliberations();
       setProcesses(procs);
-
-      const completed = procs.filter(
-        (p) => p.lifecycle === "closed" || p.lifecycle === "finalized",
-      );
-      const details = new Map<string, DeliberationReadModel>();
-      for (const p of completed) {
-        try {
-          const detail = await getDeliberation(p.process_id);
-          details.set(p.process_id, detail);
-        } catch {
-          // skip
-        }
-      }
-      setCompletedDetails(details);
     } catch {
       // no deliberations yet
     } finally {
@@ -143,24 +124,50 @@ export default function Deliberations() {
       {!loading && active.length > 0 && (
         <section className="section">
           <h2 className="section-title">Active Conversations</h2>
-          {active.map((p) => (
-            <DeliberationPanel
-              key={p.process_id}
-              processId={p.process_id}
-            />
-          ))}
+          <ul className="process-list">
+            {active.map((p) => (
+              <li key={p.process_id}>
+                <Link to={`/deliberation/${p.process_id}`} className="process-link">
+                  <div className="deliberation-card">
+                    <div className="deliberation-card-header">
+                      <h3>{p.topic}</h3>
+                      <span className="status-badge status-active">active</span>
+                    </div>
+                    {(p.participant_count ?? 0) > 0 && (
+                      <p className="deliberation-card-participants">
+                        {p.participant_count} participant{p.participant_count !== 1 ? "s" : ""}
+                      </p>
+                    )}
+                  </div>
+                </Link>
+              </li>
+            ))}
+          </ul>
         </section>
       )}
 
       {!loading && completed.length > 0 && (
         <section className="section">
           <h2 className="section-title">Completed</h2>
-          {completed.map((p) => {
-            const detail = completedDetails.get(p.process_id);
-            return detail ? (
-              <CompletedDeliberation key={p.process_id} process={detail} />
-            ) : null;
-          })}
+          <ul className="process-list">
+            {completed.map((p) => (
+              <li key={p.process_id}>
+                <Link to={`/deliberation/${p.process_id}`} className="process-link">
+                  <div className="deliberation-card">
+                    <div className="deliberation-card-header">
+                      <h3>{p.topic}</h3>
+                      <span className="status-badge status-archived">completed</span>
+                    </div>
+                    {(p.participant_count ?? 0) > 0 && (
+                      <p className="deliberation-card-participants">
+                        {p.participant_count} participant{p.participant_count !== 1 ? "s" : ""}
+                      </p>
+                    )}
+                  </div>
+                </Link>
+              </li>
+            ))}
+          </ul>
         </section>
       )}
 

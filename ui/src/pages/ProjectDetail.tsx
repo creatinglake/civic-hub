@@ -12,6 +12,7 @@ import {
   type SentimentValue,
 } from "../services/api";
 
+import ShareButton from "../components/ShareButton";
 import "./ProjectDetail.css";
 
 export default function ProjectDetail() {
@@ -123,6 +124,13 @@ export default function ProjectDetail() {
           />
         </div>
       )}
+
+      <div className="process-share-row">
+        <ShareButton
+          title={project.title}
+          shareText={`Check out this project: ${project.title}`}
+        />
+      </div>
 
       <div className="project-detail-header">
         <h1>{project.title}</h1>

@@ -5,6 +5,7 @@ import { relativeTime, absoluteTime } from "../components/FeedPost";
 import PostFeaturedImage from "../components/PostFeaturedImage";
 import LinkPreviewCard from "../components/LinkPreviewCard";
 import hub from "../config/hub";
+import ShareButton from "../components/ShareButton";
 import "./VoteResults.css";
 
 const URL_RE = /\bhttps?:\/\/\S+/gi;
@@ -91,6 +92,13 @@ export default function VoteResultsPage() {
 
   return (
     <article className="page vote-results-page">
+
+      <div className="process-share-row">
+        <ShareButton
+          title={results.title}
+          shareText={`Vote results: ${results.title}`}
+        />
+      </div>
 
       <header className="vote-results-header">
         <p className="vote-results-eyebrow">Vote results</p>

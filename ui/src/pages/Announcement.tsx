@@ -10,6 +10,7 @@ import { useAuth } from "../context/AuthContext";
 import { relativeTime, absoluteTime } from "../components/FeedPost";
 import PostFeaturedImage from "../components/PostFeaturedImage";
 import LinkPreviewCard from "../components/LinkPreviewCard";
+import ShareButton from "../components/ShareButton";
 import "./Announcement.css";
 
 const URL_RE = /\bhttps?:\/\/\S+/gi;
@@ -129,6 +130,13 @@ export default function AnnouncementPage() {
 
   return (
     <article className="page announcement-page">
+      <div className="process-share-row">
+        <ShareButton
+          title={announcement.title}
+          shareText={announcement.title}
+        />
+      </div>
+
       <header className="announcement-header">
         <p className="announcement-eyebrow">
           {isAdminLabel ? "Announcement" : `${roleLabel} announcement`}

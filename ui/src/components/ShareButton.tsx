@@ -1,40 +1,11 @@
-// ShareButton — single-purpose "share this" affordance.
-//
-// On click:
-//   1. If navigator.share is available (mobile + modern desktop),
-//      open the OS share sheet.
-//   2. Otherwise fall back to writing the URL to the clipboard and
-//      flashing "Link copied" inline for ~2.5s.
-//
-// User-cancelled native shares (AbortError) are silent — no fallback,
-// no error. Other share-API failures fall through to the clipboard
-// path so an iOS quirk doesn't strand the user without a working
-// share.
-//
-// Why no platform buttons? Civic content gets shared into Facebook
-// groups, iMessage threads, WhatsApp DMs, neighborhood listservs —
-// not posted to public Twitter / Facebook walls. The native share
-// sheet covers all of those; per-platform buttons cover one each
-// and clutter the UI.
-
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import "./ShareButton.css";
 
 export interface ShareButtonProps {
-  /** Short title — used as the share-sheet title and accessible label. */
   title: string;
-  /** Absolute URL to share. Defaults to the current page URL. */
   url?: string;
-  /**
-   * Body text passed to the share sheet. Some apps (Twitter, SMS)
-   * pre-fill it; others (iMessage) attach it as a separate line.
-   * Defaults to the title verbatim, on the assumption the recipient
-   * already understands the surrounding context from the URL unfurl.
-   */
   shareText?: string;
-  /** Visible button label. Defaults to "Share". */
   label?: string;
-  /** Visual variant. "default" (filled) or "ghost" (outlined). */
   variant?: "default" | "ghost";
 }
 
@@ -47,13 +18,26 @@ export default function ShareButton({
 }: ShareButtonProps) {
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const wrapperRef = useRef<HTMLDivElement>(null);
 
-  async function handleClick() {
-    const fullUrl = url ?? (typeof window !== "undefined" ? window.location.href : "");
-    const text = shareText ?? title;
+  const fullUrl = url ?? (typeof window !== "undefined" ? window.location.href : "");
+  const text = shareText ?? title;
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    function close(e: MouseEvent) {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
+        setMenuOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", close);
+    return () => document.removeEventListener("mousedown", close);
+  }, [menuOpen]);
+
+  async function handleShare() {
     setError(null);
 
-    // 1. Native share sheet, when available.
     if (
       typeof navigator !== "undefined" &&
       typeof navigator.share === "function"
@@ -62,17 +46,18 @@ export default function ShareButton({
         await navigator.share({ title, text, url: fullUrl });
         return;
       } catch (err) {
-        // User dismissed the sheet — treat as a no-op, not an error.
         if (err instanceof DOMException && err.name === "AbortError") return;
-        // Anything else (Permission, NotAllowed, generic) falls through
-        // to the clipboard path so the user still gets a working share.
       }
     }
 
-    // 2. Clipboard fallback.
+    setMenuOpen((prev) => !prev);
+  }
+
+  async function handleCopy() {
     try {
       await navigator.clipboard.writeText(fullUrl);
       setCopied(true);
+      setMenuOpen(false);
       window.setTimeout(() => setCopied(false), 2500);
     } catch {
       setError("Couldn't copy the link. Try selecting the URL in the address bar.");
@@ -80,15 +65,21 @@ export default function ShareButton({
     }
   }
 
+  function handleFacebook() {
+    const fbUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(fullUrl)}`;
+    window.open(fbUrl, "_blank", "noopener,noreferrer,width=600,height=400");
+    setMenuOpen(false);
+  }
+
   const buttonClass =
     variant === "ghost" ? "share-button share-button-ghost" : "share-button";
 
   return (
-    <div className="share-button-wrapper">
+    <div className="share-button-wrapper" ref={wrapperRef}>
       <button
         type="button"
         className={buttonClass}
-        onClick={handleClick}
+        onClick={handleShare}
         aria-label={`Share: ${title}`}
       >
         <svg
@@ -110,6 +101,25 @@ export default function ShareButton({
         </svg>
         <span>{copied ? "Link copied" : label}</span>
       </button>
+
+      {menuOpen && (
+        <div className="share-menu">
+          <button type="button" className="share-menu-item" onClick={handleCopy}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+            </svg>
+            Copy link
+          </button>
+          <button type="button" className="share-menu-item" onClick={handleFacebook}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
+            </svg>
+            Share on Facebook
+          </button>
+        </div>
+      )}
+
       {error && (
         <p className="share-button-error" role="alert">
           {error}
