@@ -30,6 +30,10 @@
   align-items: center;
 }
 
+.feed-votes-tabs-list li {
+  margin: 0;
+}
+
 .feed-votes-tab {
   display: inline-flex;
   align-items: center;
@@ -65,7 +69,7 @@
 /* Vertical divider after Feed to visually separate it */
 .feed-votes-tab-divider {
   position: relative;
-  padding-right: var(--space-lg);
+  margin-right: var(--space-lg);
 }
 
 .feed-votes-tab-divider::after {
