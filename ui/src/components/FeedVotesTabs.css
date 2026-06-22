@@ -1,13 +1,8 @@
-/* Slice 12.1 — Feed | Votes primary in-page tabs.
-   Underline-style active state. The strip itself has a bottom border
-   that the active-tab underline visually breaks through, so it reads
-   as one continuous control rather than two tabs floating in space.
-   Lives below banner / hub-info, above the page-specific filter row
-   or CTA. */
+/* Primary in-page tabs: Feed (pinned) | scrollable section tabs.
+   Feed stays fixed on the left; the remaining tabs scroll horizontally
+   on mobile so the strip scales as more process types are added. */
 
 .feed-votes-tabs {
-  /* Slice 12.2 — match the page-shell width so the tab strip aligns
-     with the hub info above and the section containers below. */
   max-width: var(--max-width-shell);
   margin: 0 auto;
   padding: 0 var(--space-md);
@@ -16,35 +11,40 @@
   top: var(--nav-h);
   z-index: 90;
   background: var(--color-bg);
+  display: flex;
+  align-items: stretch;
 }
 
-/* Fade hint on the right edge when tabs overflow — tells the user
-   there are more tabs to swipe to. The sticky parent is a containing
-   block, so the pseudo-element positions correctly. */
-@media (max-width: 600px) {
-  .feed-votes-tabs::after {
-    content: "";
-    position: absolute;
-    right: 0;
-    top: 0;
-    bottom: 0;
-    width: 40px;
-    background: linear-gradient(to right, transparent, var(--color-bg, #f8f7f4));
-    pointer-events: none;
-    z-index: 1;
-  }
+/* --- Pinned Feed tab + divider --- */
+
+.feed-votes-tabs-pinned {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  padding-right: var(--space-sm);
 }
+
+.feed-votes-tab-divider-line {
+  width: 1px;
+  height: 20px;
+  margin-left: var(--space-md);
+  background: var(--color-border, #e0e0e0);
+  flex-shrink: 0;
+}
+
+/* --- Scrollable tab list --- */
 
 .feed-votes-tabs-list {
   list-style: none;
   display: flex;
   gap: var(--space-lg);
   margin: 0;
-  padding: 0;
+  padding: 0 var(--space-md) 0 var(--space-sm);
   align-items: center;
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
+  min-width: 0;
 }
 .feed-votes-tabs-list::-webkit-scrollbar {
   display: none;
@@ -54,6 +54,8 @@
   margin: 0;
   flex-shrink: 0;
 }
+
+/* --- Tab links (shared between pinned + scrollable) --- */
 
 .feed-votes-tab {
   display: inline-flex;
@@ -68,6 +70,7 @@
   text-decoration: none;
   border-bottom: 4px solid transparent;
   margin-bottom: -1px;
+  white-space: nowrap;
   transition: color 0.15s ease, border-color 0.15s ease;
 }
 
@@ -89,22 +92,17 @@
   border-radius: var(--radius-sm);
 }
 
-/* Vertical divider after Feed to visually separate it.
-   The divider sits at the midpoint of the gap between Feed and
-   Conversations — achieved by splitting the extra margin evenly
-   on both sides so ::after lands dead-center. */
-.feed-votes-tab-divider {
-  position: relative;
-  padding-right: calc(var(--space-lg) / 2);
-}
-
-.feed-votes-tab-divider::after {
-  content: "";
-  position: absolute;
-  right: 0;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 1px;
-  height: 20px;
-  background: var(--color-border, #e0e0e0);
+/* Fade hint on the right edge when tabs overflow on mobile */
+@media (max-width: 600px) {
+  .feed-votes-tabs::after {
+    content: "";
+    position: absolute;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    width: 40px;
+    background: linear-gradient(to right, transparent, var(--color-bg, #f8f7f4));
+    pointer-events: none;
+    z-index: 1;
+  }
 }

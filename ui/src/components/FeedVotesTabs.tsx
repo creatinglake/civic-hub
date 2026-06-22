@@ -16,10 +16,9 @@ import { useRef, useEffect } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import "./FeedVotesTabs.css";
 
-const TABS: ReadonlyArray<{ to: string; label: string; end?: boolean; dividerAfter?: boolean }> = [
-  { to: "/", label: "Feed", end: true, dividerAfter: true },
+const SCROLLABLE_TABS: ReadonlyArray<{ to: string; label: string }> = [
   { to: "/deliberations", label: "Conversations" },
-  { to: "/propose", label: "Propose" },
+  { to: "/propose", label: "Proposals" },
   { to: "/votes", label: "Votes" },
   { to: "/projects", label: "Projects" },
 ];
@@ -53,12 +52,23 @@ export default function FeedVotesTabs() {
 
   return (
     <nav className="feed-votes-tabs" ref={navRef} aria-label="Primary content">
+      <div className="feed-votes-tabs-pinned">
+        <NavLink
+          to="/"
+          end
+          className={({ isActive }) =>
+            `feed-votes-tab${isActive ? " is-active" : ""}`
+          }
+        >
+          Feed
+        </NavLink>
+        <span className="feed-votes-tab-divider-line" aria-hidden="true" />
+      </div>
       <ul className="feed-votes-tabs-list">
-        {TABS.map((t) => (
-          <li key={t.to} className={t.dividerAfter ? "feed-votes-tab-divider" : undefined}>
+        {SCROLLABLE_TABS.map((t) => (
+          <li key={t.to}>
             <NavLink
               to={t.to}
-              end={t.end}
               className={({ isActive }) =>
                 `feed-votes-tab${isActive ? " is-active" : ""}`
               }
