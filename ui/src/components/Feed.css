@@ -145,6 +145,16 @@
   margin: 0 0 var(--space-sm);
 }
 
+@media (max-width: 767px) {
+  .feed-post-head {
+    flex-direction: column-reverse;
+    align-items: flex-start;
+  }
+  .feed-post-head .feed-pill {
+    margin-left: 0;
+  }
+}
+
 .feed-post-title {
   margin: 0;
   font-family: var(--font-heading);
