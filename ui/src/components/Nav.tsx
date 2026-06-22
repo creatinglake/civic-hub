@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Link, NavLink, useNavigate } from "react-router-dom";
+import { Link, NavLink, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import AuthModal from "./AuthModal";
 import SearchBar from "./SearchBar";
@@ -148,6 +148,9 @@ export default function Nav() {
     navigate("/");
   }
 
+  const location = useLocation();
+  const onFeedbackPage = location.pathname === "/feedback";
+
   const initial = user?.email?.[0]?.toUpperCase() ?? "?";
   const bg = user ? avatarColor(user.email) : AVATAR_COLORS[0];
 
@@ -199,6 +202,17 @@ export default function Nav() {
             <div className="civic-nav-search">
               <SearchBar />
             </div>
+
+            <Link
+              to="/feedback"
+              className={`civic-nav-feedback${onFeedbackPage ? " is-active" : ""}`}
+              aria-label="Give feedback"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2Zm0 14H5.2L4 17.2V4h16v12Z" fill="currentColor"/>
+              </svg>
+              <span className="civic-nav-feedback-label">Feedback</span>
+            </Link>
 
             {user ? (
               <>

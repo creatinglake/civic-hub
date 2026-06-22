@@ -108,7 +108,7 @@ export async function submitFeedback(
 
 async function notifyOperator(s: FeedbackSubmission): Promise<void> {
   const recipient =
-    process.env.FEEDBACK_RECIPIENT_EMAIL?.trim() || "contact@civic.social";
+    process.env.FEEDBACK_RECIPIENT_EMAIL?.trim() || "adam@civic.social";
   const subject = `[Civic Hub feedback] ${s.category} — ${s.message.slice(0, 60)}`;
   const html = renderOperatorEmail(s);
   const result = await sendEmail({ to: recipient, subject, html });
