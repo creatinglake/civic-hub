@@ -227,7 +227,6 @@ export default function SearchPage() {
 
   return (
     <div className="page search-page">
-      <Link to="/" className="back-link">&larr; Home</Link>
 
       <header className="search-page-header">
         <h1>

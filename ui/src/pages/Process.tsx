@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import { getProcessState, type ProcessState, type VoteState, type ProposalState } from "../services/api";
 import { useAuth } from "../context/AuthContext";
 import { useRequireAuth } from "../hooks/useRequireAuth";
@@ -74,7 +74,6 @@ export default function Process() {
   if (loading) return <p className="detail-page">Loading...</p>;
   if (error) return (
     <div className="page detail-page">
-      <Link to="/votes" className="back-link">&larr; Back to votes</Link>
       <p className="error">Error: {error}</p>
       <button className="retry-button" onClick={() => { setLoading(true); setError(null); fetchState(); }}>
         Try again
@@ -83,7 +82,6 @@ export default function Process() {
   );
   if (!process) return (
     <div className="page detail-page">
-      <Link to="/" className="back-link">&larr; Home</Link>
       <p>Not found.</p>
     </div>
   );
@@ -98,10 +96,6 @@ export default function Process() {
       {showAuthModal && (
         <AuthModal onComplete={handleAuthComplete} onDismiss={closeAuthModal} />
       )}
-
-      <Link to="/votes" className="back-link back-link-sticky">
-        &larr; Back to votes
-      </Link>
 
       <div className="process-header">
         <h1>{process.title}</h1>

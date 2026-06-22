@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import {
   getMeetingSummary,
   type PublicMeetingSummary,
@@ -43,9 +43,6 @@ export default function MeetingSummaryPage() {
   if (error || !summary) {
     return (
       <div className="page meeting-summary-page">
-        <Link to="/" className="back-link">
-          &larr; Home
-        </Link>
         <p className="meeting-status meeting-status-error">
           {error ?? "This summary hasn't been published yet."}
         </p>
@@ -60,9 +57,6 @@ export default function MeetingSummaryPage() {
 
   return (
     <article className="page meeting-summary-page">
-      <Link to="/" className="back-link">
-        &larr; Home
-      </Link>
       <header className="meeting-header">
         <p className="meeting-eyebrow">Meeting summary</p>
         <h1>

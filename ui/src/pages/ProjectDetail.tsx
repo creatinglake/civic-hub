@@ -11,6 +11,7 @@ import {
   type ProjectComment,
   type SentimentValue,
 } from "../services/api";
+
 import "./ProjectDetail.css";
 
 export default function ProjectDetail() {
@@ -113,10 +114,6 @@ export default function ProjectDetail() {
 
   return (
     <div className="page">
-      <Link to="/projects" className="project-detail-back">
-        &larr; Back to Projects
-      </Link>
-
       {project.banner_image_url && (
         <div className="project-banner">
           <img

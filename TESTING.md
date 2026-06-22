@@ -151,6 +151,17 @@ Each row tracks a user flow, which layer covers it, and which slice introduced i
 | Host form titled "Host a conversation" | | | D | Needs test |
 | Mock data serves statements for seed- conversations | | | D | Needs test |
 | Mock data serves cluster state for seed- conversations | | | D | Needs test |
+| Word cloud: SVG defers render until container measured | | | E | Needs test |
+| Word cloud: submit form hidden for returning users | | | E | Needs test |
+| Word cloud: accordion chevron toggles open/closed | | | E | Needs test |
+| Auth: token preserved on transient network errors | | | E | Needs test |
+| Auth: token cleared on 401/403 only | | | E | Needs test |
+| Compact CTA: Propose page shows inline header + button | | | E | Needs test |
+| Compact CTA: Votes page shows inline header + button | | | E | Needs test |
+| Compact CTA: Projects page shows inline header + button | | | E | Needs test |
+| Compact CTA: Conversations page shows inline header + button | | | E | Needs test |
+| Feed tab has vertical divider separator | | | E | Needs test |
+| Sub-pages scroll to nav on load (not Feed) | | | E | Needs test — not yet working |
 
 ### Admin Flows
 

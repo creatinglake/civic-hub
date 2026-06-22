@@ -7,7 +7,6 @@ import {
   startDeliberation,
 } from "../services/api";
 import HubInfo from "../components/HubInfo";
-import FeedVotesTabs from "../components/FeedVotesTabs";
 import DeliberationPanel from "../components/deliberation/DeliberationPanel";
 import CompletedDeliberation from "../components/deliberation/CompletedDeliberation";
 import HostDeliberationForm from "../components/deliberation/HostDeliberationForm";
@@ -85,7 +84,6 @@ export default function Deliberations() {
   return (
     <div className="page page-home">
       <HubInfo />
-      <FeedVotesTabs />
 
       <section className="section">
         <div className="section-header-row">

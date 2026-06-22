@@ -5,7 +5,6 @@ import {
   type CivicProposalSummary,
 } from "../services/api";
 import HubInfo from "../components/HubInfo";
-import FeedVotesTabs from "../components/FeedVotesTabs";
 import "./Propose.css";
 
 /**
@@ -43,7 +42,6 @@ export default function Propose() {
   return (
     <div className="page page-home">
       <HubInfo />
-      <FeedVotesTabs />
 
       {loading && <p className="section">Loading...</p>}
       {error && <p className="section error">Failed to load: {error}</p>}

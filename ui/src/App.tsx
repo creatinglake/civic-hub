@@ -5,6 +5,7 @@ import hub from "./config/hub";
 import Nav from "./components/Nav";
 import BetaLanding from "./pages/BetaLanding";
 import HubBanner from "./components/HubBanner";
+import FeedVotesTabs from "./components/FeedVotesTabs";
 import Home from "./pages/Home";
 import Votes from "./pages/Votes";
 import Process from "./pages/Process";
@@ -81,6 +82,7 @@ function AppContent() {
 
       <Nav />
       <BannerSlot />
+      <FeedVotesTabs />
 
       <main className="page-shell">
         <Routes>

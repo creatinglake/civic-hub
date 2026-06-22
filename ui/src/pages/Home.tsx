@@ -5,7 +5,6 @@ import FeedFilter, {
   useFeedFilter,
   useFilterPredicate,
 } from "../components/FeedFilter";
-import FeedVotesTabs from "../components/FeedVotesTabs";
 
 export default function Home() {
   const { active, setActive } = useFeedFilter();
@@ -21,7 +20,6 @@ export default function Home() {
           context-specific surfaces (filter pills here; suggest-a-vote
           CTA on Votes) live below the tabs so they only appear in the
           relevant context. */}
-      <FeedVotesTabs />
       <FeedFilter active={active} onChange={setActive} />
       <Feed
         filter={filter}

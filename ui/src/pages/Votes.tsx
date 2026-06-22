@@ -11,7 +11,6 @@ import {
 import HubInfo from "../components/HubInfo";
 import ProcessCard from "../components/ProcessCard";
 import ProposalCard from "../components/ProposalCard";
-import FeedVotesTabs from "../components/FeedVotesTabs";
 
 /**
  * Slice 12 — Votes-page filter pills mirror the home-feed pattern.
@@ -117,7 +116,6 @@ export default function Votes() {
           site identity reads first, then the user picks what surface
           they want. Same component on the Home page; the active
           state comes from the URL via NavLink. */}
-      <FeedVotesTabs />
 
       <section className="section">
         <div className="section-header-row">

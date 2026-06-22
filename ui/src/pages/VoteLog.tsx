@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useParams, useSearchParams, Link } from "react-router-dom";
+import { useParams, useSearchParams } from "react-router-dom";
 import {
   getVoteLog,
   verifyReceipt,
@@ -62,11 +62,10 @@ export default function VoteLog() {
     }
   }
 
-  if (loading) return <p className="page detail-page">Loading...</p>;
-  if (error) return <p className="page detail-page error">Error: {error}</p>;
+  if (loading) return <p className="detail-page">Loading...</p>;
+  if (error) return <p className="detail-page error">Error: {error}</p>;
   if (!process || !id) return (
     <div className="page detail-page">
-      <Link to="/votes" className="back-link">&larr; Back to votes</Link>
       <p>Not found.</p>
     </div>
   );
@@ -75,9 +74,6 @@ export default function VoteLog() {
 
   return (
     <div className="page detail-page">
-      <Link to={`/process/${id}`} className="back-link">
-        &larr; Back to vote
-      </Link>
 
       <h1>Vote Log</h1>
       <p className="vote-log-subtitle">{process.title}</p>

@@ -1,19 +1,28 @@
 /* Projects listing page */
 
 .project-card {
-  padding: var(--space-sm) var(--space-md);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 1rem 1.25rem;
+  background: var(--card-background);
+  transition: border-color 0.15s;
+}
+
+.project-card:hover {
+  border-color: var(--border-hover);
 }
 
 .project-card-header {
   display: flex;
-  align-items: baseline;
-  gap: var(--space-sm);
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
 }
 
 .project-card-header h3 {
   flex: 1;
   margin: 0;
-  font-size: var(--font-size-base);
+  font-size: 1.05rem;
 }
 
 .project-sentiment-bar {

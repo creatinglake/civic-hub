@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useRef, useMemo } from "react";
-import { useParams, Link, useSearchParams, useNavigate } from "react-router-dom";
+import { useParams, useSearchParams, useNavigate } from "react-router-dom";
 import {
   getWordcloud,
   submitWordcloudResponse,
@@ -503,15 +503,11 @@ export default function WordCloud() {
   if (error)
     return (
       <div className="wordcloud-page">
-        <Link to="/" className="back-link">
-          &larr; Back
-        </Link>
         <p className="error">Error: {error}</p>
       </div>
     );
   if (!wc) return (
     <div className="page wordcloud-page">
-      <Link to="/" className="back-link">&larr; Home</Link>
       <p>Not found.</p>
     </div>
   );
@@ -520,17 +516,13 @@ export default function WordCloud() {
 
   return (
     <div className="wordcloud-page">
-      {isOnboarding ? (
+      {isOnboarding && (
         <button
           className="wordcloud-skip-btn"
           onClick={() => navigate("/")}
         >
           Skip &rarr;
         </button>
-      ) : (
-        <Link to="/" className="back-link back-link-sticky">
-          &larr; Back
-        </Link>
       )}
 
       {isOnboarding && !wc.has_submitted && (

@@ -1,12 +1,12 @@
 /* Propose listing page */
 
 .propose-action-btn {
-  background: #2e7d32;
+  background: var(--pill-vote-fg, #1e3a5f);
   color: #fff;
 }
 
 .propose-action-btn:hover {
-  background: #1b5e20;
+  background: var(--color-primary-hover, #14304a);
 }
 
 /* --- Keyword emphasis (shared with ProposeDraft.css) --- */

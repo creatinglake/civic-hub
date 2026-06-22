@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { listProjects, type ProjectSummary } from "../services/api";
 import HubInfo from "../components/HubInfo";
-import FeedVotesTabs from "../components/FeedVotesTabs";
 import "./Projects.css";
 
 export default function Projects() {
@@ -28,7 +27,6 @@ export default function Projects() {
   return (
     <div className="page page-home">
       <HubInfo />
-      <FeedVotesTabs />
 
       {loading && <p className="section">Loading...</p>}
       {error && <p className="section error">Failed to load: {error}</p>}

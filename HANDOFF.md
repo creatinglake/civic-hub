@@ -13,6 +13,55 @@ Updated after every Claude Code session. Records what was built, what's incomple
 
 ---
 
+## UI Polish & Navigation Overhaul — 2026-06-22
+
+**Status:** Mostly complete. Scroll-to-nav on sub-pages still not working reliably.
+
+### What was built
+
+**Word cloud fixes:**
+- Fixed oversized SVG flash on load — `CloudViz` defers SVG render until `ResizeObserver` measures the container (`dims` starts as `null`, SVG only renders after measurement). Commit `0c46838`.
+- Hidden "Add your response" form for users who already submitted. Commit `6b13f67`.
+- Simplified accordion labels — removed "Show" prefix, replaced text expand/collapse indicators with CSS chevron arrows (border-right/border-bottom trick, rotated). Commit `215fd54`.
+
+**Auth token persistence:**
+- Added `AuthError` class with `status` field to `ui/src/services/auth.ts`.
+- `AuthContext` now only clears the stored token on 401/403 responses; transient network/server errors preserve the session. Commit `5838dd9`.
+
+**Navigation UI overhaul:**
+- Compact CTA cards on all process pages (Propose, Votes, Projects, Conversations) — replaced large colored cards with inline section-header-row pattern (title left, pill button right). Shared styles in `App.css`.
+- Added vertical divider after "Feed" tab to visually separate it from the process tabs.
+- Fixed Feed tab label alignment (`line-height: 1`, `align-items: center`).
+- Added spacing between sticky tabs and page content (`.section:first-of-type { padding-top }`).
+- Commits `6665442`, `7606a04`, `c1109e1`.
+
+**Scroll-to-nav on sub-pages (in progress):**
+- Goal: clicking Conversations/Propose/Votes/Projects loads the page scrolled down so the sticky tab bar sits at viewport top.
+- `FeedVotesTabs.tsx` sets `history.scrollRestoration = "manual"` and retries `window.scrollTo` at 0/100/300/600ms to handle async content loading.
+- Commits `6686771`, `17bb7ff`.
+- **Still not working reliably** — the user reports that sub-pages still load with the banner visible at the top. Multiple approaches tried (rAF, double-rAF, setTimeout, retry with height check). Needs further debugging — possible causes: build caching on Vercel, late-loading components resetting scroll, or the scroll firing before route transition completes.
+
+### Files changed
+- `ui/src/pages/WordCloud.tsx` — SVG defer, hide form, accordion chevrons
+- `ui/src/pages/WordCloud.css` — chevron styles
+- `ui/src/services/auth.ts` — `AuthError` class
+- `ui/src/context/AuthContext.tsx` — conditional token clearing
+- `ui/src/components/FeedVotesTabs.tsx` — divider, scroll-to-nav
+- `ui/src/components/FeedVotesTabs.css` — divider, tab alignment
+- `ui/src/App.css` — section-header-row, section-action-btn, spacing
+- `ui/src/pages/Propose.tsx` — compact CTA
+- `ui/src/pages/Votes.tsx` — compact CTA, removed scroll restoration code
+- `ui/src/pages/Projects.tsx` — compact CTA
+- `ui/src/pages/Deliberations.tsx` — compact CTA
+- `ui/src/pages/Propose.css` — cleanup
+- `ui/src/pages/Projects.css` — cleanup
+
+### What's incomplete
+- **Scroll-to-nav** — not working reliably on deployed site. Needs further investigation.
+- **Feed tab alignment** — may still sit slightly higher than other tabs.
+
+---
+
 ## Step 2 Completion + Design System + Onboarding — 2026-06-19
 
 **Status:** Complete. Pushed to production. Vercel build fixed.

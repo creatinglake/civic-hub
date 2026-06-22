@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import { getCivicProposal, supportCivicProposal, type CivicProposalDetail } from "../services/api";
 import { useAuth } from "../context/AuthContext";
 import { useRequireAuth } from "../hooks/useRequireAuth";
@@ -7,6 +7,7 @@ import AuthModal from "../components/AuthModal";
 import ShareButton from "../components/ShareButton";
 import CommunityInputPanel from "../components/CommunityInputPanel";
 import ProposalCommentForm from "../components/ProposalCommentForm";
+
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString("en-US", {
@@ -82,7 +83,6 @@ export default function ProposalDetail() {
   if (error && !proposal) return <p className="detail-page error">Error: {error}</p>;
   if (!proposal) return (
     <div className="page detail-page">
-      <Link to="/propose" className="back-link">&larr; Back to proposals</Link>
       <p>Not found.</p>
     </div>
   );
@@ -92,8 +92,6 @@ export default function ProposalDetail() {
       {showAuthModal && (
         <AuthModal onComplete={handleAuthComplete} onDismiss={closeAuthModal} />
       )}
-
-      <Link to="/propose" className="back-link back-link-sticky">&larr; Proposals</Link>
 
       <div className="process-header">
         <h1>{proposal.title}</h1>

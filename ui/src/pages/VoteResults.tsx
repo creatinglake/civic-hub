@@ -63,9 +63,6 @@ export default function VoteResultsPage() {
   if (error || !results) {
     return (
       <div className="page vote-results-page">
-        <Link to="/votes" className="back-link back-link-sticky">
-          &larr; Back to votes
-        </Link>
         <p className="vote-results-status vote-results-status-error">
           {error ?? "Vote results not found."}
         </p>
@@ -94,9 +91,6 @@ export default function VoteResultsPage() {
 
   return (
     <article className="page vote-results-page">
-      <Link to="/" className="back-link">
-        &larr; Home
-      </Link>
 
       <header className="vote-results-header">
         <p className="vote-results-eyebrow">Vote results</p>

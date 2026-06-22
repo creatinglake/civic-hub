@@ -71,9 +71,6 @@ export default function AnnouncementPage() {
   if (error || !announcement) {
     return (
       <div className="page announcement-page">
-        <Link to="/" className="back-link">
-          &larr; Home
-        </Link>
         <p className="announcement-status announcement-status-error">
           {error ?? "Announcement not found."}
         </p>
@@ -132,9 +129,6 @@ export default function AnnouncementPage() {
 
   return (
     <article className="page announcement-page">
-      <Link to="/" className="back-link">
-        &larr; Home
-      </Link>
       <header className="announcement-header">
         <p className="announcement-eyebrow">
           {isAdminLabel ? "Announcement" : `${roleLabel} announcement`}

@@ -152,6 +152,12 @@
   margin-top: var(--space-xs, 0.25rem);
 }
 
+/* When a section only contains the header row (no list below it),
+   tighten bottom padding so the next section isn't too far away. */
+.section-header-row:last-child {
+  margin-bottom: 0;
+}
+
 .section-action-btn {
   display: inline-flex;
   align-items: center;
@@ -184,11 +190,11 @@
 }
 
 .projects-action-btn {
-  background: #1565c0;
+  background: var(--pill-vote-fg, #1e3a5f);
   color: #fff;
 }
 .projects-action-btn:hover {
-  background: #0d47a1;
+  background: var(--color-primary-hover, #14304a);
 }
 
 .deliberations-action-btn {
@@ -593,7 +599,7 @@
 /* --- Sections --- */
 
 .section {
-  padding: 0 1.5rem 2rem;
+  padding: 0 1.5rem 1.25rem;
 }
 
 .section:first-of-type {
@@ -691,6 +697,7 @@
 .detail-page {
   padding: 1.5rem;
 }
+
 
 .back-link {
   display: inline-block;
@@ -946,7 +953,7 @@
 /* --- Proposal card --- */
 
 .proposal-card {
-  border: 1px dashed var(--border-color);
+  border: 1px solid var(--border-color);
   border-radius: 8px;
   padding: 1rem 1.25rem;
   background: var(--card-background);
