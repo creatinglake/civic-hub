@@ -132,6 +132,20 @@ function escapeHtml(text: string): string {
     .replace(/'/g, "&#39;");
 }
 
+function formatDateUS(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleString("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+    timeZoneName: "short",
+  });
+}
+
 function renderOperatorEmail(s: FeedbackSubmission): string {
   const messageHtml = escapeHtml(s.message).replace(/\n/g, "<br>");
   const fromLabel =
@@ -142,15 +156,11 @@ function renderOperatorEmail(s: FeedbackSubmission): string {
         : s.name
           ? escapeHtml(s.name)
           : "Anonymous";
-  const userIdLine = s.user_id
-    ? `<p style="margin:0;color:#6b7280;font-size:12px;">Signed-in user: <code>${escapeHtml(s.user_id)}</code></p>`
-    : "";
   return `
     <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:560px;margin:0 auto;padding:24px;color:#1f2937;">
       <h1 style="font-size:18px;font-weight:600;margin:0 0 12px;">New Civic Hub feedback — ${escapeHtml(s.category)}</h1>
       <p style="margin:0 0 4px;color:#374151;"><strong>From:</strong> ${fromLabel}</p>
-      ${userIdLine}
-      <p style="margin:12px 0 4px;color:#374151;"><strong>Submitted:</strong> ${escapeHtml(s.created_at)}</p>
+      <p style="margin:12px 0 4px;color:#374151;"><strong>Submitted:</strong> ${escapeHtml(formatDateUS(s.created_at))}</p>
       <div style="margin:16px 0 0;padding:14px 18px;background:#f3f4f6;border-radius:8px;line-height:1.5;font-size:14px;">${messageHtml}</div>
       <p style="margin:20px 0 0;color:#6b7280;font-size:12px;">
         Submission id: <code>${escapeHtml(s.id)}</code>
