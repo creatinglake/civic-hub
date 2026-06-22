@@ -20,7 +20,7 @@ export type FeedFilterKey =
   | "all"
   | "vote"
   | "announcement"
-  | "vote_results"
+  | "activity"
   | "meeting_summary";
 
 export interface FeedFilterChoice {
@@ -39,9 +39,9 @@ const CHOICES: FeedFilterChoice[] = [
     pillClass: "feed-filter-pill--announcement",
   },
   {
-    key: "vote_results",
-    label: "Vote results",
-    pillClass: "feed-filter-pill--vote-results",
+    key: "activity",
+    label: "Activity",
+    pillClass: "feed-filter-pill--activity",
   },
   {
     key: "meeting_summary",
@@ -56,7 +56,7 @@ function isFilterKey(v: string | null): v is FeedFilterKey {
   return (
     v === "vote" ||
     v === "announcement" ||
-    v === "vote_results" ||
+    v === "activity" ||
     v === "meeting_summary"
   );
 }
@@ -138,7 +138,7 @@ export function buildFilterPredicate(
   return (event) => {
     if (event.event_type === "civic.process.started") {
       const data = event.data as { process?: { type?: string } };
-      if (data?.process?.type === "civic.wordcloud") return false;
+      if (data?.process?.type === "civic.wordcloud") return key === "activity";
       return key === "vote";
     }
     if (event.event_type === "civic.process.result_published") {
@@ -153,7 +153,7 @@ export function buildFilterPredicate(
         wordcloud_result?: unknown;
       };
       if (data.wordcloud_snapshot !== undefined || data.wordcloud_result !== undefined) {
-        return false;
+        return key === "activity";
       }
       if (data.announcement !== undefined) return key === "announcement";
       if (
@@ -166,7 +166,7 @@ export function buildFilterPredicate(
         typeof data.results_id === "string" ||
         typeof data.brief_id === "string"
       ) {
-        return key === "vote_results";
+        return key === "activity";
       }
     }
     return false;

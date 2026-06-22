@@ -14,7 +14,6 @@
   margin: 0 auto;
   background: var(--color-bg);
   min-height: 100vh;
-  overflow-x: clip;
 }
 
 /* Page shell — caps content width on wide viewports while letting

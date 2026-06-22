@@ -42,17 +42,19 @@ export default function WelcomeBanner() {
             Learn what this site is, how it works, and how you can
             participate in {hub.jurisdiction} civic life.
           </p>
-          <Link to="/welcome" className="welcome-banner-button">
-            Learn more
-          </Link>
+          <div className="welcome-banner-actions">
+            <Link to="/welcome" className="welcome-banner-button">
+              Learn more
+            </Link>
+            <button
+              type="button"
+              className="welcome-banner-dismiss"
+              onClick={handleDismiss}
+            >
+              Dismiss
+            </button>
+          </div>
         </div>
-        <button
-          type="button"
-          className="welcome-banner-dismiss"
-          onClick={handleDismiss}
-        >
-          Dismiss &times;
-        </button>
       </div>
     </section>
   );
