@@ -7,6 +7,8 @@
 
 .propose-action-btn:hover {
   background: var(--color-primary-hover, #14304a);
+  color: #fff;
+  text-decoration: none;
 }
 
 /* --- Keyword emphasis (shared with ProposeDraft.css) --- */

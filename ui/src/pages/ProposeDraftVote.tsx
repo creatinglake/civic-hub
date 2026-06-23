@@ -390,6 +390,7 @@ export default function ProposeDraftVote() {
                 draft={draft}
                 onFieldChange={handleFieldChange}
                 onDurationChange={handleDurationChange}
+                onMethodChange={handleMethodChange}
                 onReview={handleReview}
                 onSubmit={handleSubmit}
                 disabled={submitting}
