@@ -9,6 +9,16 @@ import {
   type ProcessState,
 } from "../services/api";
 
+function formatChoice(raw: string): string {
+  if (raw.startsWith("[")) {
+    try {
+      const arr = JSON.parse(raw) as string[];
+      return arr.join(", ");
+    } catch { /* fall through */ }
+  }
+  return raw;
+}
+
 export default function VoteLog() {
   const { id } = useParams<{ id: string }>();
   const [searchParams] = useSearchParams();
@@ -116,7 +126,7 @@ export default function VoteLog() {
                   <>
                     <p className="receipt-result-title">Receipt found</p>
                     <p className="receipt-result-choice">
-                      Vote: {searchResult.choice}
+                      Vote: {formatChoice(searchResult.choice!)}
                     </p>
                   </>
                 ) : (
@@ -157,7 +167,7 @@ export default function VoteLog() {
                   }`}
                 >
                   <span className="vote-log-receipt">{entry.receipt_id}</span>
-                  <span className="vote-log-choice">{entry.choice}</span>
+                  <span className="vote-log-choice">{formatChoice(entry.choice)}</span>
                 </div>
               ))}
             </div>

@@ -1,4 +1,4 @@
-import { useCallback, useRef } from "react";
+import { useCallback, useRef, useState } from "react";
 import type { VoteDraft, DraftSuggestion } from "../services/api";
 import "./DraftingForm.css";
 import "./VoteDraftingForm.css";
@@ -7,6 +7,7 @@ interface Props {
   draft: VoteDraft;
   onFieldChange: (field: string, value: string) => void;
   onDurationChange: (ms: number) => void;
+  onMethodChange: (method: string, options: string[] | null) => void;
   onReview: () => void;
   onSubmit: () => void;
   disabled: boolean;
@@ -21,6 +22,11 @@ const DURATION_OPTIONS = [
   { label: "3 months", ms: 90 * 24 * 60 * 60 * 1000 },
 ];
 
+const METHOD_OPTIONS = [
+  { key: "yes_no_unsure", label: "Yes / No / Unsure" },
+  { key: "approval", label: "Approval (pick from options)" },
+];
+
 const PLACEHOLDERS = {
   title: "e.g., Should Floyd County add sidewalks on Main Street between First and Third?",
   description:
@@ -31,6 +37,16 @@ const PLACEHOLDERS = {
 function getStatusText(draft: VoteDraft, reviewFailed?: boolean): string {
   if (!draft.title.trim()) {
     return "Status: Title is required";
+  }
+
+  if (draft.method === "approval") {
+    const opts = draft.custom_options ?? [];
+    if (opts.length < 2) {
+      return "Status: At least 2 options are required for approval voting";
+    }
+    if (opts.some((o) => !o.trim())) {
+      return "Status: All options must have text";
+    }
   }
 
   if (draft.last_review_result === null && reviewFailed) {
@@ -57,6 +73,10 @@ function getStatusText(draft: VoteDraft, reviewFailed?: boolean): string {
 
 function getStatusClass(draft: VoteDraft, reviewFailed?: boolean): string {
   if (!draft.title.trim()) return "status-missing";
+  if (draft.method === "approval") {
+    const opts = draft.custom_options ?? [];
+    if (opts.length < 2 || opts.some((o) => !o.trim())) return "status-missing";
+  }
   if (draft.last_review_result === null && reviewFailed) return "status-error";
   if (draft.last_review_result === null) return "status-pending";
   if (draft.draft_modified_since_review) return "status-modified";
@@ -71,6 +91,7 @@ export default function VoteDraftingForm({
   draft,
   onFieldChange,
   onDurationChange,
+  onMethodChange,
   onReview,
   onSubmit,
   disabled,
@@ -78,6 +99,9 @@ export default function VoteDraftingForm({
   reviewFailed,
 }: Props) {
   const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const [localOptions, setLocalOptions] = useState<string[]>(
+    draft.custom_options ?? ["", ""],
+  );
 
   const handleChange = useCallback(
     (field: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -90,8 +114,46 @@ export default function VoteDraftingForm({
     [onFieldChange],
   );
 
+  function handleMethodSelect(method: string) {
+    if (method === "approval") {
+      const opts = localOptions.length >= 2 ? localOptions : ["", ""];
+      setLocalOptions(opts);
+      onMethodChange(method, opts);
+    } else {
+      onMethodChange(method, null);
+    }
+  }
+
+  function handleOptionChange(index: number, value: string) {
+    const updated = [...localOptions];
+    updated[index] = value;
+    setLocalOptions(updated);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      onMethodChange(draft.method, updated);
+    }, 800);
+  }
+
+  function addOption() {
+    const updated = [...localOptions, ""];
+    setLocalOptions(updated);
+    onMethodChange(draft.method, updated);
+  }
+
+  function removeOption(index: number) {
+    if (localOptions.length <= 2) return;
+    const updated = localOptions.filter((_, i) => i !== index);
+    setLocalOptions(updated);
+    onMethodChange(draft.method, updated);
+  }
+
+  const approvalOptionsValid = draft.method !== "approval" ||
+    ((draft.custom_options ?? []).length >= 2 &&
+      (draft.custom_options ?? []).every((o) => o.trim()));
+
   const canSubmit =
     draft.title.trim() &&
+    approvalOptionsValid &&
     draft.last_review_result !== null &&
     !draft.draft_modified_since_review &&
     !(draft.last_review_result ?? []).some((s: DraftSuggestion) => s.severity === "hard") &&
@@ -100,6 +162,30 @@ export default function VoteDraftingForm({
   return (
     <div className="drafting-form">
       <div className="drafting-form-scroll">
+        <div className="form-field">
+          <label className="form-label">
+            Voting method
+          </label>
+          <div className="method-selector">
+            {METHOD_OPTIONS.map((m) => (
+              <button
+                key={m.key}
+                type="button"
+                className={`method-option ${draft.method === m.key ? "method-option-selected" : ""}`}
+                onClick={() => handleMethodSelect(m.key)}
+                disabled={disabled}
+              >
+                {m.label}
+              </button>
+            ))}
+          </div>
+          <p className="form-hint">
+            {draft.method === "approval"
+              ? "Voters can approve any number of the options you define below."
+              : "Voters choose Yes, No, or Unsure."}
+          </p>
+        </div>
+
         <div className="form-field">
           <label htmlFor="draft-title" className="form-label">
             Vote question <span className="required">*</span>
@@ -110,11 +196,56 @@ export default function VoteDraftingForm({
             className="form-input"
             defaultValue={draft.title}
             onChange={handleChange("title")}
-            placeholder={PLACEHOLDERS.title}
+            placeholder={draft.method === "approval"
+              ? "e.g., Which improvements should Floyd County prioritize for Main Street?"
+              : PLACEHOLDERS.title}
             maxLength={200}
             disabled={disabled}
           />
         </div>
+
+        {draft.method === "approval" && (
+          <div className="form-field">
+            <label className="form-label">
+              Options <span className="required">*</span>
+              <span className="form-label-note"> (at least 2)</span>
+            </label>
+            <div className="approval-options-editor">
+              {localOptions.map((opt, i) => (
+                <div key={i} className="approval-option-row">
+                  <input
+                    type="text"
+                    className="form-input approval-option-input"
+                    value={opt}
+                    onChange={(e) => handleOptionChange(i, e.target.value)}
+                    placeholder={`Option ${i + 1}`}
+                    maxLength={200}
+                    disabled={disabled}
+                  />
+                  {localOptions.length > 2 && (
+                    <button
+                      type="button"
+                      className="approval-option-remove"
+                      onClick={() => removeOption(i)}
+                      disabled={disabled}
+                      aria-label={`Remove option ${i + 1}`}
+                    >
+                      &times;
+                    </button>
+                  )}
+                </div>
+              ))}
+              <button
+                type="button"
+                className="approval-option-add"
+                onClick={addOption}
+                disabled={disabled}
+              >
+                + Add option
+              </button>
+            </div>
+          </div>
+        )}
 
         <div className="form-field">
           <label htmlFor="draft-description" className="form-label">

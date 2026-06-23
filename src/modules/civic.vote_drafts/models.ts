@@ -9,6 +9,8 @@ export interface VoteDraft {
   description: string;
   sources: string;
   voting_duration_ms: number;
+  method: string; // "yes_no_unsure" | "approval"
+  custom_options: string[] | null;
   conversation_history: Array<{ role: "user" | "assistant"; content: string }>;
   last_review_result: Suggestion[] | null;
   draft_modified_since_review: boolean;
@@ -27,5 +29,7 @@ export interface UpdateVoteDraftInput {
   description?: string;
   sources?: string;
   voting_duration_ms?: number;
+  method?: string;
+  custom_options?: string[] | null;
   skip_modified_flag?: boolean;
 }

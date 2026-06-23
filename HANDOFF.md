@@ -4,6 +4,65 @@ Updated after every Claude Code session. Records what was built, what's incomple
 
 ---
 
+## Pluggable Voting Methods + Approval Voting — 2026-06-23
+
+**Status:** Complete. Backend, frontend, and unit tests all in place. Migration ready.
+
+### What was built
+
+Upgraded `civic.vote` to support pluggable voting methods via a sub-registry pattern, and added **approval voting** as the first new method alongside the existing yes/no/unsure.
+
+**Backend:**
+- `src/modules/civic.vote/methods.ts` — VotingMethod interface and sub-registry with two implementations: `yes_no_unsure` (default, backward-compatible) and `approval` (multi-select, creator-defined options)
+- `src/modules/civic.vote/models.ts` — Added `method` field to VoteProcessState, widened votes type to `string | string[]`
+- `src/modules/civic.vote/results.ts` — Delegates to method registry for tally computation
+- `src/modules/civic.vote/index.ts` — Full rewrite of `submitVote`/`closeVote`/`finalizeVote`/`getReadModel` to dispatch through method registry
+- `src/modules/civic.vote/events.ts` — Events include `method` in data payloads
+- `src/processes/voteProcess.ts` — Reads method from state, routes ballot input (`payload.selections` for approval, `payload.option` for yes_no_unsure)
+- `src/modules/civic.vote_drafts/` — Model, index, and controller updated to handle `method` + `custom_options` fields through CRUD and submission
+- `src/modules/civic.vote_results/` — VoteContextSnapshot carries `method`; snapshotted at results creation
+- `supabase/migrations/20260623000000_vote_method.sql` — Adds `method TEXT` and `custom_options JSONB` to `vote_drafts` table
+
+**Frontend:**
+- `VoteDraftingForm.tsx` — Method selector (toggle buttons: Yes/No/Unsure vs Approval) and dynamic option editor for approval voting
+- `VoteDraftingForm.css` — Styles for method selector and approval options editor
+- `ProposeDraftVote.tsx` — Wired `onMethodChange` handler, confirmation modal shows method + options
+- `VotePanel.tsx` — Approval ballot with checkboxes, submit button, shows "You approved: X, Y" in receipt; tally note for approval percentages
+- `VoteLog.tsx` — `formatChoice()` deserializes JSON array choices for display
+- `VoteResults.tsx` — Notes approval voting method in participation line
+- `App.css` — Approval ballot CSS (checkbox cards, submit button, method note)
+- `api.ts` — Added `submitApprovalVote()`, updated VoteState/VoteDraft types for method
+
+**Tests:**
+- `tests/unit/voting-methods.test.ts` — 32 unit tests covering both methods: validation, tally, serialization, same-ballot detection, edge cases
+- `vitest.config.ts` — Expanded include to cover `tests/unit/**/*.test.ts`
+
+### Backward compatibility
+
+- Missing `method` defaults to `"yes_no_unsure"` everywhere via `resolveMethod()` helper
+- No process state migration needed (JSONB field defaults are handled in code)
+- Existing votes, events, and receipts unaffected
+- Receipt system is opaque — stores serialized choice as TEXT (bare string for yes_no_unsure, JSON array for approval)
+
+### Architecture decisions
+
+- **Sub-registry pattern:** Each VotingMethod owns ballot validation, tally computation, and receipt serialization. Adding ranked-choice or score voting only requires implementing the interface and registering it — no other file changes needed.
+- **Tally semantics for approval:** `total_votes` = number of voters (not sum of approvals). Percentages represent "% of voters who approved this option" and can sum to >100%.
+- **One ballot per voter, changeable while active, secret/display-anonymous** — same privacy model as yes_no_unsure.
+
+### What's incomplete
+
+- No integration/E2E tests yet for approval voting (requires running server + DB with the new migration applied)
+- Seed data for demo doesn't include an approval vote yet
+- Admin vote results review UI (`AdminVoteResults.tsx`) not updated with approval-specific copy
+
+### Open questions
+
+- Should the method selector be available on proposal-required votes, or only direct-activation votes?
+- Should approval voting results show a "winner" indicator (option with most approvals)?
+
+---
+
 ## Deployment Summary
 
 - **Live at:** https://demo-hub.civic.social

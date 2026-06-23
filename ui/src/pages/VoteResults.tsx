@@ -216,7 +216,8 @@ export default function VoteResultsPage() {
         <h2>Results</h2>
         <p className="vote-results-participation">
           <strong>{results.participation_count}</strong>{" "}
-          resident{results.participation_count === 1 ? "" : "s"} voted.
+          resident{results.participation_count === 1 ? "" : "s"} voted
+          {ctx?.method === "approval" ? " (approval voting — each voter could approve multiple options)" : ""}.
         </p>
         <ul className="brief-bars">
           {results.position_breakdown.map((p) => (

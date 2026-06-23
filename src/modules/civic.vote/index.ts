@@ -19,6 +19,7 @@ import type {
 } from "./models.js";
 import { assertTransition, isVotingOpen, isAcceptingSupport, isTerminal } from "./lifecycle.js";
 import { computeTally } from "./results.js";
+import { getVotingMethod, DEFAULT_METHOD, type Ballot } from "./methods.js";
 import {
   emitProposed,
   emitThresholdMet,
@@ -32,6 +33,8 @@ import {
 export type { VoteConfig, VoteProcessState, VoteResult, EmitEventFn, ActionOutcome } from "./models.js";
 export { canTransition, isVotingOpen, isAcceptingSupport, isTerminal } from "./lifecycle.js";
 export { computeTally } from "./results.js";
+export { getVotingMethod, getAvailableMethods, DEFAULT_METHOD } from "./methods.js";
+export type { VotingMethod, Ballot } from "./methods.js";
 
 // --- Process Descriptor ---
 // Static metadata describing the civic.vote process type, its lifecycle,
@@ -59,6 +62,7 @@ export const PROCESS_DESCRIPTOR = {
     support_threshold: { type: "number", default: 5, description: "Endorsements required before activation" },
     voting_duration_ms: { type: "number", default: 259200000, description: "Voting window duration in milliseconds (default: 3 days)" },
     activation_mode: { type: "string", enum: ["direct", "proposal_required"], default: "direct", description: "Controls which lifecycle path is available" },
+    method: { type: "string", enum: ["yes_no_unsure", "approval"], default: "yes_no_unsure", description: "Voting method (determines ballot shape and tally algorithm)" },
   },
   events: [
     "civic.process.proposed",
@@ -75,16 +79,34 @@ export const PROCESS_DESCRIPTOR = {
 const DEFAULT_VOTING_DURATION_MS = 3 * 24 * 60 * 60 * 1000;
 const DEFAULT_SUPPORT_THRESHOLD = 5;
 
+// --- Helpers -----------------------------------------------------------------
+
+/** Resolve the method for a state, defaulting for backward compat */
+function resolveMethod(state: VoteProcessState): string {
+  return state.method ?? DEFAULT_METHOD;
+}
+
 // --- Factory ---
 
 export function createVoteState(
   input: Record<string, unknown>,
   config?: Partial<VoteConfig>
 ): VoteProcessState {
-  const options = (input.options as string[]) ?? ["yes", "no"];
+  const methodKey = (input.method as string | undefined) ?? DEFAULT_METHOD;
+  const method = getVotingMethod(methodKey);
+
+  const inputOptions = input.options as string[] | undefined;
+  const options = inputOptions ?? method.defaultOptions ?? [];
+
+  if (options.length < method.minOptions) {
+    throw new Error(
+      `Voting method "${methodKey}" requires at least ${method.minOptions} options, got ${options.length}`,
+    );
+  }
 
   return {
     type: "civic.vote",
+    method: methodKey,
     status: "draft",
     options,
     votes: {},
@@ -245,11 +267,12 @@ export async function activate(
 
 /**
  * Submit a vote during the active period.
+ * Delegates ballot validation to the voting method.
  */
 export async function submitVote(
   state: VoteProcessState,
   actor: string,
-  option: string,
+  ballotInput: unknown,
   ctx: ProcessContext
 ): Promise<ActionOutcome> {
   if (!isVotingOpen(state.status)) {
@@ -262,30 +285,25 @@ export async function submitVote(
     throw new Error("Cannot submit vote: voting window has expired");
   }
 
-  if (!option) {
-    throw new Error("process.vote requires payload.option");
-  }
+  const methodKey = resolveMethod(state);
+  const method = getVotingMethod(methodKey);
 
-  if (!state.options.includes(option)) {
-    throw new Error(
-      `Invalid option "${option}". Valid options: ${state.options.join(", ")}`
-    );
-  }
+  const ballot = method.validateBallot(ballotInput, state.options);
 
-  const previous_vote = state.votes[actor] ?? null;
+  const previousBallot = state.votes[actor] ?? null;
 
   // No-op: re-submitting the same choice is treated as a confirmation,
   // not a state change. Skip the event so the audit log doesn't fill
   // with redundant entries when residents click their current option.
-  if (previous_vote === option) {
-    return { state, result: { option, previous_vote, unchanged: true } };
+  if (previousBallot !== null && method.isSameBallot(previousBallot as Ballot, ballot)) {
+    return { state, result: { ballot, previous_ballot: previousBallot, unchanged: true } };
   }
 
-  state.votes[actor] = option;
+  state.votes[actor] = ballot;
 
-  await emitVoteSubmitted(ctx, actor, option, previous_vote);
+  await emitVoteSubmitted(ctx, actor, method.serializeForReceipt(ballot), previousBallot !== null ? method.serializeForReceipt(previousBallot as Ballot) : null);
 
-  return { state, result: { option, previous_vote } };
+  return { state, result: { ballot, previous_ballot: previousBallot } };
 }
 
 /**
@@ -295,8 +313,7 @@ export async function submitVote(
  * Emits Phase 3→4 boundary events: `ended` (participation closed) and
  * `aggregation_completed` (tally produced). Does NOT emit
  * `result_published` — that only fires once an accompanying
- * civic.vote_results record (formerly civic.brief, pre-Slice-8.5) has
- * been approved by an admin, via finalizeVote().
+ * civic.vote_results record has been approved by an admin, via finalizeVote().
  */
 export async function closeVote(
   state: VoteProcessState,
@@ -306,13 +323,12 @@ export async function closeVote(
   assertTransition(state.status, "closed", state.config.activation_mode);
 
   state.status = "closed";
-  const result = computeTally(state.votes, state.options);
-  // Tally is computed over distinct voter identities (keys of state.votes),
-  // so participant_count == Object.keys(state.votes).length.
+  const methodKey = resolveMethod(state);
+  const result = computeTally(state.votes, state.options, methodKey);
   const participantCount = Object.keys(state.votes).length;
 
   await emitEnded(ctx, actor, result);
-  await emitAggregationCompleted(ctx, actor, result, participantCount);
+  await emitAggregationCompleted(ctx, actor, result, participantCount, methodKey);
 
   return {
     state,
@@ -326,9 +342,7 @@ export async function closeVote(
  *
  * Library-only entry point: there is no HTTP action wired to this. The
  * civic.vote_results module's approval flow calls this directly once an
- * admin has reviewed and approved the accompanying record. Result
- * publication is therefore gated on admin approval; no caller outside
- * the vote-results flow should be able to reach this function.
+ * admin has reviewed and approved the accompanying record.
  */
 export async function finalizeVote(
   state: VoteProcessState,
@@ -337,7 +351,8 @@ export async function finalizeVote(
 ): Promise<ActionOutcome> {
   assertTransition(state.status, "finalized", state.config.activation_mode);
 
-  const result = computeTally(state.votes, state.options);
+  const methodKey = resolveMethod(state);
+  const result = computeTally(state.votes, state.options, methodKey);
   state.status = "finalized";
   state.result = result;
 
@@ -360,7 +375,8 @@ export function getReadModel(
   processMeta: { id: string; title: string; description: string; createdAt: string; createdBy: string },
   actor?: string
 ): Record<string, unknown> {
-  const tally = computeTally(state.votes, state.options);
+  const methodKey = resolveMethod(state);
+  const tally = computeTally(state.votes, state.options, methodKey);
   const hasVoted = actor ? actor in state.votes : null;
   const hasSupported = actor ? actor in state.supporters : null;
   const yourCurrentVote = actor ? state.votes[actor] ?? null : null;
@@ -374,6 +390,7 @@ export function getReadModel(
   return {
     id: processMeta.id,
     type: "civic.vote",
+    method: methodKey,
     title: processMeta.title,
     description: processMeta.description,
     status: state.status,
@@ -402,6 +419,7 @@ export function getSummary(
   return {
     id: processMeta.id,
     type: "civic.vote",
+    method: resolveMethod(state),
     title: processMeta.title,
     status: processMeta.status,
     total_votes: Object.keys(state.votes).length,

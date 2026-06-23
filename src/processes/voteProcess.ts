@@ -17,7 +17,10 @@ import {
   closeVote,
   getReadModel,
   getSummary,
+  getVotingMethod,
+  DEFAULT_METHOD,
   type VoteProcessState,
+  type Ballot,
 } from "../modules/civic.vote/index.js";
 import {
   recordOrUpdateVote,
@@ -107,6 +110,7 @@ async function spawnVoteResultsFromClosedVote(
       vote_title: voteProcess.title,
       vote_description: voteProcess.description,
       vote_options: voteOptions,
+      vote_method: voteState.method ?? DEFAULT_METHOD,
       vote_starts_at: voteState.voting_opens_at,
       vote_ends_at: voteState.voting_closes_at,
       vote_content: voteProcess.content ?? null,
@@ -188,13 +192,17 @@ const voteProcess: ProcessHandler = {
         break;
       }
       case "process.vote": {
-        const option = action.payload.option as string;
-        const outcome = await submitVote(state, action.actor, option, ctx);
+        // For yes_no_unsure: payload.option (string)
+        // For approval: payload.selections (string[])
+        const methodKey = state.method ?? DEFAULT_METHOD;
+        const ballotInput = methodKey === "approval"
+          ? action.payload.selections
+          : action.payload.option;
+        const outcome = await submitVote(state, action.actor, ballotInput, ctx);
         syncStatus(process, outcome.state);
 
-        // Same-option re-submit short-circuits in the lifecycle module —
-        // no receipt churn needed. Look up the existing receipt so the
-        // UI can echo it back unchanged.
+        // Same-ballot re-submit short-circuits in the lifecycle module —
+        // no receipt churn needed.
         if (outcome.result.unchanged) {
           result = { ...outcome.result };
           break;
@@ -203,7 +211,9 @@ const voteProcess: ProcessHandler = {
         // Record (or update) the user's receipt. receipt_id stays stable
         // across changes so a previously-shown receipt always verifies
         // to the current choice.
-        const receipt = await recordOrUpdateVote(process.id, action.actor, option);
+        const method = getVotingMethod(methodKey);
+        const serialized = method.serializeForReceipt(outcome.result.ballot as Ballot);
+        const receipt = await recordOrUpdateVote(process.id, action.actor, serialized);
 
         result = {
           ...outcome.result,

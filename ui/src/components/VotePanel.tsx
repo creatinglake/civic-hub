@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import type { VoteState } from "../services/api";
-import { submitVote, supportVote, unsupportVote, submitInput } from "../services/api";
+import { submitVote, submitApprovalVote, supportVote, unsupportVote, submitInput } from "../services/api";
 import { useRequireAuth } from "../hooks/useRequireAuth";
 import AuthModal from "./AuthModal";
 
@@ -16,12 +16,13 @@ interface Props {
 export default function VotePanel({ process, actor, onVoted }: Props) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [justVoted, setJustVoted] = useState<string | null>(null);
+  const [justVoted, setJustVoted] = useState<string | string[] | null>(null);
   const [voteWasUpdated, setVoteWasUpdated] = useState(false);
   const [receiptId, setReceiptId] = useState<string | null>(null);
   const [comment, setComment] = useState("");
   const [commentSubmitted, setCommentSubmitted] = useState(false);
   const [commentWarning, setCommentWarning] = useState<string | null>(null);
+  const [approvalSelections, setApprovalSelections] = useState<Set<string>>(new Set());
   const { requireAuth, showAuthModal, closeAuthModal, handleAuthComplete } = useRequireAuth();
 
   const isActive = process.status === "active";
@@ -29,6 +30,7 @@ export default function VotePanel({ process, actor, onVoted }: Props) {
   const isProposed = process.status === "proposed";
   const isThresholdMet = process.status === "threshold_met";
   const canSeeResults = process.tally !== null;
+  const isApproval = process.method === "approval";
 
   async function doVote(option: string) {
     setLoading(true);
@@ -42,24 +44,7 @@ export default function VotePanel({ process, actor, onVoted }: Props) {
       setJustVoted(option);
       setVoteWasUpdated(updated);
       if (receipt) setReceiptId(receipt);
-
-      // If the resident also typed a comment, submit it after the vote
-      // succeeds. Parallel data stream via civic.input — a comment failure
-      // does NOT roll back the vote; we surface a non-fatal warning instead.
-      const trimmed = comment.trim();
-      if (trimmed.length > 0) {
-        try {
-          await submitInput(process.id, actor, trimmed);
-          setCommentSubmitted(true);
-          setComment("");
-        } catch (commentErr) {
-          const msg = commentErr instanceof Error ? commentErr.message : "Failed to submit comment";
-          setCommentWarning(
-            `Your vote was recorded, but the comment couldn't be saved: ${msg}`,
-          );
-        }
-      }
-
+      await submitCommentIfPresent();
       onVoted();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Vote failed");
@@ -68,8 +53,63 @@ export default function VotePanel({ process, actor, onVoted }: Props) {
     }
   }
 
+  async function doApprovalVote() {
+    const selections = Array.from(approvalSelections);
+    if (selections.length === 0) {
+      setError("Select at least one option");
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    setCommentWarning(null);
+    try {
+      const result = await submitApprovalVote(process.id, actor, selections);
+      const resultPayload = result.result as Record<string, unknown>;
+      const receipt = resultPayload?.receipt_id as string | undefined;
+      const updated = resultPayload?.vote_updated === true;
+      setJustVoted(selections);
+      setVoteWasUpdated(updated);
+      if (receipt) setReceiptId(receipt);
+      await submitCommentIfPresent();
+      onVoted();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Vote failed");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function submitCommentIfPresent() {
+    const trimmed = comment.trim();
+    if (trimmed.length > 0) {
+      try {
+        await submitInput(process.id, actor, trimmed);
+        setCommentSubmitted(true);
+        setComment("");
+      } catch (commentErr) {
+        const msg = commentErr instanceof Error ? commentErr.message : "Failed to submit comment";
+        setCommentWarning(
+          `Your vote was recorded, but the comment couldn't be saved: ${msg}`,
+        );
+      }
+    }
+  }
+
   function handleVote(option: string) {
     requireAuth(() => doVote(option));
+  }
+
+  function handleApprovalSubmit() {
+    requireAuth(() => doApprovalVote());
+  }
+
+  function toggleApprovalOption(option: string) {
+    setApprovalSelections((prev) => {
+      const next = new Set(prev);
+      if (next.has(option)) next.delete(option);
+      else next.add(option);
+      return next;
+    });
   }
 
   async function doSupport() {
@@ -100,6 +140,12 @@ export default function VotePanel({ process, actor, onVoted }: Props) {
     } finally {
       setLoading(false);
     }
+  }
+
+  function formatCurrentVote(vote: string | string[] | null): string | null {
+    if (vote === null) return null;
+    if (Array.isArray(vote)) return vote.join(", ");
+    return vote;
   }
 
   return (
@@ -167,9 +213,6 @@ export default function VotePanel({ process, actor, onVoted }: Props) {
 
       {/* Active voting */}
       {isActive && (() => {
-        // The user's current choice — local optimistic state takes
-        // precedence so the UI updates immediately on click; falls back
-        // to the server-side read model.
         const currentVote = justVoted ?? process.your_current_vote;
         const hasExistingVote = currentVote !== null;
 
@@ -203,18 +246,56 @@ export default function VotePanel({ process, actor, onVoted }: Props) {
             </div>
           )}
 
-          <div className="vote-buttons">
-            {process.options.map((option) => (
+          {/* Yes/No/Unsure — original button-per-option */}
+          {!isApproval && (
+            <div className="vote-buttons">
+              {process.options.map((option) => (
+                <button
+                  key={option}
+                  className={`vote-button ${currentVote === option ? "voted" : ""}`}
+                  onClick={() => handleVote(option)}
+                  disabled={loading}
+                >
+                  {option}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Approval — checkboxes + submit */}
+          {isApproval && (
+            <div className="approval-ballot">
+              <p className="approval-instruction">Select all options you approve of:</p>
+              <div className="approval-choices">
+                {process.options.map((option) => {
+                  const isSelected = approvalSelections.has(option);
+                  const wasVoted = Array.isArray(currentVote) && currentVote.includes(option);
+                  return (
+                    <label
+                      key={option}
+                      className={`approval-choice ${isSelected ? "approval-choice-selected" : ""} ${wasVoted && !justVoted ? "approval-choice-previous" : ""}`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => toggleApprovalOption(option)}
+                        disabled={loading}
+                      />
+                      <span className="approval-choice-label">{option}</span>
+                    </label>
+                  );
+                })}
+              </div>
               <button
-                key={option}
-                className={`vote-button ${currentVote === option ? "voted" : ""}`}
-                onClick={() => handleVote(option)}
-                disabled={loading}
+                className="approval-submit-btn"
+                onClick={handleApprovalSubmit}
+                disabled={loading || approvalSelections.size === 0}
               >
-                {option}
+                {loading ? "Submitting..." : hasExistingVote ? "Update vote" : "Submit vote"}
               </button>
-            ))}
-          </div>
+            </div>
+          )}
+
           {justVoted && commentSubmitted && (
             <p className="vote-confirmation">
               Your vote and comment have been submitted.
@@ -233,6 +314,11 @@ export default function VotePanel({ process, actor, onVoted }: Props) {
               <p className="vote-receipt-title">
                 {voteWasUpdated ? "Your vote has been updated" : "Your vote has been recorded"}
               </p>
+              {isApproval && currentVote && (
+                <p className="vote-receipt-choices">
+                  You approved: {formatCurrentVote(currentVote)}
+                </p>
+              )}
               <p className="vote-receipt-explanation">
                 This is your anonymous vote receipt. You can use it to verify that
                 your vote was included in the final results. Your identity is not
@@ -276,6 +362,11 @@ export default function VotePanel({ process, actor, onVoted }: Props) {
       {(isActive || isDone) && (
         <div className="vote-tally">
           <h4>Results</h4>
+          {isApproval && canSeeResults && (
+            <p className="tally-method-note">
+              Approval voting — percentages show the share of voters who approved each option.
+            </p>
+          )}
           {canSeeResults ? (
             <>
               {process.options.map((option) => {
@@ -288,7 +379,7 @@ export default function VotePanel({ process, actor, onVoted }: Props) {
                     <div className="tally-bar-track">
                       <div
                         className="tally-bar-fill"
-                        style={{ width: `${pct}%` }}
+                        style={{ width: `${Math.min(pct, 100)}%` }}
                       />
                     </div>
                     <span className="tally-count">

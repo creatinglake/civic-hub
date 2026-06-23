@@ -40,6 +40,7 @@ export interface VoteResultsPositionBreakdown {
  */
 export interface VoteContextSnapshot {
   description: string;
+  method?: string; // "yes_no_unsure" | "approval" — absent on legacy records
   options: Array<{ option_id: string; option_label: string }>;
   starts_at: string | null;
   ends_at: string | null;
@@ -177,6 +178,7 @@ export interface CreateVoteResultsFromVoteInput {
   vote_title: string;
   vote_description: string;
   vote_options: Array<{ option_id: string; option_label: string }>;
+  vote_method?: string; // "yes_no_unsure" | "approval" — absent on legacy calls
   vote_starts_at: string | null;
   vote_ends_at: string | null;
   tally: Record<string, number>; // option → count

@@ -61,6 +61,7 @@ function generateVoteResultsContent(
   }));
   const vote_context: VoteContextSnapshot = {
     description: input.vote_description,
+    method: input.vote_method ?? "yes_no_unsure",
     options: input.vote_options,
     starts_at: input.vote_starts_at,
     ends_at: input.vote_ends_at,

@@ -34,3 +34,112 @@
   opacity: 0.5;
   cursor: not-allowed;
 }
+
+/* Method selector */
+
+.method-selector {
+  display: flex;
+  gap: var(--space-sm);
+}
+
+.method-option {
+  flex: 1;
+  padding: var(--space-sm) var(--space-md);
+  font-size: var(--font-size-sm);
+  font-family: var(--font-body);
+  color: var(--color-text-muted);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.method-option:hover:not(:disabled) {
+  border-color: var(--color-border-hover);
+}
+
+.method-option-selected {
+  border-color: var(--color-primary);
+  background: var(--pill-vote-bg);
+  color: var(--color-text);
+  font-weight: 500;
+}
+
+.method-option:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Approval options editor */
+
+.approval-options-editor {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.approval-option-row {
+  display: flex;
+  gap: var(--space-xs);
+  align-items: center;
+}
+
+.approval-option-input {
+  flex: 1;
+}
+
+.approval-option-remove {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  font-size: 1.25rem;
+  line-height: 1;
+  color: var(--color-text-muted);
+  background: none;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.approval-option-remove:hover:not(:disabled) {
+  color: var(--color-error, #dc2626);
+  border-color: var(--color-border);
+}
+
+.approval-option-remove:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.approval-option-add {
+  align-self: flex-start;
+  padding: var(--space-xs) var(--space-sm);
+  font-size: var(--font-size-sm);
+  font-family: var(--font-body);
+  color: var(--color-primary);
+  background: none;
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: border-color 0.15s ease;
+}
+
+.approval-option-add:hover:not(:disabled) {
+  border-color: var(--color-primary);
+}
+
+.approval-option-add:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.form-label-note {
+  font-weight: 400;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+}

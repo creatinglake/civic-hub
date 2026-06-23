@@ -135,6 +135,7 @@ export type ProcessSummary = VoteSummary | ProposalSummary | PublishedVoteResult
 export interface VoteState {
   id: string;
   type: "civic.vote";
+  method: string; // "yes_no_unsure" | "approval"
   title: string;
   description: string;
   status: VoteProcessStatus;
@@ -142,7 +143,7 @@ export interface VoteState {
   tally: Record<string, number> | null;
   total_votes: number | null;
   has_voted: boolean | null;
-  your_current_vote: string | null;
+  your_current_vote: string | string[] | null;
   has_supported: boolean | null;
   support_count: number;
   support_threshold: number;
@@ -196,6 +197,14 @@ export function submitVote(processId: string, actor: string, option: string): Pr
     type: "process.vote",
     actor,
     payload: { option },
+  });
+}
+
+export function submitApprovalVote(processId: string, actor: string, selections: string[]): Promise<ActionResult> {
+  return request("POST", `/process/${processId}/action`, {
+    type: "process.vote",
+    actor,
+    payload: { selections },
   });
 }
 
@@ -392,6 +401,8 @@ export interface VoteDraft {
   description: string;
   sources: string;
   voting_duration_ms: number;
+  method: string; // "yes_no_unsure" | "approval"
+  custom_options: string[] | null;
   conversation_history: Array<{ role: "user" | "assistant"; content: string }>;
   last_review_result: DraftSuggestion[] | null;
   draft_modified_since_review: boolean;
@@ -416,7 +427,7 @@ export function getVoteDraft(id: string): Promise<VoteDraft> {
 
 export function updateVoteDraft(
   id: string,
-  patch: Partial<Pick<VoteDraft, "title" | "description" | "sources" | "voting_duration_ms">> & { skip_modified_flag?: boolean },
+  patch: Partial<Pick<VoteDraft, "title" | "description" | "sources" | "voting_duration_ms" | "method" | "custom_options">> & { skip_modified_flag?: boolean },
 ): Promise<VoteDraft> {
   return request("PATCH", `/votes/drafts/${id}`, patch);
 }

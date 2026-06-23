@@ -20,6 +20,8 @@ interface DraftRow {
   description: string;
   sources: string;
   voting_duration_ms: number;
+  method: string;
+  custom_options: unknown;
   conversation_history: unknown;
   last_review_result: unknown;
   draft_modified_since_review: boolean;
@@ -37,6 +39,8 @@ function rowToDraft(row: DraftRow): VoteDraft {
     description: row.description,
     sources: row.sources,
     voting_duration_ms: Number(row.voting_duration_ms),
+    method: row.method ?? "yes_no_unsure",
+    custom_options: Array.isArray(row.custom_options) ? row.custom_options as string[] : null,
     conversation_history: Array.isArray(row.conversation_history)
       ? row.conversation_history
       : [],
@@ -112,6 +116,23 @@ export async function updateVoteDraft(
       );
     }
     updates.voting_duration_ms = ms;
+  }
+
+  if (patch.method !== undefined) {
+    const valid = ["yes_no_unsure", "approval"];
+    if (!valid.includes(patch.method)) {
+      throw new Error(`method must be one of: ${valid.join(", ")}`);
+    }
+    updates.method = patch.method;
+  }
+
+  if (patch.custom_options !== undefined) {
+    if (patch.custom_options !== null) {
+      if (!Array.isArray(patch.custom_options) || patch.custom_options.length < 2) {
+        throw new Error("custom_options must be an array with at least 2 items");
+      }
+    }
+    updates.custom_options = patch.custom_options;
   }
 
   if (!patch.skip_modified_flag) {

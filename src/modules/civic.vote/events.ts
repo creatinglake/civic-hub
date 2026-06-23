@@ -28,6 +28,7 @@ export async function emitProposed(
     jurisdiction: ctx.jurisdiction,
     data: {
       process: {
+        method: state.method ?? "yes_no_unsure",
         options: state.options,
         support_threshold: state.config.support_threshold,
       },
@@ -68,6 +69,7 @@ export async function emitStarted(
     jurisdiction: ctx.jurisdiction,
     data: {
       process: {
+        method: state.method ?? "yes_no_unsure",
         voting_opens_at: state.voting_opens_at,
         voting_closes_at: state.voting_closes_at,
         options: state.options,
@@ -79,8 +81,8 @@ export async function emitStarted(
 export async function emitVoteSubmitted(
   ctx: EventContext,
   actor: string,
-  option: string,
-  previous_vote: string | null,
+  ballot: string,
+  previous_ballot: string | null,
 ): Promise<void> {
   await ctx.emit({
     event_type: "civic.process.vote_submitted",
@@ -89,7 +91,7 @@ export async function emitVoteSubmitted(
     hub_id: ctx.hub_id,
     jurisdiction: ctx.jurisdiction,
     data: {
-      vote: { option, previous_vote },
+      vote: { option: ballot, previous_vote: previous_ballot },
     },
   });
 }
@@ -125,7 +127,10 @@ export async function emitAggregationCompleted(
   actor: string,
   result: VoteResult,
   participant_count: number,
+  methodKey?: string,
 ): Promise<void> {
+  const { getVotingMethod, DEFAULT_METHOD } = await import("./methods.js");
+  const method = getVotingMethod(methodKey ?? DEFAULT_METHOD);
   await ctx.emit({
     event_type: "civic.process.aggregation_completed",
     actor,
@@ -133,22 +138,12 @@ export async function emitAggregationCompleted(
     hub_id: ctx.hub_id,
     jurisdiction: ctx.jurisdiction,
     data: {
-      aggregation_method: "tallying",
+      aggregation_method: methodKey ?? DEFAULT_METHOD,
       participant_count,
       result_type: "tally",
-      result_summary: summarizeTally(result),
+      result_summary: method.summarizeTally(result),
     },
   });
-}
-
-function summarizeTally(result: VoteResult): string {
-  const entries = Object.entries(result.tally).sort((a, b) => b[1] - a[1]);
-  if (entries.length === 0 || result.total_votes === 0) {
-    return "No votes recorded.";
-  }
-  const [topOption, topCount] = entries[0];
-  const pct = Math.round((topCount / result.total_votes) * 100);
-  return `${topOption}: ${topCount} of ${result.total_votes} (${pct}%)`;
 }
 
 export async function emitResultPublished(

@@ -1,26 +1,17 @@
 // civic.vote module — result computation
 //
-// Pure functions for tallying votes and producing structured results.
+// Delegates tally computation to the voting method sub-registry.
+// The old single-method computeTally is preserved as a pass-through
+// for callers that already know the method or want the default.
 
 import type { VoteResult } from "./models.js";
+import { getVotingMethod, DEFAULT_METHOD, type Ballot } from "./methods.js";
 
 export function computeTally(
-  votes: Record<string, string>,
-  options: string[]
+  votes: Record<string, string | string[]>,
+  options: string[],
+  method?: string,
 ): VoteResult {
-  const tally: Record<string, number> = {};
-  for (const option of options) {
-    tally[option] = 0;
-  }
-  for (const option of Object.values(votes)) {
-    if (tally[option] !== undefined) {
-      tally[option]++;
-    }
-  }
-
-  return {
-    tally,
-    total_votes: Object.keys(votes).length,
-    computed_at: new Date().toISOString(),
-  };
+  const m = getVotingMethod(method ?? DEFAULT_METHOD);
+  return m.computeTally(votes as Record<string, Ballot>, options);
 }

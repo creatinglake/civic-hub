@@ -6,7 +6,7 @@ export default defineConfig({
     // They do NOT import backend modules directly (which would require
     // Supabase env vars at import time). This keeps test setup simple:
     // start the server, run the tests.
-    include: ["tests/api/**/*.test.ts"],
+    include: ["tests/api/**/*.test.ts", "tests/unit/**/*.test.ts"],
 
     // Tests run sequentially — they share a dev server and database.
     // fileParallelism: false ensures test files run one at a time,

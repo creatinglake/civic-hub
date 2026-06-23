@@ -27,9 +27,10 @@ export interface VoteResult {
 
 export interface VoteProcessState {
   type: "civic.vote";
+  method: string; // "yes_no_unsure" | "approval" (extensible)
   status: VoteStatus;
   options: string[];
-  votes: Record<string, string>; // actor → option
+  votes: Record<string, string | string[]>; // actor → ballot (string for yes_no_unsure, string[] for approval)
   supporters: Record<string, boolean>; // actor → supported
   support_count: number;
   config: {

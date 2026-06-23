@@ -197,6 +197,19 @@ export default function ProposeDraftVote() {
     [draft],
   );
 
+  const handleMethodChange = useCallback(
+    async (method: string, options: string[] | null) => {
+      if (!draft) return;
+      try {
+        const updated = await updateVoteDraft(draft.id, { method, custom_options: options });
+        setDraft(updated);
+      } catch {
+        // silent
+      }
+    },
+    [draft],
+  );
+
   const handleApplySuggestion = useCallback(
     async (suggestion: DraftSuggestion) => {
       if (!draft || !suggestion.field || !suggestion.suggested_revision) return;
@@ -352,6 +365,7 @@ export default function ProposeDraftVote() {
               draft={draft}
               onFieldChange={handleFieldChange}
               onDurationChange={handleDurationChange}
+              onMethodChange={handleMethodChange}
               onReview={handleReview}
               onSubmit={handleSubmit}
               disabled={submitting}
@@ -435,7 +449,18 @@ export default function ProposeDraftVote() {
               {draft.description && (
                 <p className="confirm-desc">{draft.description}</p>
               )}
+              {draft.method === "approval" && draft.custom_options && (
+                <div className="confirm-options">
+                  <p className="confirm-options-label">Options:</p>
+                  <ul className="confirm-options-list">
+                    {draft.custom_options.map((opt, i) => (
+                      <li key={i}>{opt}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
               <p className="confirm-duration">
+                Voting method: {draft.method === "approval" ? "Approval" : "Yes / No / Unsure"}.
                 Voting will stay open for {durationLabel}.
               </p>
             </div>

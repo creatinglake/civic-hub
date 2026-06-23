@@ -116,13 +116,15 @@ export async function handleUpdateVoteDraft(
       return;
     }
 
-    const { title, description, sources, voting_duration_ms, skip_modified_flag } = req.body;
+    const { title, description, sources, voting_duration_ms, method, custom_options, skip_modified_flag } = req.body;
 
     const updated = await updateVoteDraft(id, {
       title,
       description,
       sources,
       voting_duration_ms,
+      method,
+      custom_options,
       skip_modified_flag: skip_modified_flag === true,
     });
     res.json(updated);
@@ -295,6 +297,16 @@ export async function handleSubmitVoteDraft(
       .map((l) => l.trim())
       .filter((l) => l.length > 0);
 
+    const voteMethod = draft.method ?? "yes_no_unsure";
+    const stateInput: Record<string, unknown> = {
+      method: voteMethod,
+      voting_duration_ms: draft.voting_duration_ms,
+      activation_mode: "direct",
+    };
+    if (voteMethod === "approval" && Array.isArray(draft.custom_options)) {
+      stateInput.options = draft.custom_options;
+    }
+
     const process = await createProcess({
       definition: { type: "civic.vote", version: "0.1" },
       title: draft.title.trim(),
@@ -303,10 +315,7 @@ export async function handleSubmitVoteDraft(
       content: optionalLinks.length > 0
         ? { links: optionalLinks.map((url) => ({ url, label: url })) }
         : undefined,
-      state: {
-        voting_duration_ms: draft.voting_duration_ms,
-        activation_mode: "direct",
-      },
+      state: stateInput,
     });
 
     await executeAction(process.id, {
