@@ -770,6 +770,7 @@ export interface VoteResultsPositionBreakdown {
  */
 export interface VoteContextSnapshot {
   description: string;
+  method?: string;
   options: Array<{ option_id: string; option_label: string }>;
   starts_at: string | null;
   ends_at: string | null;
