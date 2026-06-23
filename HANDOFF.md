@@ -6,7 +6,7 @@ Updated after every Claude Code session. Records what was built, what's incomple
 
 ## Pluggable Voting Methods + Approval Voting — 2026-06-23
 
-**Status:** Complete. Backend, frontend, and unit tests all in place. Migration ready.
+**Status:** Complete and deployed. Backend, frontend, unit tests, migration applied to production.
 
 ### What was built
 
@@ -50,9 +50,15 @@ Upgraded `civic.vote` to support pluggable voting methods via a sub-registry pat
 - **Tally semantics for approval:** `total_votes` = number of voters (not sum of approvals). Percentages represent "% of voters who approved this option" and can sum to >100%.
 - **One ballot per voter, changeable while active, secret/display-anonymous** — same privacy model as yes_no_unsure.
 
+### Post-deploy fixes
+
+- Fixed missing `onMethodChange` prop on mobile `VoteDraftingForm` instance
+- Fixed button hover text color — global `a:hover` from design system was overriding white text on dark button-styled `<Link>` components (Suggest a vote, Start a project, etc.)
+- Added `method` field to frontend `VoteContextSnapshot` type (fixed Vercel build)
+
 ### What's incomplete
 
-- No integration/E2E tests yet for approval voting (requires running server + DB with the new migration applied)
+- No integration/E2E tests yet for approval voting (requires running server + DB)
 - Seed data for demo doesn't include an approval vote yet
 - Admin vote results review UI (`AdminVoteResults.tsx`) not updated with approval-specific copy
 
