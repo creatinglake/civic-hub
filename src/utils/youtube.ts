@@ -93,6 +93,7 @@ export async function fetchYouTubeTranscript(
 async function fetchViaSearchApi(
   videoId: string,
   apiKey: string,
+  attempt = 0,
 ): Promise<TranscriptSegment[]> {
   const url = new URL("https://www.searchapi.io/api/v1/search");
   url.searchParams.set("engine", "youtube_transcripts");
@@ -120,6 +121,15 @@ async function fetchViaSearchApi(
     throw err;
   } finally {
     clearTimeout(t);
+  }
+
+  if (res.status === 429 && attempt < 3) {
+    const wait = (attempt + 1) * 10_000;
+    console.warn(
+      `[meeting-summary] SearchAPI 429 rate-limited — retrying in ${wait / 1000}s (attempt ${attempt + 1}/3)`,
+    );
+    await new Promise((r) => setTimeout(r, wait));
+    return fetchViaSearchApi(videoId, apiKey, attempt + 1);
   }
 
   if (!res.ok) {
