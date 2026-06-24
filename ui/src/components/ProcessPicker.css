@@ -37,6 +37,14 @@
   color: var(--color-brand);
 }
 
+.picker-subtitle {
+  font-family: var(--font-body);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-relaxed);
+  color: var(--color-text-muted);
+  margin: var(--space-xs) 0 0;
+}
+
 .picker-close {
   display: inline-flex;
   align-items: center;
@@ -94,6 +102,21 @@
   outline-offset: 2px;
 }
 
+.picker-card-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+}
+
+.picker-card-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--color-primary);
+}
+
 .picker-card-label {
   font-family: var(--font-heading);
   font-size: var(--font-size-lg);
@@ -102,26 +125,34 @@
   line-height: var(--line-height-tight);
 }
 
-.picker-card-desc {
+.picker-card-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 10px;
   font-family: var(--font-body);
-  font-size: var(--font-size-base);
-  line-height: var(--line-height-relaxed);
-  color: var(--color-text-muted);
+  font-size: var(--font-size-xs, 0.75rem);
+  font-weight: 600;
+  color: var(--color-primary);
+  background: var(--color-primary-bg, rgba(42, 78, 132, 0.08));
+  border: 1px solid var(--color-primary-border, rgba(42, 78, 132, 0.2));
+  border-radius: var(--radius-pill, 999px);
+  white-space: nowrap;
+  line-height: 1.5;
 }
 
-.picker-card-container {
+.picker-card-desc {
   font-family: var(--font-body);
   font-size: var(--font-size-sm);
-  font-weight: 500;
-  color: var(--color-text-subtle);
-  font-style: italic;
+  line-height: var(--line-height-relaxed);
+  color: var(--color-text-muted);
+  padding-left: calc(24px + var(--space-sm));
 }
 
 .picker-card-guidance {
   font-family: var(--font-body);
   font-size: var(--font-size-sm);
   line-height: var(--line-height-relaxed);
-  margin-top: var(--space-xs);
+  padding-left: calc(24px + var(--space-sm));
 }
 
 .picker-card-guidance--light {
@@ -129,11 +160,8 @@
 }
 
 .picker-card-guidance--prominent {
-  color: var(--color-text-muted);
-  background: var(--color-surface-alt, #f3f4f6);
-  padding: var(--space-xs) var(--space-sm);
-  border-radius: var(--radius-sm);
-  border-left: 3px solid var(--color-primary);
+  color: var(--color-primary);
+  font-weight: 500;
 }
 
 /* Mobile: full-screen sheet */
@@ -160,5 +188,10 @@
 
   .picker-card {
     padding: var(--space-md);
+  }
+
+  .picker-card-desc,
+  .picker-card-guidance {
+    padding-left: calc(24px + var(--space-sm));
   }
 }
