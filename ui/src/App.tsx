@@ -32,6 +32,7 @@ import Feedback from "./pages/Feedback";
 import Welcome from "./pages/Welcome";
 import Projects from "./pages/Projects";
 import Deliberations from "./pages/Deliberations";
+import ConversationDraft from "./pages/ConversationDraft";
 import DeliberationDetail from "./pages/DeliberationDetail";
 import ProjectDetail from "./pages/ProjectDetail";
 import ProjectDraft from "./pages/ProjectDraft";
@@ -99,6 +100,7 @@ function AppContent() {
           <Route path="/projects/new" element={<ProjectDraft />} />
           <Route path="/project/:id" element={<ProjectDetail />} />
           <Route path="/deliberations" element={<Deliberations />} />
+          <Route path="/deliberations/new" element={<ConversationDraft />} />
           <Route path="/deliberation/:id" element={<DeliberationDetail />} />
           <Route path="/wordcloud/new" element={<CreateWordCloud />} />
           <Route path="/wordcloud/:id" element={<WordCloud />} />

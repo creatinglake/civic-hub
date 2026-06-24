@@ -2702,3 +2702,33 @@
     margin: 0 var(--space-md) var(--space-md);
   }
 }
+
+/* --- Conversation draft page header --- */
+
+.draft-page-header {
+  padding: var(--space-md) 0 var(--space-sm);
+}
+
+.draft-back-link {
+  background: none;
+  border: none;
+  padding: 0;
+  font-family: var(--font-body);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  cursor: pointer;
+  margin-bottom: var(--space-xs);
+  display: inline-block;
+}
+
+.draft-back-link:hover {
+  color: var(--color-text);
+}
+
+.draft-page-title {
+  font-family: var(--font-heading);
+  font-size: var(--font-size-2xl);
+  font-weight: 600;
+  color: var(--color-brand);
+  margin: var(--space-xs) 0 0;
+}

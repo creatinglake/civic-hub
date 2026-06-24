@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
 import {
   listCivicProposals,
   type CivicProposalSummary,
 } from "../services/api";
 import HubInfo from "../components/HubInfo";
+import ProcessPicker from "../components/ProcessPicker";
 import "./Propose.css";
 
 /**
@@ -17,9 +19,11 @@ import "./Propose.css";
  * the AI review gate.
  */
 export default function Propose() {
+  const { user } = useAuth();
   const [proposals, setProposals] = useState<CivicProposalSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showPicker, setShowPicker] = useState(false);
 
   useEffect(() => {
     listCivicProposals()
@@ -42,6 +46,7 @@ export default function Propose() {
   return (
     <div className="page page-home">
       <HubInfo />
+      {showPicker && <ProcessPicker onDismiss={() => setShowPicker(false)} />}
 
       {loading && <p className="section">Loading...</p>}
       {error && <p className="section error">Failed to load: {error}</p>}
@@ -56,16 +61,15 @@ export default function Propose() {
                   Ideas and concerns raised by community members.
                 </p>
               </div>
-              <Link to="/propose/new" className="section-action-btn propose-action-btn">
-                + Propose something
-              </Link>
+              {user && (
+                <button type="button" className="section-action-btn" onClick={() => setShowPicker(true)}>
+                  + Raise something
+                </button>
+              )}
             </div>
             {activeProposals.length === 0 ? (
               <p className="empty-state-inline">
-                No proposals yet.{" "}
-                <Link to="/propose/new" className="inline-link">
-                  Be the first to propose something.
-                </Link>
+                No proposals yet.
               </p>
             ) : (
               <ul className="process-list">

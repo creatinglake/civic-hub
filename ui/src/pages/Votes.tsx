@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import hub from "../config/hub";
+import { useAuth } from "../context/AuthContext";
 import {
   listProcesses,
   type ProcessSummary,
@@ -9,6 +10,7 @@ import {
   type ProposalSummary,
 } from "../services/api";
 import HubInfo from "../components/HubInfo";
+import ProcessPicker from "../components/ProcessPicker";
 import ProcessCard from "../components/ProcessCard";
 import ProposalCard from "../components/ProposalCard";
 
@@ -36,9 +38,11 @@ function isFilterKey(v: string | null): v is VotesFilterKey {
 }
 
 export default function Votes() {
+  const { user } = useAuth();
   const [processes, setProcesses] = useState<ProcessSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showPicker, setShowPicker] = useState(false);
 
   const [params, setParams] = useSearchParams();
   const rawStatus = params.get("status");
@@ -111,6 +115,7 @@ export default function Votes() {
   return (
     <div className="page page-home">
       <HubInfo />
+      {showPicker && <ProcessPicker onDismiss={() => setShowPicker(false)} />}
 
       {/* Slice 12.1 — Feed | Votes tab strip. Sits below HubInfo so
           site identity reads first, then the user picks what surface
@@ -125,9 +130,11 @@ export default function Votes() {
               Official and proposed advisory votes for {hub.jurisdiction}.
             </p>
           </div>
-          <Link to="/votes/new" className="section-action-btn votes-action-btn">
-            + Suggest a vote
-          </Link>
+          {user && (
+            <button type="button" className="section-action-btn" onClick={() => setShowPicker(true)}>
+              + Raise something
+            </button>
+          )}
         </div>
       </section>
 
@@ -189,8 +196,7 @@ export default function Votes() {
               </p>
               {!hasAnyProposals ? (
                 <p className="empty-state-inline">
-                  No proposals yet.{" "}
-                  <Link to="/votes/new" className="inline-link">Be the first to suggest a vote.</Link>
+                  No proposals yet.
                 </p>
               ) : (
                 <ul className="process-list">

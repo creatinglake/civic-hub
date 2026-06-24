@@ -1,13 +1,17 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
 import { listProjects, type ProjectSummary } from "../services/api";
 import HubInfo from "../components/HubInfo";
+import ProcessPicker from "../components/ProcessPicker";
 import "./Projects.css";
 
 export default function Projects() {
+  const { user } = useAuth();
   const [projects, setProjects] = useState<ProjectSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showPicker, setShowPicker] = useState(false);
 
   useEffect(() => {
     listProjects()
@@ -27,6 +31,7 @@ export default function Projects() {
   return (
     <div className="page page-home">
       <HubInfo />
+      {showPicker && <ProcessPicker onDismiss={() => setShowPicker(false)} />}
 
       {loading && <p className="section">Loading...</p>}
       {error && <p className="section error">Failed to load: {error}</p>}
@@ -41,16 +46,15 @@ export default function Projects() {
                   Projects and initiatives organized by community members.
                 </p>
               </div>
-              <Link to="/projects/new" className="section-action-btn projects-action-btn">
-                + Start a project
-              </Link>
+              {user && (
+                <button type="button" className="section-action-btn" onClick={() => setShowPicker(true)}>
+                  + Raise something
+                </button>
+              )}
             </div>
             {activeProjects.length === 0 ? (
               <p className="empty-state-inline">
-                No projects yet.{" "}
-                <Link to="/projects/new" className="inline-link">
-                  Start the first one.
-                </Link>
+                No projects yet.
               </p>
             ) : (
               <ul className="process-list">

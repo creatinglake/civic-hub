@@ -39,7 +39,7 @@ const INTENTS = [
     label: "Start a conversation",
     description:
       "A structured way to gather broad input and see where people stand on a topic.",
-    route: "/deliberations",
+    route: "/deliberations/new",
     badge: "When in doubt, start here",
     guidance:
       "Residents share their views; responses cluster into opinion groups, surfacing common ground.",

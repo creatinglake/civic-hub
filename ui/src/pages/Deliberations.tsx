@@ -7,13 +7,15 @@ import {
   startDeliberation,
 } from "../services/api";
 import HubInfo from "../components/HubInfo";
+import ProcessPicker from "../components/ProcessPicker";
 import HostDeliberationForm from "../components/deliberation/HostDeliberationForm";
 import "./Deliberations.css";
 
 export default function Deliberations() {
-  const { isAdmin } = useAuth();
+  const { user, isAdmin } = useAuth();
   const [processes, setProcesses] = useState<DeliberationSummary[]>([]);
   const [showForm, setShowForm] = useState(false);
+  const [showPicker, setShowPicker] = useState(false);
   const [loading, setLoading] = useState(true);
   const [startingId, setStartingId] = useState<string | null>(null);
 
@@ -65,6 +67,7 @@ export default function Deliberations() {
   return (
     <div className="page page-home">
       <HubInfo />
+      {showPicker && <ProcessPicker onDismiss={() => setShowPicker(false)} />}
 
       <section className="section">
         <div className="section-header-row">
@@ -74,7 +77,7 @@ export default function Deliberations() {
               Vote on statements and see where the community stands.
             </p>
           </div>
-          {isAdmin && (
+          {isAdmin ? (
             <button
               type="button"
               className="section-action-btn deliberations-action-btn"
@@ -83,7 +86,11 @@ export default function Deliberations() {
             >
               + Create a conversation
             </button>
-          )}
+          ) : user ? (
+            <button type="button" className="section-action-btn" onClick={() => setShowPicker(true)}>
+              + Raise something
+            </button>
+          ) : null}
         </div>
       </section>
 
