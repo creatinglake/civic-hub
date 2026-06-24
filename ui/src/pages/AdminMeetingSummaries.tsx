@@ -88,12 +88,12 @@ export default function AdminMeetingSummaries() {
     });
   }
 
-  function toggleAllPending() {
-    const allChecked = pendingFiltered.every((s) => checkedIds.has(s.id));
+  function toggleAllVisible() {
+    const allChecked = filtered.every((s) => checkedIds.has(s.id));
     if (allChecked) {
       setCheckedIds(new Set());
     } else {
-      setCheckedIds(new Set(pendingFiltered.map((s) => s.id)));
+      setCheckedIds(new Set(filtered.map((s) => s.id)));
     }
   }
 
@@ -617,19 +617,19 @@ export default function AdminMeetingSummaries() {
           <p className="admin-action-message">{actionMessage}</p>
         )}
 
-        {pendingFiltered.length > 0 && (
+        {filtered.length > 0 && (
           <div className="batch-bar">
             <label className="batch-select-all">
               <input
                 type="checkbox"
                 checked={
-                  pendingFiltered.length > 0 &&
-                  pendingFiltered.every((s) => checkedIds.has(s.id))
+                  filtered.length > 0 &&
+                  filtered.every((s) => checkedIds.has(s.id))
                 }
-                onChange={toggleAllPending}
+                onChange={toggleAllVisible}
                 disabled={batchBusy}
               />
-              Select all pending ({pendingFiltered.length})
+              Select all ({filtered.length})
             </label>
             {checkedIds.size > 0 && (
               <span className="batch-actions">
@@ -674,14 +674,16 @@ export default function AdminMeetingSummaries() {
                   </>
                 ) : (
                   <>
-                    <button
-                      type="button"
-                      className="admin-convert-button"
-                      onClick={() => setConfirmBatchAction("approve")}
-                      disabled={batchBusy}
-                    >
-                      Approve selected ({checkedIds.size})
-                    </button>
+                    {pendingFiltered.length > 0 && checkedIds.size > 0 && (
+                      <button
+                        type="button"
+                        className="admin-convert-button"
+                        onClick={() => setConfirmBatchAction("approve")}
+                        disabled={batchBusy}
+                      >
+                        Approve selected ({checkedIds.size})
+                      </button>
+                    )}
                     <button
                       type="button"
                       className="batch-delete-button"
@@ -712,16 +714,14 @@ export default function AdminMeetingSummaries() {
               className="admin-proposal-item"
             >
               <div className="admin-proposal-header">
-                {s.approval_status === "pending" && (
-                  <input
-                    type="checkbox"
-                    className="batch-checkbox"
-                    checked={checkedIds.has(s.id)}
-                    onChange={() => toggleChecked(s.id)}
-                    onClick={(e) => e.stopPropagation()}
-                    disabled={batchBusy}
-                  />
-                )}
+                <input
+                  type="checkbox"
+                  className="batch-checkbox"
+                  checked={checkedIds.has(s.id)}
+                  onChange={() => toggleChecked(s.id)}
+                  onClick={(e) => e.stopPropagation()}
+                  disabled={batchBusy}
+                />
                 <h3
                   className="admin-proposal-title-link"
                   onClick={() => openReview(s.id)}
