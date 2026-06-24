@@ -43,10 +43,13 @@ ${input.trimmed_html}
 For each meeting entry visible on the page, extract:
 - meeting_title: short human-readable name (e.g. "Board of Supervisors Regular Meeting", "Budget Workshop"). Do NOT include the date in this field.
 - meeting_date: ISO 8601 date (YYYY-MM-DD). Infer year if missing but prefer pages where the year is explicit.
-- source_minutes_url: the full https:// URL of the minutes PDF for that meeting. Must end in .pdf.
+- source_minutes_url: the full https:// URL of the minutes PDF for that meeting, or null if no minutes PDF is linked. Must end in .pdf. Look for links labeled "Minutes" — do NOT confuse "Agenda" links with "Minutes" links.
+- source_agenda_url: the full https:// URL of the agenda PDF for that meeting, or null if no agenda PDF is linked. Must end in .pdf. Look for links labeled "Agenda".
 - source_video_url: the full https:// URL of the primary YouTube recording for that meeting, or null if no recording is available. If multiple recordings exist for the same meeting (e.g. "Video Recording 1" and "Video Recording 2"), this is the FIRST one.
 - additional_video_urls: array of any additional YouTube URLs for the same meeting (segment 2, continuation, retry after stream drop). Empty array if only one recording exists.
-- source_id: the source_minutes_url (we use the PDF URL as the canonical dedupe key).
+- source_id: a stable dedupe key. Use the source_minutes_url when available (the PDF URL). For meetings with no minutes, use the format "YYYY-MM-DD:<meeting_title>" (e.g. "2026-06-09:Board of Supervisors Regular Meeting").
+
+IMPORTANT: Include meetings even if they only have an agenda and/or video but no minutes. A meeting entry is valid as long as it has at least one PDF link (minutes or agenda) OR a video recording.
 
 Ignore anything that is not a specific meeting entry (site chrome, navigation, footer links, general "how to attend" instructions, unrelated pages).
 

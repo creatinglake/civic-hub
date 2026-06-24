@@ -274,19 +274,45 @@ export default function AdminMeetingSummaries() {
           )}
           {error && <p className="form-error">{error}</p>}
 
+          {selected.source_type === "agenda" && (
+            <div className="meeting-ai-banner" style={{ borderLeftColor: "#d97706" }}>
+              <strong style={{ color: "#d97706" }}>Agenda-based summary.</strong> This
+              summary was generated from the meeting agenda (not official minutes).
+              It will be automatically upgraded when minutes are posted.
+            </div>
+          )}
+
           <section className="admin-detail-section">
             <h3>Source</h3>
             <ul className="meeting-source-list">
-              <li>
-                <strong>Minutes PDF:</strong>{" "}
-                <a
-                  href={selected.source_minutes_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  {selected.source_minutes_url}
-                </a>
-              </li>
+              {selected.source_minutes_url ? (
+                <li>
+                  <strong>Minutes PDF:</strong>{" "}
+                  <a
+                    href={selected.source_minutes_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    {selected.source_minutes_url}
+                  </a>
+                </li>
+              ) : (
+                <li>
+                  <strong>Minutes PDF:</strong> not yet posted
+                </li>
+              )}
+              {selected.source_agenda_url && (
+                <li>
+                  <strong>Agenda PDF:</strong>{" "}
+                  <a
+                    href={selected.source_agenda_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    {selected.source_agenda_url}
+                  </a>
+                </li>
+              )}
               {selected.source_video_url ? (
                 <li>
                   <strong>Primary recording:</strong>{" "}
@@ -710,6 +736,9 @@ export default function AdminMeetingSummaries() {
               >
                 <span>Meeting {formatDate(s.meeting_date)}</span>
                 <span>{s.block_count} blocks</span>
+                {s.source_type === "agenda" && (
+                  <span className="badge-agenda">Agenda-only</span>
+                )}
                 {!s.has_video && <span>PDF-only</span>}
                 <span>Generated {formatDate(s.generated_at)}</span>
                 {s.published_at && (

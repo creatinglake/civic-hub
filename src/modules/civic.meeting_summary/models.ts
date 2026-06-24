@@ -62,8 +62,12 @@ export interface MeetingSummaryProcessState {
    * new summary.
    */
   source_id: string;
-  /** PDF URL scraped from the minutes page. Always present. */
-  source_minutes_url: string;
+  /** PDF URL of the minutes document. Null when only an agenda was available. */
+  source_minutes_url: string | null;
+  /** PDF URL of the agenda document. Null when the page didn't list one. */
+  source_agenda_url: string | null;
+  /** What the summary was built from: "minutes" or "agenda". */
+  source_type: "minutes" | "agenda";
   /**
    * YouTube watch URL of the primary recording. Null when the meeting
    * has no video recording (e.g. streaming failure, PDF-only workshop).
@@ -116,7 +120,9 @@ export interface MeetingSummaryProcessState {
 /** Input the pipeline passes when creating a summary from a completed run. */
 export interface CreateMeetingSummaryInput {
   source_id: string;
-  source_minutes_url: string;
+  source_minutes_url: string | null;
+  source_agenda_url: string | null;
+  source_type: "minutes" | "agenda";
   source_video_url: string | null;
   additional_video_urls: string[];
   meeting_title: string;
@@ -216,12 +222,15 @@ export interface MeetingEntry {
   meeting_title: string;
   /** ISO 8601 date (YYYY-MM-DD). */
   meeting_date: string;
-  source_minutes_url: string;
+  /** Minutes PDF URL. Null when only an agenda is available. */
+  source_minutes_url: string | null;
+  /** Agenda PDF URL. Null when the page didn't list one separately. */
+  source_agenda_url: string | null;
   /** Null if the meeting has no video recording. */
   source_video_url: string | null;
   /** Non-empty if the meeting has multiple recordings (segment 2, etc.). */
   additional_video_urls: string[];
-  /** Stable dedupe key. Typically the PDF URL. */
+  /** Stable dedupe key. Derived from meeting date + title. */
   source_id: string;
 }
 
@@ -243,4 +252,5 @@ export interface SummarizeMeetingResult {
   blocks: SummaryBlock[];
   ai_instructions_used: string;
   model: string;
+  sourceType: "minutes" | "agenda";
 }

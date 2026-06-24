@@ -998,6 +998,7 @@ export interface MeetingSummarySummary {
   approval_status: MeetingSummaryApprovalStatus;
   block_count: number;
   has_video: boolean;
+  source_type: "minutes" | "agenda";
   generated_at: string;
   approved_at: string | null;
   published_at: string | null;
@@ -1008,7 +1009,9 @@ export interface MeetingSummarySummary {
 /** Admin detail (full read). */
 export interface MeetingSummaryDetail extends MeetingSummarySummary {
   source_id: string;
-  source_minutes_url: string;
+  source_minutes_url: string | null;
+  source_agenda_url: string | null;
+  source_type: "minutes" | "agenda";
   source_video_url: string | null;
   additional_video_urls: string[];
   blocks: SummaryBlock[];
@@ -1027,7 +1030,9 @@ export interface PublicMeetingSummary {
   title: string;
   meeting_title: string;
   meeting_date: string;
-  source_minutes_url: string;
+  source_minutes_url: string | null;
+  source_agenda_url: string | null;
+  source_type: "minutes" | "agenda";
   source_video_url: string | null;
   additional_video_urls: string[];
   blocks: SummaryBlock[];

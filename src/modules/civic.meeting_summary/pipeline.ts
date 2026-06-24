@@ -59,8 +59,14 @@ export async function summarizeMeeting(
 ): Promise<SummarizeMeetingResult> {
   const instructions = resolveEffectiveInstructions(cfg.extraction_instructions);
 
-  // --- Fetch PDF (required; fail fast if it 404s) ---
-  const pdf = await deps.fetchPdf(entry.source_minutes_url);
+  // --- Determine which PDF to use (minutes preferred, agenda fallback) ---
+  const pdfUrl = entry.source_minutes_url ?? entry.source_agenda_url;
+  if (!pdfUrl) {
+    throw new Error("No PDF available (no minutes or agenda URL)");
+  }
+  const sourceType: "minutes" | "agenda" = entry.source_minutes_url ? "minutes" : "agenda";
+
+  const pdf = await deps.fetchPdf(pdfUrl);
   if (pdf.bytes.length > MAX_PDF_BYTES) {
     const sizeMb = (pdf.bytes.length / (1024 * 1024)).toFixed(1);
     throw new Error(
@@ -120,7 +126,7 @@ export async function summarizeMeeting(
     documentBase64: {
       data: pdfBase64,
       mediaType: pdf.mime || "application/pdf",
-      filename: filenameFromUrl(entry.source_minutes_url) ?? "minutes.pdf",
+      filename: filenameFromUrl(pdfUrl) ?? (sourceType === "minutes" ? "minutes.pdf" : "agenda.pdf"),
     },
     // 16k gives headroom for verbose minutes with 15+ topic blocks
     // without ever flirting with the model's per-response ceiling.
@@ -133,6 +139,7 @@ export async function summarizeMeeting(
     blocks,
     ai_instructions_used: instructions,
     model,
+    sourceType,
   };
 }
 
@@ -145,6 +152,8 @@ export function buildCreateInput(
   return {
     source_id: entry.source_id,
     source_minutes_url: entry.source_minutes_url,
+    source_agenda_url: entry.source_agenda_url,
+    source_type: summary.sourceType,
     source_video_url: entry.source_video_url,
     additional_video_urls: entry.additional_video_urls,
     meeting_title: entry.meeting_title,

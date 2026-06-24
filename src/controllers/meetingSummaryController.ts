@@ -241,13 +241,21 @@ export async function handleRunMeetingSummary(
     // Process newest meetings first so the per-run cap prioritizes recent ones.
     filteredEntries.sort((a, b) => b.meeting_date.localeCompare(a.meeting_date));
 
-    // Build the set of existing source_ids once so the inner loop is O(1).
+    // Build the set of existing source_ids and a map of agenda-based
+    // summaries (keyed by meeting_date) eligible for upgrade once minutes
+    // become available.
     const allProcesses = await getAllProcesses();
     const existingSourceIds = new Set<string>();
+    const agendaByDate = new Map<string, typeof allProcesses[0]>();
     for (const p of allProcesses) {
       if (p.definition.type !== "civic.meeting_summary") continue;
       const s = summaryState(p);
-      if (typeof s?.source_id === "string") existingSourceIds.add(s.source_id);
+      if (typeof s?.source_id === "string") {
+        existingSourceIds.add(s.source_id);
+        if ((s.source_type ?? "minutes") === "agenda") {
+          agendaByDate.set(s.meeting_date, p);
+        }
+      }
     }
 
     const perRunCap = maxPerRun();
@@ -263,10 +271,7 @@ export async function handleRunMeetingSummary(
         );
         break;
       }
-      if (existingSourceIds.has(entry.source_id)) {
-        console.log(
-          `[meeting-summary] skip existing source_id=${entry.source_id}`,
-        );
+      if (existingSourceIds.has(entry.source_id) || agendaByDate.has(entry.meeting_date)) {
         skippedExisting += 1;
         continue;
       }
@@ -320,13 +325,61 @@ export async function handleRunMeetingSummary(
       }
     }
 
+    // --- Upgrade pass: re-summarize agenda-based summaries when minutes appear ---
+    let upgraded = 0;
+    if (agendaByDate.size > 0) {
+      for (const entry of filteredEntries) {
+        if (!entry.source_minutes_url) continue;
+        const existing = agendaByDate.get(entry.meeting_date);
+        if (!existing) continue;
+        const meetingStart = Date.now();
+        try {
+          console.log(
+            `[meeting-summary] upgrading agenda→minutes source_id=${entry.source_id}`,
+          );
+          const summary = await summarizeMeeting(entry, cfg, {
+            fetchPdf,
+            fetchYouTubeTranscript,
+            callClaude,
+          });
+          const state = summaryState(existing);
+          state.source_id = entry.source_id;
+          state.source_minutes_url = entry.source_minutes_url;
+          state.source_agenda_url = entry.source_agenda_url;
+          state.source_type = "minutes";
+          state.blocks = summary.blocks;
+          state.ai_instructions_used = summary.ai_instructions_used;
+          state.ai_model = summary.model;
+          state.generated_at = new Date().toISOString();
+          // Reset to pending so admin reviews the upgraded version
+          state.approval_status = "pending";
+          state.published_at = null;
+          state.approved_at = null;
+          existing.state = state as unknown as Record<string, unknown>;
+          await saveProcessState(existing);
+          console.log(
+            `[meeting-summary] upgraded process=${existing.id} source_id=${entry.source_id} duration_ms=${Date.now() - meetingStart}`,
+          );
+          upgraded += 1;
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : "unknown error";
+          console.warn(
+            `[meeting-summary] upgrade failed source_id=${entry.source_id} error=${msg}`,
+          );
+          failures.push({ source_id: entry.source_id, error: `upgrade: ${msg}` });
+          failed += 1;
+        }
+      }
+    }
+
     const duration_ms = Date.now() - started;
     console.log(
-      `[meeting-summary] run complete discovered=${discovered} created=${created} skipped=${skippedExisting} failed=${failed} duration_ms=${duration_ms}`,
+      `[meeting-summary] run complete discovered=${discovered} created=${created} upgraded=${upgraded} skipped=${skippedExisting} failed=${failed} duration_ms=${duration_ms}`,
     );
     res.status(200).json({
       discovered,
       created,
+      upgraded,
       skipped_existing: skippedExisting,
       failed,
       duration_ms,

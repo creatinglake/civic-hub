@@ -109,12 +109,26 @@ function isValidEntry(raw: unknown): raw is MeetingEntry {
   if (typeof e.meeting_date !== "string" || !ISO_DATE_PATTERN.test(e.meeting_date)) {
     return false;
   }
-  if (
-    typeof e.source_minutes_url !== "string" ||
-    !FLOYD_PDF_PATTERN.test(e.source_minutes_url)
-  ) {
-    return false;
+  // Minutes URL: must be a valid Floyd PDF or null
+  if (e.source_minutes_url !== null && e.source_minutes_url !== undefined) {
+    if (typeof e.source_minutes_url !== "string" || !FLOYD_PDF_PATTERN.test(e.source_minutes_url)) {
+      return false;
+    }
   }
+  // Agenda URL: must be a valid Floyd PDF or null
+  if (e.source_agenda_url !== null && e.source_agenda_url !== undefined) {
+    if (typeof e.source_agenda_url !== "string" || !FLOYD_PDF_PATTERN.test(e.source_agenda_url)) {
+      return false;
+    }
+  }
+  // Must have at least one document source (minutes, agenda, or video)
+  const hasMinutes = typeof e.source_minutes_url === "string" && FLOYD_PDF_PATTERN.test(e.source_minutes_url);
+  const hasAgenda = typeof e.source_agenda_url === "string" && FLOYD_PDF_PATTERN.test(e.source_agenda_url);
+  const hasVideo = typeof e.source_video_url === "string" && YOUTUBE_WATCH_PATTERN.test(e.source_video_url);
+  if (!hasMinutes && !hasAgenda && !hasVideo) return false;
+  // Normalize nulls
+  if (!hasMinutes) e.source_minutes_url = null;
+  if (!hasAgenda) e.source_agenda_url = null;
   if (
     e.source_video_url !== null &&
     (typeof e.source_video_url !== "string" ||

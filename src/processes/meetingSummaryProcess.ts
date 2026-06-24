@@ -47,7 +47,9 @@ const meetingSummaryProcess: ProcessHandler = {
     }
     const typed: CreateMeetingSummaryInput = {
       source_id: input.source_id as string,
-      source_minutes_url: input.source_minutes_url as string,
+      source_minutes_url: (input.source_minutes_url ?? null) as string | null,
+      source_agenda_url: (input.source_agenda_url ?? null) as string | null,
+      source_type: (input.source_type as "minutes" | "agenda") ?? "minutes",
       source_video_url: (input.source_video_url ?? null) as string | null,
       additional_video_urls: Array.isArray(input.additional_video_urls)
         ? (input.additional_video_urls as string[])
