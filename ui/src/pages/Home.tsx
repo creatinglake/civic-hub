@@ -1,5 +1,8 @@
+import { useState } from "react";
+import { useAuth } from "../context/AuthContext";
 import HubInfo from "../components/HubInfo";
 import WelcomeBanner from "../components/WelcomeBanner";
+import ProcessPicker from "../components/ProcessPicker";
 import Feed from "../components/Feed";
 import FeedFilter, {
   useFeedFilter,
@@ -7,19 +10,35 @@ import FeedFilter, {
 } from "../components/FeedFilter";
 
 export default function Home() {
+  const { user } = useAuth();
   const { active, setActive } = useFeedFilter();
   const filter = useFilterPredicate(active);
+  const [showPicker, setShowPicker] = useState(false);
 
   return (
     <div className="page page-home">
       <HubInfo />
       <WelcomeBanner />
-      {/* Slice 12.1 — primary tabs between the chronological Feed and
-          the action-oriented Votes page. Persistent across both routes
-          so the user always knows the toggle is there. The
-          context-specific surfaces (filter pills here; suggest-a-vote
-          CTA on Votes) live below the tabs so they only appear in the
-          relevant context. */}
+
+      {user && (
+        <div className="home-start-cta">
+          <button
+            type="button"
+            className="home-start-btn"
+            onClick={() => setShowPicker(true)}
+          >
+            <svg width="18" height="18" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+              <path d="M8 3V13M3 8H13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+            </svg>
+            Start something
+          </button>
+        </div>
+      )}
+
+      {showPicker && (
+        <ProcessPicker onDismiss={() => setShowPicker(false)} />
+      )}
+
       <FeedFilter active={active} onChange={setActive} />
       <Feed
         filter={filter}

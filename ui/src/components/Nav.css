@@ -170,6 +170,54 @@
   outline-offset: 2px;
 }
 
+/* --- Start something CTA --- */
+
+.civic-nav-start {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 6px 14px;
+  background: var(--color-action-accent, #C37B51);
+  color: #ffffff;
+  border: none;
+  border-radius: var(--radius-pill, 999px);
+  font-family: var(--font-body);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s ease, transform 0.05s ease;
+}
+
+.civic-nav-start:hover {
+  background: var(--color-action-accent-hover, #A85D38);
+  color: #ffffff;
+}
+
+.civic-nav-start:active {
+  transform: translateY(1px);
+}
+
+.civic-nav-start:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+.civic-nav-start svg {
+  flex-shrink: 0;
+}
+
+@media (max-width: 767px) {
+  .civic-nav-start-label {
+    display: none;
+  }
+  .civic-nav-start {
+    padding: 6px 8px;
+    min-height: 32px;
+  }
+}
+
 /* --- Feedback button (header) — matches suggest-vote-cta-button --- */
 
 .civic-nav-feedback {

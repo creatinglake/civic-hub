@@ -2640,3 +2640,40 @@
 .retry-button:hover {
   background: var(--accent-hover, #1f5e3b);
 }
+
+/* --- Home: Start something CTA --- */
+
+.home-start-cta {
+  padding: 0 var(--space-md);
+  margin-bottom: var(--space-md);
+}
+
+.home-start-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-lg);
+  background: var(--color-action-accent, #C37B51);
+  color: #ffffff;
+  border: none;
+  border-radius: var(--radius-md);
+  font-family: var(--font-body);
+  font-size: var(--font-size-base);
+  font-weight: 600;
+  cursor: pointer;
+  min-height: 44px;
+  transition: background 0.15s ease, transform 0.05s ease;
+}
+
+.home-start-btn:hover {
+  background: var(--color-action-accent-hover, #A85D38);
+}
+
+.home-start-btn:active {
+  transform: translateY(1px);
+}
+
+.home-start-btn:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
