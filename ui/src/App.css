@@ -2650,6 +2650,11 @@
   gap: var(--space-md);
 }
 
+.home-hero-row .home-start-btn {
+  margin-top: var(--space-lg);
+  margin-right: var(--space-md);
+}
+
 .home-hero-row .hub-info {
   flex: 1;
   min-width: 0;
@@ -2660,8 +2665,6 @@
   align-items: center;
   gap: 6px;
   flex-shrink: 0;
-  margin-top: var(--space-lg);
-  margin-right: var(--space-md);
   padding: 6px 14px;
   min-height: 36px;
   background: var(--color-action-accent, #C37B51);
