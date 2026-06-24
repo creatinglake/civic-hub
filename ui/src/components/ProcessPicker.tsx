@@ -15,11 +15,9 @@ const ICONS = {
   ),
   proposal: (
     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <circle cx="12" cy="8" r="5" stroke="currentColor" strokeWidth="1.8" />
-      <path d="M10 13v2.5a2 2 0 1 0 4 0V13" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-      <line x1="10" y1="17" x2="14" y2="17" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-      <line x1="10" y1="19.5" x2="14" y2="19.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-      <path d="M12 3v1M17.5 5.5l-.7.7M19 10h-1M5 10H4M7.2 6.2l-.7-.7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+      <path d="M9 21h6M12 3a6 6 0 0 0-4 10.5V17h8v-3.5A6 6 0 0 0 12 3Z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      <line x1="10" y1="17" x2="10" y2="19" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      <line x1="14" y1="17" x2="14" y2="19" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
     </svg>
   ),
   vote: (
@@ -43,8 +41,9 @@ const INTENTS = [
       "A structured way to gather broad input and see where people stand on a topic.",
     route: "/deliberations",
     badge: "When in doubt, start here",
-    guidance: null,
-    guidanceWeight: null,
+    guidance:
+      "Residents share their views; responses cluster into opinion groups, surfacing common ground.",
+    guidanceWeight: "light" as const,
   },
   {
     key: "proposal" as const,
@@ -55,7 +54,7 @@ const INTENTS = [
     badge: null,
     guidance:
       "For a broad or divisive idea, a conversation first can surface common ground before people take a position.",
-    guidanceWeight: "light" as const,
+    guidanceWeight: "prominent" as const,
   },
   {
     key: "vote" as const,

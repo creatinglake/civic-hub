@@ -94,7 +94,7 @@
 .picker-card:hover {
   border-color: var(--color-primary);
   box-shadow: 0 2px 8px rgba(42, 78, 132, 0.10);
-  background: var(--color-surface-alt);
+  background: var(--pill-vote-bg, #e3eaf6);
 }
 
 .picker-card:focus-visible {
@@ -162,6 +162,12 @@
 .picker-card-guidance--prominent {
   color: var(--color-primary);
   font-weight: 500;
+  background: var(--pill-vote-bg, #e3eaf6);
+  padding: var(--space-xs) var(--space-sm);
+  border-left: 3px solid var(--color-primary);
+  border-radius: var(--radius-sm);
+  margin-left: calc(24px + var(--space-sm));
+  padding-left: var(--space-sm);
 }
 
 /* Mobile: full-screen sheet */
