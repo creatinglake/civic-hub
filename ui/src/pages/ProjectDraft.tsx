@@ -30,7 +30,7 @@ function friendlyError(msg: string): string {
 
 export default function ProjectDraft() {
   const navigate = useNavigate();
-  const { canParticipate } = useAuth();
+  const { canParticipate, isAdmin } = useAuth();
   const { requireAuth, showAuthModal, closeAuthModal, handleAuthComplete } =
     useRequireAuth();
 
@@ -238,7 +238,11 @@ export default function ProjectDraft() {
     setError(null);
     try {
       const result = await apiSubmitProjectDraft(draft.id);
-      navigate(`/project/${result.project_id}`);
+      if (result.review_id) {
+        navigate(`/my-submissions/${result.review_id}`);
+      } else {
+        navigate(`/project/${result.project_id}`);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Submit failed");
     } finally {
@@ -463,7 +467,7 @@ export default function ProjectDraft() {
                 onClick={confirmSubmit}
                 disabled={submitting}
               >
-                {submitting ? "Submitting..." : "Submit project"}
+                {submitting ? "Submitting..." : isAdmin ? "Submit project" : "Submit for review"}
               </button>
               <button
                 type="button"

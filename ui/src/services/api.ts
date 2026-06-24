@@ -449,7 +449,7 @@ export function reviewVoteDraft(draftId: string): Promise<VoteDraftAssistantResu
 
 export function submitVoteDraft(
   draftId: string,
-): Promise<{ process_id: string }> {
+): Promise<{ process_id?: string; review_id?: string }> {
   return request("POST", `/votes/drafts/${draftId}/submit`);
 }
 
@@ -588,7 +588,7 @@ export function reviewProjectDraft(draftId: string): Promise<ProjectDraftAssista
 
 export function submitProjectDraft(
   draftId: string,
-): Promise<{ project_id: string }> {
+): Promise<{ project_id?: string; review_id?: string }> {
   return request("POST", `/projects/drafts/${draftId}/submit`);
 }
 
@@ -1604,4 +1604,122 @@ export function submitWordcloudResponse(
     actor: "unused",
     payload: { prompt_id: promptId, text },
   });
+}
+
+// --- Process reviews (collaborative admin review) ---
+
+export type ReviewStatus =
+  | "pending_review"
+  | "changes_requested"
+  | "approved"
+  | "declined"
+  | "withdrawn";
+
+export interface ProcessReviewSummary {
+  id: string;
+  process_id: string;
+  creator_id: string;
+  creator_name: string;
+  creator_email: string;
+  status: ReviewStatus;
+  created_at: string;
+  updated_at: string;
+  process_type: string | null;
+  process_title: string | null;
+}
+
+export interface ReviewTurn {
+  id: string;
+  review_id: string;
+  turn_number: number;
+  actor: string;
+  actor_role: "creator" | "admin";
+  action: string;
+  note: string | null;
+  process_snapshot: {
+    title: string;
+    description: string;
+    content?: Record<string, unknown> | null;
+    config?: Record<string, unknown> | null;
+  } | null;
+  created_at: string;
+}
+
+export interface ReviewDetail {
+  review: ProcessReviewSummary;
+  turns: ReviewTurn[];
+  process: Record<string, unknown>;
+}
+
+export function submitForReview(input: {
+  process_type: string;
+  title: string;
+  description: string;
+  creator_name: string;
+  creator_email: string;
+  content?: Record<string, unknown>;
+  config?: Record<string, unknown>;
+  state?: Record<string, unknown>;
+}): Promise<{ review: ProcessReviewSummary; process_id: string }> {
+  return request("POST", "/reviews/submit", input);
+}
+
+export function getMyReviews(): Promise<ProcessReviewSummary[]> {
+  return request("GET", "/reviews/mine");
+}
+
+export function getReviewDetail(reviewId: string): Promise<ReviewDetail> {
+  return request("GET", `/reviews/${reviewId}`);
+}
+
+export function reviseReview(
+  reviewId: string,
+  input: {
+    title?: string;
+    description?: string;
+    content?: Record<string, unknown>;
+    config?: Record<string, unknown>;
+    note?: string;
+  },
+): Promise<ProcessReviewSummary> {
+  return request("POST", `/reviews/${reviewId}/revise`, input);
+}
+
+export function withdrawReview(
+  reviewId: string,
+): Promise<ProcessReviewSummary> {
+  return request("POST", `/reviews/${reviewId}/withdraw`);
+}
+
+export function adminListReviews(
+  status?: string,
+): Promise<ProcessReviewSummary[]> {
+  const qs = status ? `?status=${status}` : "";
+  return request("GET", `/admin/reviews${qs}`);
+}
+
+export function adminGetReview(reviewId: string): Promise<ReviewDetail> {
+  return request("GET", `/admin/reviews/${reviewId}`);
+}
+
+export function adminApproveReview(
+  reviewId: string,
+): Promise<{ review: ProcessReviewSummary; process_id: string }> {
+  return request("POST", `/admin/reviews/${reviewId}/approve`);
+}
+
+export function adminRequestChanges(
+  reviewId: string,
+  note: string,
+): Promise<ProcessReviewSummary> {
+  return request("POST", `/admin/reviews/${reviewId}/request-changes`, {
+    note,
+  });
+}
+
+export function adminDeclineReview(
+  reviewId: string,
+  reason: string,
+): Promise<ProcessReviewSummary> {
+  return request("POST", `/admin/reviews/${reviewId}/decline`, { reason });
 }

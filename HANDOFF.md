@@ -4,6 +4,65 @@ Updated after every Claude Code session. Records what was built, what's incomple
 
 ---
 
+## Collaborative Admin Creation Review — 2026-06-24
+
+**Status:** Core system built. Backend + frontend + DB migration complete. TypeScript compiles clean. Needs browser testing and integration tests.
+
+### What was built
+
+A review layer between resident submission and public posting. When a non-admin resident submits a vote, project, or conversation, it enters `pending_review` status. An admin reviews and can approve, request changes, or decline. The creator can revise and resubmit or withdraw. Admin users bypass review and create directly.
+
+**Database migration:** `supabase/migrations/20260624000000_process_reviews.sql`
+- `process_reviews` table (id, process_id, creator_id, creator_name, creator_email, status, timestamps)
+- `review_turns` table (id, review_id, turn_number, actor, actor_role, action, note, process_snapshot JSONB) — append-only via trigger
+- `review_id` column added to `processes` table
+- RLS enabled on both tables
+
+**Review module:** `src/modules/civic.review/`
+- `models.ts` — ReviewStatus, ProcessReview, ReviewTurn, SubmitForReviewInput, ReviseInput types
+- `service.ts` — State machine: submitForReview → approveReview / requestChanges / declineReview / reviseAndResubmit / withdrawReview. Read operations for list/detail. On approval: votes → "proposed" status (support threshold), projects → creates actual project row, conversations → "active" status.
+- `events.ts` — All review events emitted with `visibility: "restricted"` (automatically hidden from public feed)
+- `email.ts` — 7 notification functions via existing mailer (creator submitted/approved/declined/changes-requested, admin new-submission/resubmitted/withdrawn)
+
+**Routes + controller:** `src/routes/reviewRoutes.ts`, `src/controllers/reviewController.ts`
+- Creator: POST /reviews/submit, GET /reviews/mine, GET /reviews/:id, POST /reviews/:id/revise, POST /reviews/:id/withdraw
+- Admin: GET /admin/reviews, GET /admin/reviews/:id, POST /admin/reviews/:id/approve, POST /admin/reviews/:id/request-changes, POST /admin/reviews/:id/decline
+
+**Draft submit handler changes (admin bypass):**
+- `voteDraftController.ts` — Non-admin → submitForReview("civic.vote"), admin → direct createProcess
+- `projectDraftController.ts` — Non-admin → submitForReview("civic.project"), admin → direct createProject
+- `deliberationController.ts` — Non-admin → submitForReview("civic.polis_deliberation"), admin → direct createProcess
+- `deliberationRoutes.ts` — POST / changed from requireAdmin to requireResident (controller handles admin check)
+
+**ProcessStatus:** Added `"pending_review"` and `"archived"` to union type. `getAllProcesses()` filters them from public listings.
+
+**Frontend:**
+- `AdminReviews.tsx` + CSS — Admin review queue with status filters, detail view with thread + action buttons
+- `MySubmissions.tsx` + CSS — Creator submission tracker with status, detail view with revise form + withdraw
+- `api.ts` — Review API functions (submit, list, detail, revise, withdraw, admin CRUD)
+- `AdminTabs.tsx` — Added "Reviews" tab
+- `Nav.tsx` — Added "My submissions" link in user menu
+- `ProposeDraftVote.tsx` — Redirect to /my-submissions on review_id response; button text "Submit for review" for non-admin
+- `ProjectDraft.tsx` — Same redirect + button text pattern
+- `ConversationDraft.tsx` + `HostDeliberationForm.tsx` — onSubmittedForReview callback, button text changes
+- `App.tsx` — Routes for /my-submissions, /admin/reviews
+
+### Coverage
+
+- **Votes, projects, conversations:** Routed through review for non-admin residents
+- **Proposals:** Already have their own review flow (AdminProposals) — not changed
+- **Word cloud:** Admin-only creation — not affected
+
+### Incomplete / follow-ups
+
+- **Browser testing:** Not yet verified in browser
+- **Integration tests:** Review state machine tests not yet written (Task 8)
+- **display_name requirement:** The system falls back to email prefix if display_name is null. Consider requiring display_name at submission time.
+- **Conversation approval:** On approval, the process goes "active" but doesn't call the deliberation start flow (Polis integration). Admin may need to manually start after approval.
+- **Proposal review consolidation:** Proposals have a separate review flow. Consider migrating to the unified review system in a future pass.
+
+---
+
 ## Pluggable Voting Methods + Approval Voting — 2026-06-23
 
 **Status:** Complete and deployed. Backend, frontend, unit tests, migration applied to production.

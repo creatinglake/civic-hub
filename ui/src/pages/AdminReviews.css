@@ -1,0 +1,204 @@
+.admin-reviews-page {
+  padding: 0;
+}
+
+.admin-reviews-body {
+  padding: var(--space-md) var(--space-lg) var(--space-xl);
+}
+
+.admin-reviews-body h1 {
+  margin: 0 0 var(--space-xs);
+}
+
+.admin-review-filters {
+  display: flex;
+  gap: var(--space-sm);
+  margin: var(--space-md) 0 var(--space-lg);
+  flex-wrap: wrap;
+}
+
+.admin-review-filter {
+  padding: var(--space-xs) var(--space-md);
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-body);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+
+.admin-review-filter:hover {
+  color: var(--color-text);
+  border-color: var(--color-border-hover);
+}
+
+.admin-review-filter.is-active {
+  color: var(--color-primary-text);
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+}
+
+.admin-review-filter:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+/* Status chips */
+.review-status-pending_review {
+  background: #fff3e0;
+  color: #e65100;
+}
+
+.review-status-changes_requested {
+  background: #fce4ec;
+  color: #c62828;
+}
+
+.review-status-approved {
+  background: var(--success-bg, #e8f5e9);
+  color: var(--success-color, #2e7d32);
+}
+
+.review-status-declined {
+  background: #efebe9;
+  color: #4e342e;
+}
+
+.review-status-withdrawn {
+  background: #eceff1;
+  color: #546e7a;
+}
+
+/* Review thread */
+.review-thread {
+  margin: var(--space-lg) 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.review-turn {
+  padding: var(--space-md);
+  background: var(--color-surface-alt);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+.review-turn-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-xs);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+.review-turn-actor {
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.review-turn-note {
+  margin-top: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  background: var(--color-surface);
+  border-left: 3px solid var(--color-primary);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  white-space: pre-wrap;
+}
+
+/* Admin action buttons */
+.review-actions {
+  display: flex;
+  gap: var(--space-sm);
+  margin-top: var(--space-lg);
+  flex-wrap: wrap;
+}
+
+.review-action-btn {
+  padding: var(--space-sm) var(--space-lg);
+  border: none;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-body);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.review-action-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.review-action-btn--approve {
+  background: var(--success-color, #2e7d32);
+  color: #fff;
+}
+
+.review-action-btn--changes {
+  background: #e65100;
+  color: #fff;
+}
+
+.review-action-btn--decline {
+  background: #c62828;
+  color: #fff;
+}
+
+.review-action-btn--secondary {
+  background: var(--color-surface);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+}
+
+/* Note textarea */
+.review-note-area {
+  margin-top: var(--space-md);
+}
+
+.review-note-area textarea {
+  width: 100%;
+  min-height: 80px;
+  padding: var(--space-sm);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-body);
+  font-size: var(--font-size-sm);
+  resize: vertical;
+}
+
+.review-note-area textarea:focus {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+  border-color: var(--color-primary);
+}
+
+/* Process preview */
+.review-process-preview {
+  margin: var(--space-md) 0;
+  padding: var(--space-md);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+.review-process-preview h3 {
+  margin: 0 0 var(--space-xs);
+}
+
+.review-process-preview p {
+  margin: 0 0 var(--space-sm);
+  color: var(--color-text-muted);
+}
+
+.review-type-badge {
+  display: inline-block;
+  padding: 2px var(--space-xs);
+  font-size: var(--font-size-xs, 0.75rem);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-alt);
+  color: var(--color-text-muted);
+  margin-right: var(--space-xs);
+}

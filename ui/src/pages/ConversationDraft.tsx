@@ -20,6 +20,7 @@ export default function ConversationDraft() {
       <HostDeliberationForm
         onCreated={() => navigate("/deliberations")}
         onCancel={() => navigate(-1)}
+        onSubmittedForReview={(reviewId) => navigate(`/my-submissions/${reviewId}`)}
       />
     </div>
   );

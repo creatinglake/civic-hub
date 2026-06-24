@@ -37,7 +37,7 @@ function friendlyError(msg: string): string {
 
 export default function ProposeDraftVote() {
   const navigate = useNavigate();
-  const { canParticipate } = useAuth();
+  const { canParticipate, isAdmin } = useAuth();
   const { requireAuth, showAuthModal, closeAuthModal, handleAuthComplete } =
     useRequireAuth();
 
@@ -257,7 +257,11 @@ export default function ProposeDraftVote() {
     setError(null);
     try {
       const result = await apiSubmitVoteDraft(draft.id);
-      navigate(`/process/${result.process_id}`);
+      if (result.review_id) {
+        navigate(`/my-submissions/${result.review_id}`);
+      } else {
+        navigate(`/process/${result.process_id}`);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Submit failed");
     } finally {
@@ -467,8 +471,9 @@ export default function ProposeDraftVote() {
             </div>
 
             <p className="confirm-finality-warning">
-              Once submitted, your vote cannot be edited. Please make
-              sure everything looks the way you want it before submitting.
+              {isAdmin
+                ? "Once submitted, your vote cannot be edited. Please make sure everything looks the way you want it before submitting."
+                : "Your vote will be submitted for review before going live. You'll be notified when an admin has reviewed it."}
             </p>
 
             {draft.assistant_helped && (
@@ -505,7 +510,7 @@ export default function ProposeDraftVote() {
                 onClick={confirmSubmit}
                 disabled={submitting}
               >
-                {submitting ? "Submitting..." : "Submit vote"}
+                {submitting ? "Submitting..." : isAdmin ? "Submit vote" : "Submit for review"}
               </button>
               <button
                 type="button"

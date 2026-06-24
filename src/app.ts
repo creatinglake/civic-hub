@@ -30,6 +30,7 @@ import projectRoutes from "./routes/projectRoutes.js";
 import projectDraftRoutes from "./routes/projectDraftRoutes.js";
 import deliberationRoutes from "./routes/deliberationRoutes.js";
 import feedbackRoutes from "./routes/feedbackRoutes.js";
+import reviewRoutes from "./routes/reviewRoutes.js";
 import waitlistRoutes from "./routes/waitlistRoutes.js";
 import {
   digestCronRouter,
@@ -118,6 +119,9 @@ app.use("/wordcloud", wordcloudRoutes);
 
 // Proposal endpoints — user-facing proposal submission and endorsement
 app.use("/proposals", proposalRoutes);
+
+// Process review — resident submissions go through collaborative admin review
+app.use("/reviews", reviewRoutes);
 
 // Admin endpoints — proposal review and conversion to votes
 app.use("/admin", adminRoutes);

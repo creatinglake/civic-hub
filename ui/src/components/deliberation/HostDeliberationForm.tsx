@@ -1,13 +1,16 @@
 import { useState } from "react";
+import { useAuth } from "../../context/AuthContext";
 import { createDeliberation } from "../../services/api";
 import "./HostDeliberationForm.css";
 
 interface Props {
   onCreated: () => void;
   onCancel: () => void;
+  onSubmittedForReview?: (reviewId: string) => void;
 }
 
-export default function HostDeliberationForm({ onCreated, onCancel }: Props) {
+export default function HostDeliberationForm({ onCreated, onCancel, onSubmittedForReview }: Props) {
+  const { isAdmin } = useAuth();
   const [topic, setTopic] = useState("");
   const [framing, setFraming] = useState("");
   const [deadline, setDeadline] = useState("");
@@ -29,14 +32,18 @@ export default function HostDeliberationForm({ onCreated, onCancel }: Props) {
         .map((s) => s.trim())
         .filter((s) => s.length > 0);
 
-      await createDeliberation({
+      const result = await createDeliberation({
         topic: topic.trim(),
         framing: framing.trim(),
         ...(deadline ? { deadline: new Date(deadline).toISOString() } : {}),
         ...(threshold ? { participation_threshold: parseInt(threshold, 10) } : {}),
         ...(seeds.length > 0 ? { seed_statements: seeds } : {}),
-      });
-      onCreated();
+      }) as Record<string, unknown>;
+      if (result.review_id && onSubmittedForReview) {
+        onSubmittedForReview(result.review_id as string);
+      } else {
+        onCreated();
+      }
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -118,7 +125,7 @@ export default function HostDeliberationForm({ onCreated, onCancel }: Props) {
           className="delib-form-submit-btn"
           disabled={!topic.trim() || !framing.trim() || submitting}
         >
-          {submitting ? "Creating..." : "Create Deliberation"}
+          {submitting ? "Submitting..." : isAdmin ? "Create conversation" : "Submit for review"}
         </button>
       </div>
     </form>

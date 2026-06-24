@@ -8,6 +8,8 @@ export type ProcessStatus =
   | "active"
   | "closed"
   | "finalized"
+  | "pending_review"
+  | "archived"
   // Legacy aliases — kept for backward compatibility with civic.proposal
   | "open";
 

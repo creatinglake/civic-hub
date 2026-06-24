@@ -1,5 +1,5 @@
 import type { Request, Response } from "express";
-import { getAuthUser } from "../middleware/auth.js";
+import { getAuthUser, isAdminEmail } from "../middleware/auth.js";
 import { getPolisAdapter } from "../processes/deliberationBoot.js";
 import * as processService from "../services/processService.js";
 import type { PolisDeliberationState } from "../shared/polis_deliberation/types.js";
@@ -11,6 +11,7 @@ import {
   advanceMockStatement,
   addMockStatement,
 } from "../debug/seedDeliberationMocks.js";
+import { submitForReview } from "../modules/civic.review/index.js";
 
 async function getConversationId(processId: string): Promise<string> {
   const process = await processService.getProcess(processId);
@@ -145,21 +146,38 @@ export async function handleCreateDeliberation(req: Request, res: Response): Pro
       return;
     }
 
-    const process = await processService.createProcess({
-      definition: { type: "civic.polis_deliberation", version: "1.0" },
-      title: title || topic,
-      description: description || framing,
-      createdBy: user.id,
-      state: {
-        topic,
-        framing,
-        ...(deadline ? { deadline: new Date(deadline).toISOString() } : {}),
-        ...(participation_threshold ? { participation_threshold: parseInt(participation_threshold, 10) } : {}),
-        ...(seed_statements?.length ? { seed_statements } : {}),
-      },
-    });
+    const statePayload: Record<string, unknown> = {
+      topic,
+      framing,
+      ...(deadline ? { deadline: new Date(deadline).toISOString() } : {}),
+      ...(participation_threshold ? { participation_threshold: parseInt(participation_threshold, 10) } : {}),
+      ...(seed_statements?.length ? { seed_statements } : {}),
+    };
 
-    res.status(201).json(process);
+    if (isAdminEmail(user.email)) {
+      const process = await processService.createProcess({
+        definition: { type: "civic.polis_deliberation", version: "1.0" },
+        title: title || topic,
+        description: description || framing,
+        createdBy: user.id,
+        state: statePayload,
+      });
+
+      res.status(201).json(process);
+    } else {
+      const creatorName = user.display_name || user.email.split("@")[0];
+      const result = await submitForReview({
+        process_type: "civic.polis_deliberation",
+        title: title || topic,
+        description: description || framing,
+        creator_id: user.id,
+        creator_name: creatorName,
+        creator_email: user.email,
+        state: statePayload,
+      });
+
+      res.status(201).json({ review_id: result.review.id });
+    }
   } catch (err: any) {
     handleError(res, err);
   }

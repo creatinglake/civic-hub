@@ -28,6 +28,13 @@ import {
   handlePatchSettings,
 } from "../controllers/adminSettingsController.js";
 import {
+  handleAdminListReviews,
+  handleAdminGetReview,
+  handleAdminApprove,
+  handleAdminRequestChanges,
+  handleAdminDecline,
+} from "../controllers/reviewController.js";
+import {
   handleGetModerationLog,
   handleHideComment,
   handleRemoveAnnouncement,
@@ -60,6 +67,13 @@ router.get("/meeting-summaries", handleAdminListMeetingSummaries);
 router.get("/meeting-summaries/:id", handleAdminGetMeetingSummary);
 router.patch("/meeting-summaries/:id", handlePatchMeetingSummary);
 router.post("/meeting-summaries/:id/approve", handleApproveMeetingSummary);
+
+// Process reviews (collaborative admin review before publication)
+router.get("/reviews", handleAdminListReviews);
+router.get("/reviews/:reviewId", handleAdminGetReview);
+router.post("/reviews/:reviewId/approve", handleAdminApprove);
+router.post("/reviews/:reviewId/request-changes", handleAdminRequestChanges);
+router.post("/reviews/:reviewId/decline", handleAdminDecline);
 
 // Hub settings (admin-configurable; overrides env var fallbacks)
 router.get("/settings", handleGetSettings);

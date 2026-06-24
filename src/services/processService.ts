@@ -177,6 +177,7 @@ export async function getAllProcesses(): Promise<Process[]> {
   const { data, error } = await getDb()
     .from("processes")
     .select("*")
+    .not("status", "in", '("pending_review","archived")')
     .order("created_at", { ascending: false });
   if (error) throw new Error(`ProcessService: ${error.message}`);
   return (data ?? []).map((r) => rowToProcess(r as ProcessRow));

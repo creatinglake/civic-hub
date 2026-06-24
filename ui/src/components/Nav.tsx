@@ -249,6 +249,14 @@ export default function Nav() {
                       type="button"
                       role="menuitem"
                       className="civic-nav-menu-item"
+                      onClick={() => selectMenuItem(() => navigate("/my-submissions"))}
+                    >
+                      My submissions
+                    </button>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      className="civic-nav-menu-item"
                       onClick={() => selectMenuItem(() => navigate("/settings"))}
                     >
                       Settings

@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import { getAuthUser } from "../middleware/auth.js";
+import { getAuthUser, isAdminEmail } from "../middleware/auth.js";
 import {
   createVoteDraft,
   getVoteDraft,
@@ -20,6 +20,7 @@ import {
   createProcess,
   executeAction,
 } from "../services/processService.js";
+import { submitForReview } from "../modules/civic.review/index.js";
 
 const VALID_PHASES = new Set(["brainstorm", "review", "free_form"]);
 
@@ -307,26 +308,44 @@ export async function handleSubmitVoteDraft(
       stateInput.options = draft.custom_options;
     }
 
-    const process = await createProcess({
-      definition: { type: "civic.vote", version: "0.1" },
-      title: draft.title.trim(),
-      description: draft.description.trim() || "",
-      createdBy: user.id,
-      content: optionalLinks.length > 0
-        ? { links: optionalLinks.map((url) => ({ url, label: url })) }
-        : undefined,
-      state: stateInput,
-    });
+    const contentPayload = optionalLinks.length > 0
+      ? { links: optionalLinks.map((url: string) => ({ url, label: url })) }
+      : undefined;
 
-    await executeAction(process.id, {
-      type: "process.activate",
-      actor: user.id,
-      payload: {},
-    });
+    if (isAdminEmail(user.email)) {
+      const process = await createProcess({
+        definition: { type: "civic.vote", version: "0.1" },
+        title: draft.title.trim(),
+        description: draft.description.trim() || "",
+        createdBy: user.id,
+        content: contentPayload,
+        state: stateInput,
+      });
 
-    await setVoteDraftStatus(id, "submitted");
+      await executeAction(process.id, {
+        type: "process.activate",
+        actor: user.id,
+        payload: {},
+      });
 
-    res.status(201).json({ process_id: process.id });
+      await setVoteDraftStatus(id, "submitted");
+      res.status(201).json({ process_id: process.id });
+    } else {
+      const creatorName = user.display_name || user.email.split("@")[0];
+      const result = await submitForReview({
+        process_type: "civic.vote",
+        title: draft.title.trim(),
+        description: draft.description.trim() || "",
+        creator_id: user.id,
+        creator_name: creatorName,
+        creator_email: user.email,
+        content: contentPayload as Record<string, unknown> | undefined,
+        state: stateInput,
+      });
+
+      await setVoteDraftStatus(id, "submitted");
+      res.status(201).json({ review_id: result.review.id });
+    }
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
     console.error("[vote-submit]", message);

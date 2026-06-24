@@ -16,8 +16,8 @@ router.post("/:processId/participate/vote", requireResident, ctrl.vote);
 router.post("/:processId/participate/statement", requireResident, ctrl.submitStatement);
 router.get("/:processId/participate/next", requireResident, ctrl.getNextStatement);
 
-// Admin — create, start, close, regenerate summary
-router.post("/", requireAdmin, ctrl.handleCreateDeliberation);
+// Create — residents submit for review, admins create directly
+router.post("/", requireResident, ctrl.handleCreateDeliberation);
 router.post("/:processId/start", requireAdmin, ctrl.handleStartDeliberation);
 router.post("/:processId/close", requireAdmin, ctrl.closeDeliberation);
 router.post("/:processId/regenerate", requireAdmin, ctrl.regenerateSummary);

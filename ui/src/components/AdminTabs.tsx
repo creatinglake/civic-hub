@@ -12,6 +12,9 @@ import "./AdminTabs.css";
 export default function AdminTabs() {
   return (
     <nav className="admin-tabs" aria-label="Admin sections">
+      <NavLink to="/admin/reviews" className={tabClass}>
+        Reviews
+      </NavLink>
       <NavLink to="/admin/proposals" className={tabClass}>
         Proposals
       </NavLink>
