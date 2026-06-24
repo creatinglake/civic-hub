@@ -4,6 +4,7 @@ import {
   adminApproveMeetingSummary,
   adminBatchApproveMeetingSummaries,
   adminBatchDeleteMeetingSummaries,
+  adminCleanupOrphanedEvents,
   adminGetMeetingSummary,
   adminListMeetingSummaries,
   adminPatchMeetingSummary,
@@ -616,6 +617,22 @@ export default function AdminMeetingSummaries() {
         {actionMessage && (
           <p className="admin-action-message">{actionMessage}</p>
         )}
+
+        <button
+          type="button"
+          className="admin-cancel-button"
+          style={{ fontSize: "var(--font-size-sm)", marginBottom: "var(--space-md)" }}
+          onClick={async () => {
+            try {
+              const result = await adminCleanupOrphanedEvents();
+              setActionMessage(result.message);
+            } catch (err) {
+              setError(err instanceof Error ? err.message : "Cleanup failed");
+            }
+          }}
+        >
+          Clean up orphaned feed entries
+        </button>
 
         {filtered.length > 0 && (
           <div className="batch-bar">
