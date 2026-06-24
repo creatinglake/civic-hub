@@ -91,14 +91,25 @@ export default function MeetingSummaryPage() {
       </div>
 
       <div className="meeting-provenance">
-        <a
-          href={summary.source_minutes_url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="meeting-chip"
-        >
-          View minutes PDF
-        </a>
+        {summary.source_minutes_url ? (
+          <a
+            href={summary.source_minutes_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="meeting-chip"
+          >
+            View minutes PDF
+          </a>
+        ) : summary.source_agenda_url ? (
+          <a
+            href={summary.source_agenda_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="meeting-chip"
+          >
+            View agenda PDF
+          </a>
+        ) : null}
         {summary.source_video_url && (
           <a
             href={summary.source_video_url}
