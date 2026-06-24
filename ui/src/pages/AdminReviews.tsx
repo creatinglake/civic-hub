@@ -204,7 +204,7 @@ export default function AdminReviews() {
               <div className="review-process-preview">
                 <h3>Process content</h3>
                 <p>{(proc?.description as string) || "No description"}</p>
-                {proc?.content && (
+                {!!proc?.content && (
                   <details>
                     <summary>Structured content</summary>
                     <pre
