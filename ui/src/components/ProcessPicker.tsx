@@ -121,7 +121,7 @@ export default function ProcessPicker({ onDismiss, context = null }: Props) {
               What would you like to start?
             </h2>
             <p className="picker-subtitle">
-              Start with one — you can move it to another later.
+              Start your topic with one tool, you can move it to another later.
             </p>
           </div>
           <button
