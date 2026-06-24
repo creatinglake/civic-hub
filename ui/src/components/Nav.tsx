@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from "react";
 import { Link, NavLink, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import AuthModal from "./AuthModal";
-import ProcessPicker from "./ProcessPicker";
 import SearchBar from "./SearchBar";
 import hub from "../config/hub";
 import "./Nav.css";
@@ -65,8 +64,6 @@ export default function Nav() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [showAuth, setShowAuth] = useState(false);
-  const [showPicker, setShowPicker] = useState(false);
-
   const avatarRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const drawerRef = useRef<HTMLDivElement>(null);
@@ -204,19 +201,6 @@ export default function Nav() {
             <div className="civic-nav-search">
               <SearchBar />
             </div>
-
-            {user && (
-              <button
-                type="button"
-                className="civic-nav-start"
-                onClick={() => setShowPicker(true)}
-              >
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-                  <path d="M8 3V13M3 8H13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                </svg>
-                <span className="civic-nav-start-label">Start something</span>
-              </button>
-            )}
 
             <Link
               to="/feedback"
@@ -400,9 +384,6 @@ export default function Nav() {
         />
       )}
 
-      {showPicker && (
-        <ProcessPicker onDismiss={() => setShowPicker(false)} />
-      )}
     </>
   );
 }

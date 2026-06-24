@@ -2641,27 +2641,38 @@
   background: var(--accent-hover, #1f5e3b);
 }
 
-/* --- Home: Start something CTA --- */
+/* --- Home: Raise something CTA --- */
 
-.home-start-cta {
-  padding: 0 var(--space-md);
-  margin-bottom: var(--space-md);
+.home-hero-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-md);
+}
+
+.home-hero-row .hub-info {
+  flex: 1;
+  min-width: 0;
 }
 
 .home-start-btn {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-sm);
-  padding: var(--space-sm) var(--space-lg);
+  gap: 6px;
+  flex-shrink: 0;
+  margin-top: var(--space-lg);
+  margin-right: var(--space-md);
+  padding: 6px 14px;
+  min-height: 36px;
   background: var(--color-action-accent, #C37B51);
   color: #ffffff;
   border: none;
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-pill, 999px);
   font-family: var(--font-body);
-  font-size: var(--font-size-base);
+  font-size: var(--font-size-sm);
   font-weight: 600;
   cursor: pointer;
-  min-height: 44px;
+  white-space: nowrap;
   transition: background 0.15s ease, transform 0.05s ease;
 }
 
@@ -2676,4 +2687,18 @@
 .home-start-btn:focus-visible {
   outline: 2px solid var(--color-focus);
   outline-offset: 2px;
+}
+
+.home-start-btn svg {
+  flex-shrink: 0;
+}
+
+@media (max-width: 767px) {
+  .home-hero-row {
+    flex-direction: column;
+  }
+
+  .home-start-btn {
+    margin: 0 var(--space-md) var(--space-md);
+  }
 }

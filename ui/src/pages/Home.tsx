@@ -17,23 +17,22 @@ export default function Home() {
 
   return (
     <div className="page page-home">
-      <HubInfo />
-      <WelcomeBanner />
-
-      {user && (
-        <div className="home-start-cta">
+      <div className="home-hero-row">
+        <HubInfo />
+        {user && (
           <button
             type="button"
             className="home-start-btn"
             onClick={() => setShowPicker(true)}
           >
-            <svg width="18" height="18" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
               <path d="M8 3V13M3 8H13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
             </svg>
-            Start something
+            Raise something
           </button>
-        </div>
-      )}
+        )}
+      </div>
+      <WelcomeBanner />
 
       {showPicker && (
         <ProcessPicker onDismiss={() => setShowPicker(false)} />
