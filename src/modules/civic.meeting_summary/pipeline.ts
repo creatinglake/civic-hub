@@ -118,6 +118,7 @@ export async function summarizeMeeting(
     meeting_date: entry.meeting_date,
     transcript_text: transcriptText,
     has_video: hasVideo,
+    source_type: sourceType,
   });
 
   const { text, model } = await deps.callClaude({

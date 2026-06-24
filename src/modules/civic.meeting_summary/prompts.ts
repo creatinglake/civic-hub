@@ -84,14 +84,25 @@ export function buildSummarizationPrompt(input: {
   meeting_date: string;
   transcript_text: string;
   has_video: boolean;
+  source_type: "minutes" | "agenda";
 }): string {
+  const isAgenda = input.source_type === "agenda";
+
   const videoGuidance = input.has_video
     ? `For each block, set start_time_seconds to the transcript timestamp where that topic begins (an integer number of seconds from the start of the video). Use ONLY timestamps you can ground in a specific transcript line. If you cannot find the topic in the transcript, set start_time_seconds to null — do NOT default to 0 and do NOT guess.`
-    : `This meeting has NO video recording. Set start_time_seconds to null on every block. Summarize from the minutes document only.`;
+    : `This meeting has NO video recording. Set start_time_seconds to null on every block. Summarize from the ${isAgenda ? "agenda" : "minutes"} document only.`;
 
   const transcriptBlock = input.has_video
     ? `<transcript>\n${input.transcript_text}\n</transcript>`
     : `<transcript>(no video recording for this meeting)</transcript>`;
+
+  const sourceGuidance = isAgenda
+    ? `The attached PDF is the meeting AGENDA (not official minutes). The agenda only lists planned topics — it does NOT record what was actually discussed or decided.
+
+${input.has_video ? `The video transcript is your PRIMARY source for what happened in this meeting. Use it to determine what was discussed, what decisions were made, and what actions were taken. The agenda serves only as a topic guide — the transcript tells you what actually occurred, including any topics that came up during public comment or discussion that were NOT on the agenda.
+
+IMPORTANT: Do not limit yourself to agenda items. If the transcript shows substantive discussion on a topic not listed in the agenda (e.g. public comments, ad-hoc discussions, citizen concerns), include it as a block.` : `Without minutes or a video transcript, summarize the planned agenda items. Note that this is a summary of what was planned, not what actually occurred.`}`
+    : `The minutes document is attached as a PDF. Use it as the authoritative record of what was discussed and what was decided.`;
 
   return `You are summarizing a government meeting into a short list of topic blocks for citizens to read.
 
@@ -102,7 +113,7 @@ ${instructionsBlock(input.extraction_instructions)}
   <date>${input.meeting_date}</date>
 </meeting>
 
-The minutes document is attached as a PDF. Use it as the authoritative record of what was discussed and what was decided.
+${sourceGuidance}
 
 ${transcriptBlock}
 
@@ -110,7 +121,7 @@ Produce a chronological list of topic blocks. Each block covers one coherent age
 
 For each block, produce:
 - topic_title: a short phrase (under 12 words) naming the topic.
-- topic_summary: 1–4 sentences of plain-language summary. Neutral tone. No speculation. If the minutes are unclear or contradict the transcript, say so.
+- topic_summary: 1–4 sentences of plain-language summary. Neutral tone. No speculation. If the ${isAgenda ? "transcript is" : "minutes are"} unclear, say so.
 - start_time_seconds: see below.
 - action_taken: a single short sentence describing any concrete action, motion, vote, or decision from this block. Null if the block is discussion only.
 
