@@ -1,9 +1,12 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import "./ProcessPicker.css";
 
+export type PickerContext = "conversation" | "proposal" | "vote" | "project" | null;
+
 interface Props {
   onDismiss: () => void;
+  context?: PickerContext;
 }
 
 const ICONS = {
@@ -78,9 +81,16 @@ const INTENTS = [
   },
 ];
 
-export default function ProcessPicker({ onDismiss }: Props) {
+export default function ProcessPicker({ onDismiss, context = null }: Props) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const navigate = useNavigate();
+
+  const orderedIntents = useMemo(() => {
+    if (!context) return INTENTS;
+    const promoted = INTENTS.find((i) => i.key === context);
+    if (!promoted) return INTENTS;
+    return [promoted, ...INTENTS.filter((i) => i.key !== context)];
+  }, [context]);
 
   useEffect(() => {
     const d = dialogRef.current;
@@ -127,7 +137,7 @@ export default function ProcessPicker({ onDismiss }: Props) {
         </div>
 
         <div className="picker-cards">
-          {INTENTS.map((intent) => (
+          {orderedIntents.map((intent) => (
             <button
               key={intent.key}
               type="button"

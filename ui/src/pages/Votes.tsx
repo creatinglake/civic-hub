@@ -115,7 +115,7 @@ export default function Votes() {
   return (
     <div className="page page-home">
       <HubInfo />
-      {showPicker && <ProcessPicker onDismiss={() => setShowPicker(false)} />}
+      {showPicker && <ProcessPicker onDismiss={() => setShowPicker(false)} context="vote" />}
 
       {/* Slice 12.1 — Feed | Votes tab strip. Sits below HubInfo so
           site identity reads first, then the user picks what surface
@@ -135,7 +135,7 @@ export default function Votes() {
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
                 <path d="M8 3V13M3 8H13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
               </svg>
-              Raise something
+              Suggest a vote
             </button>
           )}
         </div>

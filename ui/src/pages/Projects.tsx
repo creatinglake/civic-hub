@@ -31,7 +31,7 @@ export default function Projects() {
   return (
     <div className="page page-home">
       <HubInfo />
-      {showPicker && <ProcessPicker onDismiss={() => setShowPicker(false)} />}
+      {showPicker && <ProcessPicker onDismiss={() => setShowPicker(false)} context="project" />}
 
       {loading && <p className="section">Loading...</p>}
       {error && <p className="section error">Failed to load: {error}</p>}
@@ -51,7 +51,7 @@ export default function Projects() {
                   <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
                     <path d="M8 3V13M3 8H13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
                   </svg>
-                  Raise something
+                  Begin a project
                 </button>
               )}
             </div>
