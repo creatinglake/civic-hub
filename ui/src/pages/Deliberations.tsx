@@ -8,13 +8,11 @@ import {
 } from "../services/api";
 import HubInfo from "../components/HubInfo";
 import ProcessPicker from "../components/ProcessPicker";
-import HostDeliberationForm from "../components/deliberation/HostDeliberationForm";
 import "./Deliberations.css";
 
 export default function Deliberations() {
   const { user, isAdmin } = useAuth();
   const [processes, setProcesses] = useState<DeliberationSummary[]>([]);
-  const [showForm, setShowForm] = useState(false);
   const [showPicker, setShowPicker] = useState(false);
   const [loading, setLoading] = useState(true);
   const [startingId, setStartingId] = useState<string | null>(null);
@@ -39,11 +37,6 @@ export default function Deliberations() {
     (p) => p.lifecycle === "closed" || p.lifecycle === "finalized",
   );
   const draft = processes.filter((p) => p.lifecycle === "draft");
-
-  function handleCreated() {
-    setShowForm(false);
-    load();
-  }
 
   async function handleStart(processId: string, topic: string) {
     const confirmed = window.confirm(
@@ -77,31 +70,13 @@ export default function Deliberations() {
               Vote on statements and see where the community stands.
             </p>
           </div>
-          {isAdmin ? (
-            <button
-              type="button"
-              className="section-action-btn deliberations-action-btn"
-              onClick={() => setShowForm(true)}
-              disabled={showForm}
-            >
-              + Create a conversation
-            </button>
-          ) : user ? (
+          {user && (
             <button type="button" className="section-action-btn" onClick={() => setShowPicker(true)}>
               + Raise something
             </button>
-          ) : null}
+          )}
         </div>
       </section>
-
-      {showForm && (
-        <div className="deliberations-form-wrapper">
-          <HostDeliberationForm
-            onCreated={handleCreated}
-            onCancel={() => setShowForm(false)}
-          />
-        </div>
-      )}
 
       {loading && <p className="section deliberations-loading">Loading...</p>}
 
@@ -178,7 +153,7 @@ export default function Deliberations() {
         </section>
       )}
 
-      {!loading && processes.length === 0 && !showForm && (
+      {!loading && processes.length === 0 && (
         <p className="section deliberations-empty">
           No conversations yet.
           {isAdmin ? " Create one to gather community perspectives." : ""}
