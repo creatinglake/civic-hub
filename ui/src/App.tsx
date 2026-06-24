@@ -50,6 +50,13 @@ import "./App.css";
 // not pushed down by 200px of imagery.
 const BANNER_ROUTES = new Set(["/", "/votes", "/propose", "/projects", "/deliberations"]);
 
+function AdminGuard({ children }: { children: React.ReactNode }) {
+  const { isAdmin, loading } = useAuth();
+  if (loading) return null;
+  if (!isAdmin) return <Navigate to="/" replace />;
+  return <>{children}</>;
+}
+
 function BannerSlot() {
   const { pathname } = useLocation();
   if (!BANNER_ROUTES.has(pathname)) return null;
@@ -109,11 +116,11 @@ function AppContent() {
           <Route path="/votes/:id/log" element={<VoteLog />} />
           <Route path="/my-submissions" element={<MySubmissions />} />
           <Route path="/my-submissions/:reviewId" element={<MySubmissions />} />
-          <Route path="/admin/reviews" element={<AdminReviews />} />
-          <Route path="/admin/reviews/:reviewId" element={<AdminReviews />} />
-          <Route path="/admin/proposals" element={<AdminProposals />} />
-          <Route path="/admin/vote-results" element={<AdminVoteResults />} />
-          <Route path="/admin/vote-results/:id" element={<AdminVoteResults />} />
+          <Route path="/admin/reviews" element={<AdminGuard><AdminReviews /></AdminGuard>} />
+          <Route path="/admin/reviews/:reviewId" element={<AdminGuard><AdminReviews /></AdminGuard>} />
+          <Route path="/admin/proposals" element={<AdminGuard><AdminProposals /></AdminGuard>} />
+          <Route path="/admin/vote-results" element={<AdminGuard><AdminVoteResults /></AdminGuard>} />
+          <Route path="/admin/vote-results/:id" element={<AdminGuard><AdminVoteResults /></AdminGuard>} />
           {/* Legacy admin paths from before the Slice 8.5 rename — redirect
               so old bookmarks / nav muscle-memory continue to work. */}
           <Route
@@ -123,13 +130,13 @@ function AppContent() {
           <Route path="/admin/briefs/:id" element={<LegacyBriefAdminRedirect />} />
           <Route
             path="/admin/meeting-summaries"
-            element={<AdminMeetingSummaries />}
+            element={<AdminGuard><AdminMeetingSummaries /></AdminGuard>}
           />
           <Route
             path="/admin/meeting-summaries/:id"
-            element={<AdminMeetingSummaries />}
+            element={<AdminGuard><AdminMeetingSummaries /></AdminGuard>}
           />
-          <Route path="/admin/settings" element={<AdminSettings />} />
+          <Route path="/admin/settings" element={<AdminGuard><AdminSettings /></AdminGuard>} />
           <Route path="/vote-results/:id" element={<VoteResults />} />
           {/* Legacy public path: historical event action_urls point at
               /brief/:id. Vercel rewrites all non-/api requests to
@@ -159,7 +166,7 @@ function AppContent() {
               moderation action, gated server-side via requireAdmin
               and client-side via the AuthContext.isAdmin flag inside
               the page. */}
-          <Route path="/admin/moderation" element={<AdminModeration />} />
+          <Route path="/admin/moderation" element={<AdminGuard><AdminModeration /></AdminGuard>} />
         </Routes>
       </main>
 
