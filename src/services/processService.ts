@@ -368,12 +368,52 @@ export async function saveProcessState(process: Process): Promise<void> {
 }
 
 export async function deleteProcess(id: string): Promise<void> {
+  // Delete associated events first to avoid orphaned feed entries.
+  const { error: evError } = await getDb()
+    .from("events")
+    .delete()
+    .eq("process_id", id);
+  if (evError) {
+    console.warn(
+      `ProcessService: failed to delete events for process ${id}: ${evError.message}`,
+    );
+  }
   const { error } = await getDb().from("processes").delete().eq("id", id);
   if (error) {
     throw new Error(
       `ProcessService: failed to delete process ${id}: ${error.message}`,
     );
   }
+}
+
+/**
+ * Delete events whose process_id doesn't match any existing process.
+ * Returns the count of orphaned events removed.
+ */
+export async function cleanOrphanedEvents(): Promise<number> {
+  const { data: processes } = await getDb()
+    .from("processes")
+    .select("id");
+  const validIds = new Set((processes ?? []).map((p: { id: string }) => p.id));
+
+  const { data: events } = await getDb()
+    .from("events")
+    .select("id, process_id");
+  if (!events || events.length === 0) return 0;
+
+  const orphanIds = (events as Array<{ id: string; process_id: string }>)
+    .filter((e) => !validIds.has(e.process_id))
+    .map((e) => e.id);
+  if (orphanIds.length === 0) return 0;
+
+  const { error } = await getDb()
+    .from("events")
+    .delete()
+    .in("id", orphanIds);
+  if (error) {
+    throw new Error(`Failed to clean orphaned events: ${error.message}`);
+  }
+  return orphanIds.length;
 }
 
 export async function clearProcesses(): Promise<void> {

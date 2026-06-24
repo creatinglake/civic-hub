@@ -41,11 +41,23 @@ import {
   handleRestoreAnnouncement,
   handleRestoreComment,
 } from "../controllers/moderationController.js";
+import { cleanOrphanedEvents } from "../services/processService.js";
 import { requireAdmin } from "../middleware/auth.js";
 
 const router = Router();
 
 router.use(requireAdmin);
+
+// Maintenance
+router.post("/cleanup-orphaned-events", async (_req, res) => {
+  try {
+    const removed = await cleanOrphanedEvents();
+    res.json({ message: `Removed ${removed} orphaned event(s).`, removed });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "unknown";
+    res.status(500).json({ error: msg });
+  }
+});
 
 // Proposals
 router.get("/proposals", handleAdminListProposals);
