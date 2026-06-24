@@ -19,6 +19,8 @@ import {
   handleAdminGetMeetingSummary,
   handleAdminListMeetingSummaries,
   handleApproveMeetingSummary,
+  handleBatchApproveMeetingSummaries,
+  handleBatchDeleteMeetingSummaries,
   handlePatchMeetingSummary,
 } from "../controllers/meetingSummaryController.js";
 import {
@@ -51,7 +53,9 @@ router.get("/vote-results/:id", handleAdminGetVoteResults);
 router.patch("/vote-results/:id", handlePatchVoteResults);
 router.post("/vote-results/:id/approve", handleApproveVoteResults);
 
-// Meeting Summaries
+// Meeting Summaries (batch routes before /:id to avoid Express treating them as an id)
+router.post("/meeting-summaries/batch-approve", handleBatchApproveMeetingSummaries);
+router.post("/meeting-summaries/batch-delete", handleBatchDeleteMeetingSummaries);
 router.get("/meeting-summaries", handleAdminListMeetingSummaries);
 router.get("/meeting-summaries/:id", handleAdminGetMeetingSummary);
 router.patch("/meeting-summaries/:id", handlePatchMeetingSummary);

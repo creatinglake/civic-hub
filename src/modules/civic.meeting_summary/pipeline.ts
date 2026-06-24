@@ -36,6 +36,10 @@ export async function discoverMeetings(
 
 // --- Summarization ---------------------------------------------------------
 
+// Base64 inflates bytes ~33%; Anthropic's request limit is ~32MB.
+// 20MB raw leaves headroom for the prompt text, transcript, and JSON overhead.
+const MAX_PDF_BYTES = 20 * 1024 * 1024;
+
 /**
  * Fetches the minutes PDF and (if present) the YouTube transcript, then
  * asks Claude for a list of topic blocks. Returns the blocks plus the
@@ -57,6 +61,12 @@ export async function summarizeMeeting(
 
   // --- Fetch PDF (required; fail fast if it 404s) ---
   const pdf = await deps.fetchPdf(entry.source_minutes_url);
+  if (pdf.bytes.length > MAX_PDF_BYTES) {
+    const sizeMb = (pdf.bytes.length / (1024 * 1024)).toFixed(1);
+    throw new Error(
+      `PDF too large: ${sizeMb}MB exceeds ${MAX_PDF_BYTES / (1024 * 1024)}MB limit — skipping`,
+    );
+  }
   const pdfBase64 = uint8ToBase64(pdf.bytes);
 
   // --- Fetch transcript (optional — some meetings have no video) ---

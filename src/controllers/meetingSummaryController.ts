@@ -42,6 +42,7 @@ import {
 } from "../modules/civic.meeting_summary/index.js";
 import {
   createProcess,
+  deleteProcess,
   getAllProcesses,
   getProcess,
   saveProcessState,
@@ -50,6 +51,7 @@ import { getAuthUser } from "../middleware/auth.js";
 import { callClaude, DEFAULT_MODEL } from "../utils/anthropic.js";
 import { fetchHtml, fetchPdf } from "../utils/http.js";
 import { fetchYouTubeTranscript } from "../utils/youtube.js";
+import { sendEmail } from "../utils/email.js";
 
 const DEFAULT_CONNECTOR_ID = "floyd-minutes-page";
 const CRON_ACTOR = "system:meeting-summary-cron";
@@ -99,6 +101,58 @@ function modelName(): string {
 function connectorFor(id: string | undefined): MeetingSourceConnector | null {
   const lookup = id?.trim() || DEFAULT_CONNECTOR_ID;
   return CONNECTORS[lookup] ?? null;
+}
+
+function autoPublish(): boolean {
+  const v = process.env.MEETING_SUMMARY_AUTO_PUBLISH?.trim().toLowerCase();
+  return v === "true";
+}
+
+const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+function cutoffDate(): string | null {
+  const v = process.env.MEETING_SUMMARY_CUTOFF_DATE?.trim();
+  if (!v || !ISO_DATE_RE.test(v)) return null;
+  return v;
+}
+
+function adminRecipients(): string[] {
+  return (process.env.CIVIC_ADMIN_EMAILS ?? "")
+    .split(",")
+    .map((e) => e.trim().toLowerCase())
+    .filter((e) => e.length > 0);
+}
+
+async function notifyCronFailures(stats: {
+  discovered: number;
+  created: number;
+  skippedExisting: number;
+  failed: number;
+  failures: Array<{ source_id: string; error: string }>;
+  duration_ms: number;
+}): Promise<void> {
+  const recipients = adminRecipients();
+  if (recipients.length === 0 || stats.failed === 0) return;
+
+  const subject = `[Civic Hub] Meeting summary cron: ${stats.failed} failure(s)`;
+  const failureLines = stats.failures
+    .map((f) => `<li><code>${f.source_id}</code>: ${f.error}</li>`)
+    .join("\n");
+  const html = `
+    <p>The meeting summary cron completed with <strong>${stats.failed} failure(s)</strong>.</p>
+    <ul>${failureLines}</ul>
+    <p>Discovered: ${stats.discovered} | Created: ${stats.created} | Skipped existing: ${stats.skippedExisting} | Duration: ${stats.duration_ms}ms</p>
+  `;
+
+  for (const to of recipients) {
+    try {
+      await sendEmail({ to, subject, html });
+    } catch (err) {
+      console.warn(
+        `[meeting-summary] notification email failed for ${to}: ${err instanceof Error ? err.message : "unknown"}`,
+      );
+    }
+  }
 }
 
 // --- POST /internal/meeting-summary/run ------------------------------------
@@ -156,6 +210,7 @@ export async function handleRunMeetingSummary(
   let created = 0;
   let skippedExisting = 0;
   let failed = 0;
+  const failures: Array<{ source_id: string; error: string }> = [];
 
   try {
     console.log(
@@ -172,6 +227,20 @@ export async function handleRunMeetingSummary(
       `[meeting-summary] discovery done entries=${discovered} duration_ms=${Date.now() - discoveryStart}`,
     );
 
+    // Apply date cutoff to skip old meetings (e.g. pre-2026 backlog with
+    // oversized PDFs that fail every run).
+    const cutoff = cutoffDate();
+    let filteredEntries = entries;
+    if (cutoff) {
+      filteredEntries = entries.filter((e) => e.meeting_date >= cutoff);
+      console.log(
+        `[meeting-summary] date cutoff=${cutoff} filtered ${entries.length}→${filteredEntries.length}`,
+      );
+    }
+
+    // Process newest meetings first so the per-run cap prioritizes recent ones.
+    filteredEntries.sort((a, b) => b.meeting_date.localeCompare(a.meeting_date));
+
     // Build the set of existing source_ids once so the inner loop is O(1).
     const allProcesses = await getAllProcesses();
     const existingSourceIds = new Set<string>();
@@ -182,15 +251,13 @@ export async function handleRunMeetingSummary(
     }
 
     const perRunCap = maxPerRun();
+    const willAutoPublish = autoPublish();
     console.log(
-      `[meeting-summary] processing with per_run_cap=${perRunCap}`,
+      `[meeting-summary] processing with per_run_cap=${perRunCap} auto_publish=${willAutoPublish}`,
     );
 
-    for (const entry of entries) {
+    for (const entry of filteredEntries) {
       if (created >= perRunCap) {
-        // Cap reached — remaining new meetings will be picked up on the
-        // next run. Prevents a backfill batch from exceeding the
-        // function's maxDuration.
         console.log(
           `[meeting-summary] cap reached (${perRunCap}); remaining new meetings deferred to next run`,
         );
@@ -233,8 +300,14 @@ export async function handleRunMeetingSummary(
         };
         await emitCreationEvents(ctx, CRON_ACTOR, state);
 
+        if (willAutoPublish) {
+          await approveMeetingSummary(state, CRON_ACTOR, ctx);
+          newProcess.status = "finalized";
+          await saveProcessState(newProcess);
+        }
+
         console.log(
-          `[meeting-summary] created process=${newProcess.id} source_id=${entry.source_id} blocks=${summary.blocks.length} duration_ms=${Date.now() - meetingStart}`,
+          `[meeting-summary] created process=${newProcess.id} source_id=${entry.source_id} blocks=${summary.blocks.length} published=${willAutoPublish} duration_ms=${Date.now() - meetingStart}`,
         );
         created += 1;
       } catch (err) {
@@ -242,6 +315,7 @@ export async function handleRunMeetingSummary(
         console.warn(
           `[meeting-summary] failed source_id=${entry.source_id} error=${msg} duration_ms=${Date.now() - meetingStart}`,
         );
+        failures.push({ source_id: entry.source_id, error: msg });
         failed += 1;
       }
     }
@@ -256,6 +330,19 @@ export async function handleRunMeetingSummary(
       skipped_existing: skippedExisting,
       failed,
       duration_ms,
+    });
+
+    notifyCronFailures({
+      discovered,
+      created,
+      skippedExisting,
+      failed,
+      failures,
+      duration_ms,
+    }).catch((err) => {
+      console.warn(
+        `[meeting-summary] notification send error: ${err instanceof Error ? err.message : "unknown"}`,
+      );
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
@@ -449,6 +536,122 @@ export async function handleApproveMeetingSummary(
         createdAt: record.createdAt,
         createdBy: record.createdBy,
       }),
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Unknown error";
+    res.status(500).json({ error: message });
+  }
+}
+
+// --- POST /admin/meeting-summaries/batch-approve ---------------------------
+
+export async function handleBatchApproveMeetingSummaries(
+  req: Request,
+  res: Response,
+): Promise<void> {
+  try {
+    const body = (req.body ?? {}) as Record<string, unknown>;
+    const ids = Array.isArray(body.ids) ? (body.ids as string[]) : null;
+    if (!ids || ids.length === 0) {
+      res.status(400).json({ error: "ids[] is required" });
+      return;
+    }
+
+    const backdate = body.backdate === true;
+    const actor = getAuthUser(res).id;
+    let published = 0;
+    let bulkFailed = 0;
+    let skipped = 0;
+
+    for (const id of ids) {
+      const record = await getProcess(id);
+      if (!record || record.definition.type !== "civic.meeting_summary") {
+        skipped += 1;
+        continue;
+      }
+      const state = summaryState(record);
+      if (state.approval_status !== "pending") {
+        skipped += 1;
+        continue;
+      }
+      try {
+        const emit = backdate
+          ? (input: Parameters<typeof emitEvent>[0]) =>
+              emitEvent({
+                ...input,
+                timestamp: `${state.meeting_date}T12:00:00Z`,
+              })
+          : emitEvent;
+        const ctx = {
+          process_id: record.id,
+          hub_id: record.hubId,
+          jurisdiction: record.jurisdiction,
+          emit,
+        };
+        await approveMeetingSummary(state, actor, ctx);
+        record.status = "finalized";
+        await saveProcessState(record);
+        published += 1;
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "unknown";
+        console.warn(
+          `[meeting-summary] batch-approve failed id=${record.id}: ${msg}`,
+        );
+        bulkFailed += 1;
+      }
+    }
+
+    res.json({
+      message: "Batch approve complete.",
+      published,
+      skipped,
+      failed: bulkFailed,
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Unknown error";
+    res.status(500).json({ error: message });
+  }
+}
+
+// --- POST /admin/meeting-summaries/batch-delete ----------------------------
+
+export async function handleBatchDeleteMeetingSummaries(
+  req: Request,
+  res: Response,
+): Promise<void> {
+  try {
+    const body = (req.body ?? {}) as Record<string, unknown>;
+    const ids = Array.isArray(body.ids) ? (body.ids as string[]) : null;
+    if (!ids || ids.length === 0) {
+      res.status(400).json({ error: "ids[] is required" });
+      return;
+    }
+
+    let deleted = 0;
+    let skipped = 0;
+
+    for (const id of ids) {
+      const record = await getProcess(id);
+      if (!record || record.definition.type !== "civic.meeting_summary") {
+        skipped += 1;
+        continue;
+      }
+      try {
+        await deleteProcess(id);
+        deleted += 1;
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "unknown";
+        console.warn(
+          `[meeting-summary] batch-delete failed id=${id}: ${msg}`,
+        );
+        skipped += 1;
+      }
+    }
+
+    res.json({
+      message: "Batch delete complete.",
+      deleted,
+      skipped,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";

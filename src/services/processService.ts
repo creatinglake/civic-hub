@@ -366,6 +366,15 @@ export async function saveProcessState(process: Process): Promise<void> {
   process.updatedAt = now;
 }
 
+export async function deleteProcess(id: string): Promise<void> {
+  const { error } = await getDb().from("processes").delete().eq("id", id);
+  if (error) {
+    throw new Error(
+      `ProcessService: failed to delete process ${id}: ${error.message}`,
+    );
+  }
+}
+
 export async function clearProcesses(): Promise<void> {
   const { error } = await getDb().from("processes").delete().neq("id", "");
   if (error) {

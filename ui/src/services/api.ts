@@ -1070,6 +1070,22 @@ export function adminApproveMeetingSummary(
   return request("POST", `/admin/meeting-summaries/${id}/approve`);
 }
 
+export function adminBatchApproveMeetingSummaries(
+  ids: string[],
+  opts?: { backdate?: boolean },
+): Promise<{ message: string; published: number; skipped: number; failed: number }> {
+  return request("POST", `/admin/meeting-summaries/batch-approve`, {
+    ids,
+    backdate: opts?.backdate ?? false,
+  });
+}
+
+export function adminBatchDeleteMeetingSummaries(
+  ids: string[],
+): Promise<{ message: string; deleted: number; skipped: number }> {
+  return request("POST", `/admin/meeting-summaries/batch-delete`, { ids });
+}
+
 export function getMeetingSummary(id: string): Promise<PublicMeetingSummary> {
   return request("GET", `/meeting-summary/${id}`);
 }

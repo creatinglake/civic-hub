@@ -151,6 +151,7 @@ export interface EmitEventFn {
     jurisdiction: string;
     data: Record<string, unknown>;
     action_url_path?: string;
+    timestamp?: string;
   }): Promise<unknown>;
 }
 

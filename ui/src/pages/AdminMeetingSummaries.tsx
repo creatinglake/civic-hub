@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   adminApproveMeetingSummary,
+  adminBatchApproveMeetingSummaries,
+  adminBatchDeleteMeetingSummaries,
   adminGetMeetingSummary,
   adminListMeetingSummaries,
   adminPatchMeetingSummary,
@@ -37,6 +39,14 @@ export default function AdminMeetingSummaries() {
   const [error, setError] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
 
+  // Batch selection state
+  const [checkedIds, setCheckedIds] = useState<Set<string>>(new Set());
+  const [batchBusy, setBatchBusy] = useState(false);
+  const [confirmBatchAction, setConfirmBatchAction] = useState<
+    "approve" | "delete" | null
+  >(null);
+  const [backdateBatch, setBackdateBatch] = useState(true);
+
   // Review form state
   const [meetingTitle, setMeetingTitle] = useState("");
   const [blocks, setBlocks] = useState<SummaryBlock[]>([]);
@@ -63,6 +73,59 @@ export default function AdminMeetingSummaries() {
     if (statusFilter === "all") return summaries;
     return summaries.filter((s) => s.approval_status === statusFilter);
   }, [summaries, statusFilter]);
+
+  const pendingFiltered = useMemo(
+    () => filtered.filter((s) => s.approval_status === "pending"),
+    [filtered],
+  );
+
+  function toggleChecked(id: string) {
+    setCheckedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleAllPending() {
+    const allChecked = pendingFiltered.every((s) => checkedIds.has(s.id));
+    if (allChecked) {
+      setCheckedIds(new Set());
+    } else {
+      setCheckedIds(new Set(pendingFiltered.map((s) => s.id)));
+    }
+  }
+
+  async function executeBatchAction(action: "approve" | "delete") {
+    const ids = Array.from(checkedIds);
+    if (ids.length === 0) return;
+    setBatchBusy(true);
+    setError(null);
+    setConfirmBatchAction(null);
+    try {
+      if (action === "approve") {
+        const result = await adminBatchApproveMeetingSummaries(ids, {
+          backdate: backdateBatch,
+        });
+        setActionMessage(
+          `Approved ${result.published} summary${result.published !== 1 ? "ies" : ""}.` +
+            (result.failed > 0 ? ` ${result.failed} failed.` : ""),
+        );
+      } else {
+        const result = await adminBatchDeleteMeetingSummaries(ids);
+        setActionMessage(
+          `Deleted ${result.deleted} summary${result.deleted !== 1 ? "ies" : ""}.`,
+        );
+      }
+      setCheckedIds(new Set());
+      loadList();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Batch action failed");
+    } finally {
+      setBatchBusy(false);
+    }
+  }
 
   function openReview(id: string) {
     setError(null);
@@ -524,6 +587,89 @@ export default function AdminMeetingSummaries() {
 
         {loading && <p>Loading…</p>}
         {error && <p className="form-error">{error}</p>}
+        {actionMessage && (
+          <p className="admin-action-message">{actionMessage}</p>
+        )}
+
+        {pendingFiltered.length > 0 && (
+          <div className="batch-bar">
+            <label className="batch-select-all">
+              <input
+                type="checkbox"
+                checked={
+                  pendingFiltered.length > 0 &&
+                  pendingFiltered.every((s) => checkedIds.has(s.id))
+                }
+                onChange={toggleAllPending}
+                disabled={batchBusy}
+              />
+              Select all pending ({pendingFiltered.length})
+            </label>
+            {checkedIds.size > 0 && (
+              <span className="batch-actions">
+                {confirmBatchAction ? (
+                  <>
+                    <span className="batch-confirm-label">
+                      {confirmBatchAction === "approve"
+                        ? `Approve ${checkedIds.size} selected?`
+                        : `Delete ${checkedIds.size} selected?`}
+                    </span>
+                    {confirmBatchAction === "approve" && (
+                      <label className="batch-backdate-label">
+                        <input
+                          type="checkbox"
+                          checked={backdateBatch}
+                          onChange={(e) => setBackdateBatch(e.target.checked)}
+                          disabled={batchBusy}
+                        />
+                        Post with meeting dates
+                      </label>
+                    )}
+                    <button
+                      type="button"
+                      className={
+                        confirmBatchAction === "approve"
+                          ? "admin-convert-button"
+                          : "batch-delete-button"
+                      }
+                      onClick={() => executeBatchAction(confirmBatchAction)}
+                      disabled={batchBusy}
+                    >
+                      {batchBusy ? "Working…" : "Confirm"}
+                    </button>
+                    <button
+                      type="button"
+                      className="admin-cancel-button"
+                      onClick={() => setConfirmBatchAction(null)}
+                      disabled={batchBusy}
+                    >
+                      Cancel
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      className="admin-convert-button"
+                      onClick={() => setConfirmBatchAction("approve")}
+                      disabled={batchBusy}
+                    >
+                      Approve selected ({checkedIds.size})
+                    </button>
+                    <button
+                      type="button"
+                      className="batch-delete-button"
+                      onClick={() => setConfirmBatchAction("delete")}
+                      disabled={batchBusy}
+                    >
+                      Delete selected ({checkedIds.size})
+                    </button>
+                  </>
+                )}
+              </span>
+            )}
+          </div>
+        )}
 
         {!loading && !error && filtered.length === 0 && (
           <p className="empty-state-inline">
@@ -538,13 +684,30 @@ export default function AdminMeetingSummaries() {
             <li
               key={s.id}
               className="admin-proposal-item"
-              onClick={() => openReview(s.id)}
             >
               <div className="admin-proposal-header">
-                <h3>{s.meeting_title}</h3>
+                {s.approval_status === "pending" && (
+                  <input
+                    type="checkbox"
+                    className="batch-checkbox"
+                    checked={checkedIds.has(s.id)}
+                    onChange={() => toggleChecked(s.id)}
+                    onClick={(e) => e.stopPropagation()}
+                    disabled={batchBusy}
+                  />
+                )}
+                <h3
+                  className="admin-proposal-title-link"
+                  onClick={() => openReview(s.id)}
+                >
+                  {s.meeting_title}
+                </h3>
                 <StatusChip status={s.approval_status} />
               </div>
-              <div className="admin-proposal-meta">
+              <div
+                className="admin-proposal-meta"
+                onClick={() => openReview(s.id)}
+              >
                 <span>Meeting {formatDate(s.meeting_date)}</span>
                 <span>{s.block_count} blocks</span>
                 {!s.has_video && <span>PDF-only</span>}

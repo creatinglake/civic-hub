@@ -129,3 +129,85 @@
 .meeting-block-watch-link:hover {
   text-decoration: underline;
 }
+
+/* Batch action bar */
+.batch-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-sm) var(--space-md);
+  padding: var(--space-sm) var(--space-md);
+  margin-bottom: var(--space-md);
+  background: var(--color-surface-muted);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.batch-select-all {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  font-size: var(--font-size-sm);
+  color: var(--color-text);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.batch-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+}
+
+.batch-confirm-label {
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.batch-delete-button {
+  background: #b91c1c;
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 6px 14px;
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.batch-delete-button:hover:not(:disabled) {
+  background: #991b1b;
+}
+
+.batch-delete-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.batch-checkbox {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+.admin-proposal-title-link {
+  cursor: pointer;
+  flex: 1;
+}
+
+.admin-proposal-title-link:hover {
+  color: var(--color-primary);
+}
+
+.batch-backdate-label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  cursor: pointer;
+  white-space: nowrap;
+}
