@@ -236,10 +236,15 @@ export async function approveReview(
     process_snapshot: null,
   });
 
-  // For types with their own tables, create the actual row on approval
+  // For types with their own tables, create the actual row on approval.
+  // These get a fresh id distinct from the placeholder process row, so we
+  // track it to build a correct "view it" link in the approval email.
+  // Votes and conversations flip the process in place, so their live id is
+  // just review.process_id.
+  let liveId = review.process_id;
   if (proc.type === "civic.project") {
     const content = (proc.content ?? {}) as Record<string, unknown>;
-    await createProject(
+    const project = await createProject(
       {
         title: proc.title,
         description: proc.description ?? "",
@@ -251,11 +256,12 @@ export async function approveReview(
       },
       emitEvent,
     );
+    liveId = project.id;
   } else if (proc.type === "civic.proposal") {
     const content = (proc.content ?? {}) as Record<string, unknown>;
     const durationMs = (content.proposal_duration_ms as number) || 30 * 24 * 60 * 60 * 1000;
     const closesAt = new Date(Date.now() + durationMs).toISOString();
-    await createProposal(
+    const proposal = await createProposal(
       {
         title: proc.title,
         description: proc.description ?? undefined,
@@ -267,6 +273,7 @@ export async function approveReview(
       },
       emitEvent,
     );
+    liveId = proposal.id;
   }
 
   // Emit review approved event (restricted)
@@ -303,7 +310,7 @@ export async function approveReview(
       creator_name: review.creator_name,
       process_type: proc.type,
       title: proc.title,
-      process_id: review.process_id,
+      process_id: liveId,
     });
   } catch (e) {
     console.warn("[review] Failed to notify creator of approval:", e);
