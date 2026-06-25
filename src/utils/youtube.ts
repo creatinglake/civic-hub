@@ -123,17 +123,23 @@ async function fetchViaSearchApi(
     clearTimeout(t);
   }
 
-  if (res.status === 429 && attempt < 3) {
-    const wait = (attempt + 1) * 10_000;
-    console.warn(
-      `[meeting-summary] SearchAPI 429 rate-limited — retrying in ${wait / 1000}s (attempt ${attempt + 1}/3)`,
-    );
-    await new Promise((r) => setTimeout(r, wait));
-    return fetchViaSearchApi(videoId, apiKey, attempt + 1);
-  }
-
   if (!res.ok) {
     const body = await res.text();
+    // Monthly quota exhausted — no point retrying.
+    if (res.status === 429 && body.includes("all of the searches")) {
+      throw new Error(
+        `SearchAPI monthly quota exhausted — transcripts unavailable until quota resets`,
+      );
+    }
+    // Transient rate limit — retry with backoff.
+    if (res.status === 429 && attempt < 3) {
+      const wait = (attempt + 1) * 5_000;
+      console.warn(
+        `[meeting-summary] SearchAPI 429 rate-limited — retrying in ${wait / 1000}s (attempt ${attempt + 1}/3)`,
+      );
+      await new Promise((r) => setTimeout(r, wait));
+      return fetchViaSearchApi(videoId, apiKey, attempt + 1);
+    }
     throw new Error(
       `SearchAPI ${res.status}: ${body.slice(0, 300)}`,
     );
