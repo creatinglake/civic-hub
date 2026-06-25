@@ -21,6 +21,7 @@ import {
 } from "./email.js";
 import { emitEvent } from "../../events/eventEmitter.js";
 import { createProject } from "../civic.projects/index.js";
+import { createProposal } from "../civic.proposals/index.js";
 
 const HUB_ID = "civic-hub-local";
 const DEFAULT_JURISDICTION = "local";
@@ -221,7 +222,7 @@ export async function approveReview(
     process_snapshot: null,
   });
 
-  // For projects: create the actual project row in the projects table
+  // For types with their own tables, create the actual row on approval
   if (proc.type === "civic.project") {
     const content = (proc.content ?? {}) as Record<string, unknown>;
     await createProject(
@@ -233,6 +234,22 @@ export async function approveReview(
         assistant_helped: (content.assistant_helped as boolean) ?? false,
         banner_image_url: (content.banner_image_url as string) ?? undefined,
         banner_image_alt: (content.banner_image_alt as string) ?? undefined,
+      },
+      emitEvent,
+    );
+  } else if (proc.type === "civic.proposal") {
+    const content = (proc.content ?? {}) as Record<string, unknown>;
+    const durationMs = (content.proposal_duration_ms as number) || 30 * 24 * 60 * 60 * 1000;
+    const closesAt = new Date(Date.now() + durationMs).toISOString();
+    await createProposal(
+      {
+        title: proc.title,
+        description: proc.description ?? undefined,
+        optional_links: (content.optional_links as string[]) ?? undefined,
+        submitted_by: review.creator_id,
+        category: (content.category as string) ?? undefined,
+        assistant_helped: (content.assistant_helped as boolean) ?? false,
+        closes_at: closesAt,
       },
       emitEvent,
     );
@@ -248,8 +265,8 @@ export async function approveReview(
   });
 
   // Emit public process created event (the process is now live)
-  // Skip for projects — createProject already emits its own event
-  if (proc.type !== "civic.project") {
+  // Skip for projects and proposals — they emit their own events
+  if (proc.type !== "civic.project" && proc.type !== "civic.proposal") {
     await emitEvent({
       event_type: "civic.process.created",
       actor: review.creator_id,

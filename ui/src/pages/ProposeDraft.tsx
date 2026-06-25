@@ -45,7 +45,7 @@ const DURATION_LABELS: Record<number, string> = {
 
 export default function ProposeDraft() {
   const navigate = useNavigate();
-  const { canParticipate } = useAuth();
+  const { canParticipate, isAdmin } = useAuth();
   const { requireAuth, showAuthModal, closeAuthModal, handleAuthComplete } =
     useRequireAuth();
 
@@ -253,8 +253,12 @@ export default function ProposeDraft() {
     setSubmitting(true);
     setError(null);
     try {
-      await apiSubmitDraft(draft.id);
-      navigate("/propose");
+      const result = await apiSubmitDraft(draft.id);
+      if (result.review_id) {
+        navigate(`/my-submissions/${result.review_id}`);
+      } else {
+        navigate("/propose");
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Submit failed");
     } finally {
@@ -453,8 +457,9 @@ export default function ProposeDraft() {
             </p>
 
             <p className="confirm-finality-warning">
-              Once submitted, your proposal cannot be edited. Please make
-              sure everything looks the way you want it before submitting.
+              {isAdmin
+                ? "Once submitted, your proposal cannot be edited. Please make sure everything looks the way you want it before submitting."
+                : "Your proposal will be submitted for review before going live. You'll be notified when an admin has reviewed it."}
             </p>
 
             {draft.assistant_helped && (
@@ -491,7 +496,7 @@ export default function ProposeDraft() {
                 onClick={confirmSubmit}
                 disabled={submitting}
               >
-                {submitting ? "Submitting..." : "Submit proposal"}
+                {submitting ? "Submitting..." : isAdmin ? "Submit proposal" : "Submit for review"}
               </button>
               <button
                 type="button"

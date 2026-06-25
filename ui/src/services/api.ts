@@ -388,7 +388,7 @@ export function reviewDraft(draftId: string): Promise<DraftAssistantResult> {
 
 export function submitDraft(
   draftId: string,
-): Promise<{ proposal: CivicProposalDetail }> {
+): Promise<{ proposal?: CivicProposalDetail; review_id?: string }> {
   return request("POST", `/proposals/drafts/${draftId}/submit`);
 }
 

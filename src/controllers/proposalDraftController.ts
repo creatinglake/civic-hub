@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import { getAuthUser } from "../middleware/auth.js";
+import { getAuthUser, isAdminEmail } from "../middleware/auth.js";
 import { emitEvent } from "../events/eventEmitter.js";
 import {
   createDraft,
@@ -19,6 +19,7 @@ import {
   type Category,
 } from "../modules/civic.proposal_assistant/index.js";
 import { createProposal } from "../modules/civic.proposals/index.js";
+import { submitForReview } from "../modules/civic.review/index.js";
 
 const VALID_CATEGORIES = new Set(["issue", "idea", "project", "concern"]);
 const VALID_PHASES = new Set(["brainstorm", "review", "free_form"]);
@@ -331,24 +332,44 @@ export async function handleSubmitDraft(
         : `Considerations:\n${draft.considerations.trim()}`;
     }
 
-    const closesAt = new Date(Date.now() + draft.proposal_duration_ms).toISOString();
+    if (isAdminEmail(user.email)) {
+      const closesAt = new Date(Date.now() + draft.proposal_duration_ms).toISOString();
 
-    const proposal = await createProposal(
-      {
+      const proposal = await createProposal(
+        {
+          title: draft.title.trim(),
+          description: fullDescription || undefined,
+          optional_links: optionalLinks.length > 0 ? optionalLinks : undefined,
+          submitted_by: user.id,
+          category: draft.category ?? undefined,
+          assistant_helped: draft.assistant_helped,
+          closes_at: closesAt,
+        },
+        emitEvent,
+      );
+
+      await setDraftStatus(id, "submitted");
+      res.status(201).json({ proposal });
+    } else {
+      const creatorName = user.display_name || user.email.split("@")[0];
+      const result = await submitForReview({
+        process_type: "civic.proposal",
         title: draft.title.trim(),
-        description: fullDescription || undefined,
-        optional_links: optionalLinks.length > 0 ? optionalLinks : undefined,
-        submitted_by: user.id,
-        category: draft.category ?? undefined,
-        assistant_helped: draft.assistant_helped,
-        closes_at: closesAt,
-      },
-      emitEvent,
-    );
+        description: fullDescription || "",
+        creator_id: user.id,
+        creator_name: creatorName,
+        creator_email: user.email,
+        content: {
+          optional_links: optionalLinks,
+          category: draft.category ?? null,
+          assistant_helped: draft.assistant_helped,
+          proposal_duration_ms: draft.proposal_duration_ms,
+        },
+      });
 
-    await setDraftStatus(id, "submitted");
-
-    res.status(201).json({ proposal });
+      await setDraftStatus(id, "submitted");
+      res.status(201).json({ review_id: result.review.id });
+    }
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
     res.status(400).json({ error: message });
