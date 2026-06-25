@@ -44,7 +44,7 @@ export async function notifyCreatorSubmitted(input: {
 
   await send({
     to: input.creator_email,
-    subject: `Your ${typeLabel} is in review`,
+    subject: `Your ${typeLabel} "${input.title}" is in review`,
     html: `
       <p>Hi ${input.creator_name},</p>
       <p>Your ${typeLabel} <strong>"${input.title}"</strong> has been submitted and is now in review.</p>
@@ -68,7 +68,7 @@ export async function notifyAdminNewSubmission(input: {
 
   await send({
     to: input.admin_email,
-    subject: `New ${typeLabel} submitted for review by ${input.creator_name}`,
+    subject: `New ${typeLabel} "${input.title}" submitted for review by ${input.creator_name}`,
     html: `
       <p>${input.creator_name} submitted a new ${typeLabel} for review:</p>
       <p><strong>"${input.title}"</strong></p>
@@ -92,7 +92,7 @@ export async function notifyCreatorChangesRequested(input: {
 
   await send({
     to: input.creator_email,
-    subject: `Changes requested on your ${typeLabel}`,
+    subject: `Changes requested on your ${typeLabel} "${input.title}"`,
     html: `
       <p>Hi ${input.creator_name},</p>
       <p>The admin has requested changes on your ${typeLabel} <strong>"${input.title}"</strong>:</p>
@@ -124,7 +124,7 @@ export async function notifyCreatorApproved(input: {
 
   await send({
     to: input.creator_email,
-    subject: `Your ${typeLabel} is now live!`,
+    subject: `Your ${typeLabel} "${input.title}" is now live!`,
     html: `
       <p>Hi ${input.creator_name},</p>
       <p>Your ${typeLabel} <strong>"${input.title}"</strong> has been approved and is now live on the hub.</p>
@@ -148,7 +148,7 @@ export async function notifyCreatorDeclined(input: {
 
   await send({
     to: input.creator_email,
-    subject: `Your ${typeLabel} was not approved`,
+    subject: `Your ${typeLabel} "${input.title}" was not approved`,
     html: `
       <p>Hi ${input.creator_name},</p>
       <p>Your ${typeLabel} <strong>"${input.title}"</strong> was not approved for the following reason:</p>
@@ -172,7 +172,7 @@ export async function notifyAdminResubmitted(input: {
 
   await send({
     to: input.admin_email,
-    subject: `${input.creator_name} revised their ${typeLabel}`,
+    subject: `${input.creator_name} revised their ${typeLabel} "${input.title}"`,
     html: `
       <p>${input.creator_name} has revised and resubmitted their ${typeLabel}:</p>
       <p><strong>"${input.title}"</strong></p>
@@ -192,7 +192,7 @@ export async function notifyAdminWithdrawn(input: {
 
   await send({
     to: input.admin_email,
-    subject: `${input.creator_name} withdrew their ${typeLabel}`,
+    subject: `${input.creator_name} withdrew their ${typeLabel} "${input.title}"`,
     html: `
       <p>${input.creator_name} has withdrawn their ${typeLabel}:</p>
       <p><strong>"${input.title}"</strong></p>
