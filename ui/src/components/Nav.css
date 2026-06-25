@@ -144,6 +144,7 @@
 /* --- Avatar --- */
 
 .civic-nav-avatar {
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -158,6 +159,18 @@
   font-weight: 600;
   cursor: pointer;
   transition: transform 0.15s, box-shadow 0.15s;
+}
+
+/* Attention dot — something in the review flow needs the user. */
+.civic-nav-avatar-dot {
+  position: absolute;
+  top: -1px;
+  right: -1px;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: #e02424;
+  border: 2px solid var(--color-surface, #ffffff);
 }
 
 .civic-nav-avatar:hover {
@@ -313,6 +326,21 @@
 
 .civic-nav-menu-item:hover {
   background: var(--color-surface-alt);
+}
+
+/* Count pill on a menu item — mirrors the avatar attention dot. */
+.civic-nav-menu-badge {
+  float: right;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 10px;
+  background: #e02424;
+  color: #ffffff;
+  font-size: var(--font-size-xs, 0.75rem);
+  font-weight: 600;
+  line-height: 20px;
+  text-align: center;
 }
 
 .civic-nav-menu-item:focus-visible {

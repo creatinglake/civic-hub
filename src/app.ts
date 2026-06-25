@@ -31,6 +31,7 @@ import projectDraftRoutes from "./routes/projectDraftRoutes.js";
 import deliberationRoutes from "./routes/deliberationRoutes.js";
 import feedbackRoutes from "./routes/feedbackRoutes.js";
 import reviewRoutes from "./routes/reviewRoutes.js";
+import notificationRoutes from "./routes/notificationRoutes.js";
 import waitlistRoutes from "./routes/waitlistRoutes.js";
 import {
   digestCronRouter,
@@ -122,6 +123,9 @@ app.use("/proposals", proposalRoutes);
 
 // Process review — resident submissions go through collaborative admin review
 app.use("/reviews", reviewRoutes);
+
+// Notification indicator (review attention badge) — requireAuth, both roles
+app.use("/notifications", notificationRoutes);
 
 // Admin endpoints — proposal review and conversion to votes
 app.use("/admin", adminRoutes);

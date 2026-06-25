@@ -6,6 +6,7 @@ import {
   getReviewDetail,
   reviseReview,
   withdrawReview,
+  markReviewsSeen,
   type ProcessReviewSummary,
   type ReviewDetail,
 } from "../services/api";
@@ -72,6 +73,13 @@ export default function MySubmissions() {
         .finally(() => setLoading(false));
     }
   }, [view, user]);
+
+  // Viewing this page clears the attention badge, regardless of whether the
+  // user acts on anything. Best-effort — failure just leaves the badge up.
+  useEffect(() => {
+    if (!user) return;
+    markReviewsSeen().catch(() => {});
+  }, [user]);
 
   useEffect(() => {
     if (routeId) {

@@ -6,6 +6,7 @@ import {
   adminApproveReview,
   adminRequestChanges,
   adminDeclineReview,
+  markReviewsSeen,
   type ProcessReviewSummary,
   type ReviewDetail,
   type ReviewStatus,
@@ -79,6 +80,11 @@ export default function AdminReviews() {
       loadList();
     }
   }, [view]);
+
+  // Opening the review queue clears the admin attention badge.
+  useEffect(() => {
+    markReviewsSeen().catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (routeId) {

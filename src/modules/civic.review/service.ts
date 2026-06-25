@@ -692,6 +692,53 @@ export async function listCreatorReviews(
   return (data ?? []) as ProcessReview[];
 }
 
+// --- Notification indicator ---
+
+const EPOCH = "1970-01-01T00:00:00.000Z";
+
+/**
+ * Count reviews that need the user's attention and have changed since they
+ * last looked. Admins see the pending_review queue; residents see their own
+ * submissions where the admin requested changes. "Since they last looked"
+ * is keyed off users.reviews_seen_at, so the badge clears on view rather
+ * than on action — notifications never pile up.
+ */
+export async function countReviewNotifications(
+  userId: string,
+  isAdmin: boolean,
+): Promise<number> {
+  const { data: userRow } = await getDb()
+    .from("users")
+    .select("reviews_seen_at")
+    .eq("id", userId)
+    .maybeSingle();
+  const seenAt = (userRow?.reviews_seen_at as string | null) ?? EPOCH;
+
+  let query = getDb()
+    .from("process_reviews")
+    .select("id", { count: "exact", head: true })
+    .gt("updated_at", seenAt);
+
+  if (isAdmin) {
+    query = query.eq("status", "pending_review");
+  } else {
+    query = query.eq("creator_id", userId).eq("status", "changes_requested");
+  }
+
+  const { count, error } = await query;
+  if (error) throw new Error(`Failed to count notifications: ${error.message}`);
+  return count ?? 0;
+}
+
+/** Stamp reviews_seen_at = now() for the user, clearing their badge. */
+export async function markReviewsSeen(userId: string): Promise<void> {
+  const { error } = await getDb()
+    .from("users")
+    .update({ reviews_seen_at: new Date().toISOString() })
+    .eq("id", userId);
+  if (error) throw new Error(`Failed to mark reviews seen: ${error.message}`);
+}
+
 // --- Helpers ---
 
 async function getNextTurnNumber(reviewId: string): Promise<number> {

@@ -21,4 +21,6 @@ export {
   getReviewTurns,
   listReviews,
   listCreatorReviews,
+  countReviewNotifications,
+  markReviewsSeen,
 } from "./service.js";

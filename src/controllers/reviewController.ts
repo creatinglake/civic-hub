@@ -11,8 +11,43 @@ import {
   getReviewTurns,
   listReviews,
   listCreatorReviews,
+  countReviewNotifications,
+  markReviewsSeen,
 } from "../modules/civic.review/index.js";
 import { getDb } from "../db/client.js";
+
+// --- Notification indicator ---
+
+export async function handleGetReviewNotifications(
+  _req: Request,
+  res: Response,
+): Promise<void> {
+  try {
+    const user = getAuthUser(res);
+    const count = await countReviewNotifications(
+      user.id,
+      isAdminEmail(user.email),
+    );
+    res.json({ count });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Unknown error";
+    res.status(500).json({ error: message });
+  }
+}
+
+export async function handleMarkReviewsSeen(
+  _req: Request,
+  res: Response,
+): Promise<void> {
+  try {
+    const user = getAuthUser(res);
+    await markReviewsSeen(user.id);
+    res.json({ ok: true });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Unknown error";
+    res.status(500).json({ error: message });
+  }
+}
 
 // --- Creator endpoints ---
 

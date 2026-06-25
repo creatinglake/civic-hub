@@ -1672,6 +1672,14 @@ export function getMyReviews(): Promise<ProcessReviewSummary[]> {
   return request("GET", "/reviews/mine");
 }
 
+export function getReviewNotificationCount(): Promise<{ count: number }> {
+  return request("GET", "/notifications/reviews/count");
+}
+
+export function markReviewsSeen(): Promise<{ ok: boolean }> {
+  return request("POST", "/notifications/reviews/seen");
+}
+
 export function getReviewDetail(reviewId: string): Promise<ReviewDetail> {
   return request("GET", `/reviews/${reviewId}`);
 }

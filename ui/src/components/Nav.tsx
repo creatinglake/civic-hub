@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, NavLink, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { getReviewNotificationCount } from "../services/api";
 import AuthModal from "./AuthModal";
 import SearchBar from "./SearchBar";
 import hub from "../config/hub";
@@ -64,6 +65,7 @@ export default function Nav() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [showAuth, setShowAuth] = useState(false);
+  const [notifCount, setNotifCount] = useState(0);
   const avatarRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const drawerRef = useRef<HTMLDivElement>(null);
@@ -150,6 +152,32 @@ export default function Nav() {
   const location = useLocation();
   const onFeedbackPage = location.pathname === "/feedback";
 
+  // Review attention badge. Poll on mount, on navigation (so it clears right
+  // after the user views My submissions, which stamps reviews_seen_at), and
+  // every 60s while the tab is open.
+  useEffect(() => {
+    if (!user) {
+      setNotifCount(0);
+      return;
+    }
+    let active = true;
+    const fetchCount = () => {
+      getReviewNotificationCount()
+        .then((r) => {
+          if (active) setNotifCount(r.count);
+        })
+        .catch(() => {
+          /* best-effort — a failed poll shouldn't disrupt the nav */
+        });
+    };
+    fetchCount();
+    const interval = setInterval(fetchCount, 60_000);
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
+  }, [user, location.pathname]);
+
   const initial = user?.email?.[0]?.toUpperCase() ?? "?";
   const bg = user ? avatarColor(user.email) : AVATAR_COLORS[0];
 
@@ -230,6 +258,12 @@ export default function Nav() {
                   onClick={() => setMenuOpen((v) => !v)}
                 >
                   <span aria-hidden="true">{initial}</span>
+                  {notifCount > 0 && (
+                    <span
+                      className="civic-nav-avatar-dot"
+                      aria-label={`${notifCount} item${notifCount === 1 ? "" : "s"} need your attention`}
+                    />
+                  )}
                 </button>
                 {menuOpen && (
                   <div
@@ -252,6 +286,9 @@ export default function Nav() {
                       onClick={() => selectMenuItem(() => navigate("/my-submissions"))}
                     >
                       My submissions
+                      {!isAdmin && notifCount > 0 && (
+                        <span className="civic-nav-menu-badge">{notifCount}</span>
+                      )}
                     </button>
                     <button
                       type="button"
@@ -279,10 +316,13 @@ export default function Nav() {
                         role="menuitem"
                         className="civic-nav-menu-item"
                         onClick={() =>
-                          selectMenuItem(() => navigate("/admin/proposals"))
+                          selectMenuItem(() => navigate("/admin/reviews"))
                         }
                       >
                         Admin panel
+                        {isAdmin && notifCount > 0 && (
+                          <span className="civic-nav-menu-badge">{notifCount}</span>
+                        )}
                       </button>
                     )}
                     <div className="civic-nav-menu-divider" role="separator" />
