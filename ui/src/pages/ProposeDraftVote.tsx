@@ -258,7 +258,7 @@ export default function ProposeDraftVote() {
     try {
       const result = await apiSubmitVoteDraft(draft.id);
       if (result.review_id) {
-        navigate(`/my-submissions/${result.review_id}`);
+        navigate(`/my-submissions/${result.review_id}`, { state: { submitted: true } });
       } else {
         navigate(`/process/${result.process_id}`);
       }

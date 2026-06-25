@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import {
   getMyReviews,
@@ -39,6 +39,7 @@ function formatDate(iso: string): string {
 export default function MySubmissions() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const { reviewId: routeId } = useParams<{ reviewId?: string }>();
   const view: "list" | "detail" = routeId ? "detail" : "list";
 
@@ -46,7 +47,10 @@ export default function MySubmissions() {
   const [detail, setDetail] = useState<ReviewDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [actionMessage, setActionMessage] = useState<string | null>(null);
+  const justSubmitted = (location.state as { submitted?: boolean })?.submitted === true;
+  const [actionMessage, setActionMessage] = useState<string | null>(
+    justSubmitted ? "Submitted! An admin will review your submission shortly." : null,
+  );
 
   // Revise form
   const [showRevise, setShowRevise] = useState(false);

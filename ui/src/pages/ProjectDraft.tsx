@@ -239,7 +239,7 @@ export default function ProjectDraft() {
     try {
       const result = await apiSubmitProjectDraft(draft.id);
       if (result.review_id) {
-        navigate(`/my-submissions/${result.review_id}`);
+        navigate(`/my-submissions/${result.review_id}`, { state: { submitted: true } });
       } else {
         navigate(`/project/${result.project_id}`);
       }
