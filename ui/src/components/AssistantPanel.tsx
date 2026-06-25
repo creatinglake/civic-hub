@@ -91,6 +91,7 @@ export default function AssistantPanel({
         {loading && (
           <div className="assistant-msg msg-assistant">
             <div className="msg-content msg-loading">
+              <span className="thinking-label">Reviewing your draft</span>
               <span className="thinking-dots">
                 <span className="dot" />
                 <span className="dot" />

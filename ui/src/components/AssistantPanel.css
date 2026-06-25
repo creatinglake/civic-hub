@@ -68,7 +68,13 @@
 .msg-loading {
   display: flex;
   align-items: center;
+  gap: 8px;
   min-height: 24px;
+}
+
+.thinking-label {
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
 }
 
 .thinking-dots {
