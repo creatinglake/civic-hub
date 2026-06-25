@@ -270,9 +270,16 @@ app.get("/", (_req, res) => {
 // Health check — includes a DB ping so you can verify Supabase connectivity
 app.get("/health", async (_req, res) => {
   const db = await pingDb();
+  // Vercel injects the deployed commit SHA at build time. Exposing it here
+  // makes "is the latest code actually live?" answerable in one request:
+  // compare this to `git rev-parse HEAD` locally.
+  const commit =
+    process.env.VERCEL_GIT_COMMIT_SHA ?? process.env.GIT_COMMIT_SHA ?? "unknown";
   res.status(db.ok ? 200 : 503).json({
     status: db.ok ? "ok" : "degraded",
     db,
+    commit,
+    deployed_at: process.env.VERCEL_DEPLOYMENT_ID ?? null,
     timestamp: new Date().toISOString(),
   });
 });
