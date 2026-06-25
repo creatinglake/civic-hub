@@ -92,6 +92,12 @@ interface ProcessMeta {
  *     indefinitely so old events keep working without rewriting.
  */
 function kindFromEvent(event: CivicEvent): ProcessKind | null {
+  // Review-lifecycle events (submit / request_changes / approve / etc.) are
+  // restricted, so residents never receive them — but admins DO (the events
+  // endpoint includes restricted events for them, for the moderation log).
+  // They are private review correspondence, not public activity, so never
+  // render them as feed cards regardless of who is viewing.
+  if (event.event_type.startsWith("civic.review.")) return null;
   if (event.event_type === "civic.process.started") {
     const data = event.data as { process?: { type?: string } };
     if (data?.process?.type === "civic.wordcloud") return "civic.wordcloud";

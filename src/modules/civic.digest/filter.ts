@@ -41,6 +41,9 @@ import type { DigestEvent, DigestItem, DigestItemKind } from "./models.js";
  * Same shape the Feed predicate should produce — keep in sync.
  */
 export function isDigestRenderable(event: DigestEvent): boolean {
+  // Review-lifecycle events are private admin/creator correspondence —
+  // never include them in the digest. Mirrors the Feed exclusion.
+  if (event.event_type.startsWith("civic.review.")) return false;
   if (event.event_type === "civic.process.started") {
     // Only civic.vote emits `started` today, so no secondary type check
     // is needed.
