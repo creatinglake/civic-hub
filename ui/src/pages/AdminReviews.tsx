@@ -117,7 +117,7 @@ export default function AdminReviews() {
     setError(null);
     try {
       await adminApproveReview(routeId);
-      setActionMessage("✓ Approved and posted to the feed — it's now live.");
+      setActionMessage("✓ Approved — it's now live (find it under its tab, e.g. Proposals/Votes).");
       const refreshed = await adminGetReview(routeId);
       setDetail(refreshed);
     } catch (err) {
