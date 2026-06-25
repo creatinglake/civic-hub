@@ -208,3 +208,21 @@ export async function setDraftStatus(
 
   if (error) throw new Error(`Drafts: ${error.message}`);
 }
+
+/**
+ * Atomically claim a draft for submission: flip drafting → submitted only
+ * if it is still "drafting". Returns true if this call won the claim, false
+ * if it was already claimed (concurrent/duplicate submit). The conditional
+ * WHERE makes this the single source of truth against double submission.
+ */
+export async function claimDraftForSubmission(id: string): Promise<boolean> {
+  const { data, error } = await getDb()
+    .from("proposal_drafts")
+    .update({ status: "submitted" as DraftStatus })
+    .eq("id", id)
+    .eq("status", "drafting")
+    .select("id");
+
+  if (error) throw new Error(`Drafts: ${error.message}`);
+  return !!data && data.length > 0;
+}

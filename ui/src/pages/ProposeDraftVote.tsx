@@ -252,7 +252,7 @@ export default function ProposeDraftVote() {
   }
 
   async function confirmSubmit() {
-    if (!draft) return;
+    if (!draft || submitting) return;
     setSubmitting(true);
     setError(null);
     try {

@@ -10,6 +10,7 @@ import {
   saveReviewResult,
   applyDraftProposal,
   setDraftStatus,
+  claimDraftForSubmission,
 } from "../modules/civic.proposal_drafts/index.js";
 import {
   callAssistant,
@@ -332,43 +333,57 @@ export async function handleSubmitDraft(
         : `Considerations:\n${draft.considerations.trim()}`;
     }
 
-    if (isAdminEmail(user.email)) {
-      const closesAt = new Date(Date.now() + draft.proposal_duration_ms).toISOString();
+    // Atomically claim the draft BEFORE creating anything. If a concurrent
+    // or duplicate submit already claimed it, bail out without creating a
+    // second proposal/review. On failure we roll the claim back so the user
+    // can retry.
+    const claimed = await claimDraftForSubmission(id);
+    if (!claimed) {
+      res.status(409).json({ error: "Draft has already been submitted" });
+      return;
+    }
 
-      const proposal = await createProposal(
-        {
+    try {
+      if (isAdminEmail(user.email)) {
+        const closesAt = new Date(Date.now() + draft.proposal_duration_ms).toISOString();
+
+        const proposal = await createProposal(
+          {
+            title: draft.title.trim(),
+            description: fullDescription || undefined,
+            optional_links: optionalLinks.length > 0 ? optionalLinks : undefined,
+            submitted_by: user.id,
+            category: draft.category ?? undefined,
+            assistant_helped: draft.assistant_helped,
+            closes_at: closesAt,
+          },
+          emitEvent,
+        );
+
+        res.status(201).json({ proposal });
+      } else {
+        const creatorName = user.display_name || user.email.split("@")[0];
+        const result = await submitForReview({
+          process_type: "civic.proposal",
           title: draft.title.trim(),
-          description: fullDescription || undefined,
-          optional_links: optionalLinks.length > 0 ? optionalLinks : undefined,
-          submitted_by: user.id,
-          category: draft.category ?? undefined,
-          assistant_helped: draft.assistant_helped,
-          closes_at: closesAt,
-        },
-        emitEvent,
-      );
+          description: fullDescription || "",
+          creator_id: user.id,
+          creator_name: creatorName,
+          creator_email: user.email,
+          content: {
+            optional_links: optionalLinks,
+            category: draft.category ?? null,
+            assistant_helped: draft.assistant_helped,
+            proposal_duration_ms: draft.proposal_duration_ms,
+          },
+        });
 
-      await setDraftStatus(id, "submitted");
-      res.status(201).json({ proposal });
-    } else {
-      const creatorName = user.display_name || user.email.split("@")[0];
-      const result = await submitForReview({
-        process_type: "civic.proposal",
-        title: draft.title.trim(),
-        description: fullDescription || "",
-        creator_id: user.id,
-        creator_name: creatorName,
-        creator_email: user.email,
-        content: {
-          optional_links: optionalLinks,
-          category: draft.category ?? null,
-          assistant_helped: draft.assistant_helped,
-          proposal_duration_ms: draft.proposal_duration_ms,
-        },
-      });
-
-      await setDraftStatus(id, "submitted");
-      res.status(201).json({ review_id: result.review.id });
+        res.status(201).json({ review_id: result.review.id });
+      }
+    } catch (workErr) {
+      // The create failed after we claimed — release the draft for retry.
+      await setDraftStatus(id, "drafting").catch(() => {});
+      throw workErr;
     }
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";

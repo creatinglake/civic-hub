@@ -233,7 +233,7 @@ export default function ProjectDraft() {
   }
 
   async function confirmSubmit() {
-    if (!draft) return;
+    if (!draft || submitting) return;
     setSubmitting(true);
     setError(null);
     try {

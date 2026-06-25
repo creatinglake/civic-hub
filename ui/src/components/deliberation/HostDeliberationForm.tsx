@@ -21,7 +21,7 @@ export default function HostDeliberationForm({ onCreated, onCancel, onSubmittedF
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!topic.trim() || !framing.trim()) return;
+    if (!topic.trim() || !framing.trim() || submitting) return;
 
     setSubmitting(true);
     setError(null);
