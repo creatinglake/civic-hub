@@ -87,7 +87,7 @@ async function fetchViaSupadata(
   apiKey: string,
 ): Promise<TranscriptSegment[]> {
   const url = new URL("https://api.supadata.ai/v1/transcript");
-  url.searchParams.set("videoId", videoId);
+  url.searchParams.set("url", `https://www.youtube.com/watch?v=${videoId}`);
   url.searchParams.set("lang", "en");
 
   const controller = new AbortController();
