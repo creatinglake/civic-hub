@@ -196,22 +196,31 @@ export async function approveReview(
   // Everything else goes "active"
   const liveStatus = proc.type === "civic.vote" ? "proposed" : "active";
 
-  // Update process status to live
+  // Atomically claim the review: flip pending_review → approved in a single
+  // conditional update. Only the first caller matches the WHERE clause; any
+  // concurrent or duplicate approve (double-click, network retry, stale UI)
+  // affects 0 rows and bails out here, BEFORE creating a proposal/project.
+  // This is the real guard against duplicate postings.
+  const { data: claimedRows, error: revErr } = await getDb()
+    .from("process_reviews")
+    .update({ status: "approved" as ReviewStatus })
+    .eq("id", reviewId)
+    .eq("status", "pending_review")
+    .select();
+  if (revErr) throw new Error(`Failed to update review: ${revErr.message}`);
+  if (!claimedRows || claimedRows.length === 0) {
+    // Someone already approved this between our read and write.
+    throw new Error("Review has already been approved");
+  }
+  const updatedReview = claimedRows[0];
+
+  // Update process status to live (safe to run once we've claimed the review)
   const now = new Date().toISOString();
   const { error: updErr } = await getDb()
     .from("processes")
     .update({ status: liveStatus, updated_at: now })
     .eq("id", review.process_id);
   if (updErr) throw new Error(`Failed to activate process: ${updErr.message}`);
-
-  // Update review status
-  const { data: updatedReview, error: revErr } = await getDb()
-    .from("process_reviews")
-    .update({ status: "approved" as ReviewStatus })
-    .eq("id", reviewId)
-    .select()
-    .single();
-  if (revErr) throw new Error(`Failed to update review: ${revErr.message}`);
 
   // Add the approval turn
   const nextTurn = await getNextTurnNumber(reviewId);

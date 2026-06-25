@@ -290,7 +290,7 @@ export async function handleAdminApprove(
     const message = err instanceof Error ? err.message : "Unknown error";
     const status = message.includes("not found")
       ? 404
-      : message.includes("Cannot approve")
+      : message.includes("Cannot approve") || message.includes("already been approved")
         ? 409
         : 500;
     res.status(status).json({ error: message });

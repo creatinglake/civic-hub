@@ -117,11 +117,20 @@ export default function AdminReviews() {
     setError(null);
     try {
       await adminApproveReview(routeId);
-      setActionMessage("Approved — process is now live.");
+      setActionMessage("✓ Approved and posted to the feed — it's now live.");
       const refreshed = await adminGetReview(routeId);
       setDetail(refreshed);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Approve failed");
+      const msg = err instanceof Error ? err.message : "Approve failed";
+      // Duplicate / double-submit: the review was already approved. Don't
+      // show a scary error — just reflect the already-live state.
+      if (msg.includes("already been approved")) {
+        setActionMessage("This submission was already approved and posted.");
+        const refreshed = await adminGetReview(routeId).catch(() => null);
+        if (refreshed) setDetail(refreshed);
+      } else {
+        setError(msg);
+      }
     } finally {
       setActing(false);
     }
