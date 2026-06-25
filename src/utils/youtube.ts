@@ -1,15 +1,16 @@
 // YouTube helpers — transcript fetch + video-id extraction.
 //
-// Two transcript paths, picked at call time based on env vars:
+// Three transcript paths, picked at call time based on env vars:
 //
-// 1) SearchAPI.io (preferred when SEARCHAPI_API_KEY is set).
-//    Wraps "give me transcripts for this YouTube URL" into one HTTPS
-//    call. The service runs from residential IPs so YouTube's anti-
-//    scraping defenses don't challenge it. This is the production
-//    path on Vercel — Vercel's cloud IPs get captcha-challenged when
-//    they hit YouTube directly.
+// 1) Supadata.ai (preferred when SUPADATA_API_KEY is set).
+//    Simple REST API for YouTube transcripts. Free tier: 100 credits/month.
+//    Runs from non-cloud IPs so YouTube doesn't block it.
 //
-// 2) `youtube-transcript` library (fallback when no SearchAPI key).
+// 2) SearchAPI.io (fallback when SEARCHAPI_API_KEY is set but no Supadata key).
+//    Legacy path — kept for backwards compatibility but the free tier
+//    (100 searches/month) has been exhausted and paid plans are $40/month.
+//
+// 3) `youtube-transcript` library (last resort when no API keys are set).
 //    Consumes YouTube's public `timedtext` endpoint directly — works
 //    from residential IPs (local dev) but typically fails on cloud
 //    hosts. Kept around so dev / non-Vercel hosts still work.
@@ -55,10 +56,9 @@ const SEARCHAPI_TIMEOUT_MS = 60_000;
  * error (no transcript available, video private, endpoint changed
  * upstream). Callers catch and treat as "no transcript."
  *
- * Routes through SearchAPI.io when SEARCHAPI_API_KEY is set; falls back
- * to the unofficial youtube-transcript library otherwise. The fallback
- * works in local dev but typically fails on cloud hosts (Vercel etc.)
- * because YouTube blocks programmatic access from data-center IPs.
+ * Priority: Supadata.ai → SearchAPI.io → youtube-transcript library.
+ * Cloud hosts (Vercel) need one of the API keys since YouTube blocks
+ * data-center IPs from accessing transcripts directly.
  */
 export async function fetchYouTubeTranscript(
   watchUrl: string,
@@ -68,11 +68,78 @@ export async function fetchYouTubeTranscript(
     throw new Error(`Invalid YouTube watch URL: ${watchUrl}`);
   }
 
-  const key = process.env.SEARCHAPI_API_KEY?.trim();
-  if (key) {
-    return fetchViaSearchApi(id, key);
+  const supadataKey = process.env.SUPADATA_API_KEY?.trim();
+  if (supadataKey) {
+    return fetchViaSupadata(id, supadataKey);
+  }
+
+  const searchApiKey = process.env.SEARCHAPI_API_KEY?.trim();
+  if (searchApiKey) {
+    return fetchViaSearchApi(id, searchApiKey);
   }
   return fetchViaLibrary(id);
+}
+
+const SUPADATA_TIMEOUT_MS = 60_000;
+
+async function fetchViaSupadata(
+  videoId: string,
+  apiKey: string,
+): Promise<TranscriptSegment[]> {
+  const url = new URL("https://api.supadata.ai/v1/transcript");
+  url.searchParams.set("videoId", videoId);
+  url.searchParams.set("lang", "en");
+
+  const controller = new AbortController();
+  const t = setTimeout(() => controller.abort(), SUPADATA_TIMEOUT_MS);
+  let res: Response;
+  try {
+    res = await fetch(url.toString(), {
+      method: "GET",
+      headers: {
+        "x-api-key": apiKey,
+        Accept: "application/json",
+      },
+      signal: controller.signal,
+    });
+  } catch (err) {
+    if (err instanceof Error && err.name === "AbortError") {
+      throw new Error(
+        `Supadata transcript fetch exceeded ${SUPADATA_TIMEOUT_MS}ms — aborted`,
+      );
+    }
+    throw err;
+  } finally {
+    clearTimeout(t);
+  }
+
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`Supadata ${res.status}: ${body.slice(0, 300)}`);
+  }
+
+  const data = (await res.json()) as {
+    content?: Array<{ text?: unknown; offset?: unknown }>;
+    error?: string;
+  };
+
+  if (data.error) {
+    throw new Error(`Supadata error: ${data.error}`);
+  }
+
+  const raw = Array.isArray(data.content) ? data.content : [];
+  const out: TranscriptSegment[] = [];
+  for (const seg of raw) {
+    const text = typeof seg.text === "string" ? seg.text : "";
+    if (text.trim().length === 0) continue;
+    // Supadata returns offset in milliseconds — convert to seconds
+    const offsetMs =
+      typeof seg.offset === "number" && Number.isFinite(seg.offset) && seg.offset >= 0
+        ? seg.offset
+        : 0;
+    out.push({ start: Math.max(0, Math.round(offsetMs / 1000)), text });
+  }
+  return out;
 }
 
 /**
