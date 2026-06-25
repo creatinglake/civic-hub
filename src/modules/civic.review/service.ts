@@ -59,7 +59,7 @@ export async function submitForReview(
     ? handler.initializeState(input.state ?? {})
     : (input.state ?? {});
 
-  // Insert the process in pending_review status
+  // Insert the process first without review_id (FK requires review to exist)
   const processRow = {
     id: processId,
     type: input.process_type,
@@ -73,7 +73,6 @@ export async function submitForReview(
     state: initialState,
     hub_id: HUB_ID,
     created_by: input.creator_id,
-    review_id: reviewId,
   };
 
   const { error: procErr } = await getDb()
@@ -101,6 +100,12 @@ export async function submitForReview(
   if (revErr) {
     throw new Error(`Failed to create review: ${revErr.message}`);
   }
+
+  // Now link the process back to the review
+  await getDb()
+    .from("processes")
+    .update({ review_id: reviewId })
+    .eq("id", processId);
 
   // Insert the first turn
   const turnId = generateId("turn");
