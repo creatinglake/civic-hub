@@ -214,6 +214,15 @@ export async function approveReview(
   }
   const updatedReview = claimedRows[0];
 
+  // The live id used for the approval email link. Declared out here so it
+  // survives past the try block below. Votes/conversations flip in place
+  // (process_id); proposals/projects get a fresh id assigned inside.
+  let liveId = review.process_id;
+
+  // We've claimed the review. If any posting step below fails, roll the claim
+  // back so the review returns to pending_review instead of getting stuck as
+  // "approved" with nothing actually posted.
+  try {
   // Update process status to live (safe to run once we've claimed the review)
   const now = new Date().toISOString();
   const { error: updErr } = await getDb()
@@ -240,8 +249,7 @@ export async function approveReview(
   // These get a fresh id distinct from the placeholder process row, so we
   // track it to build a correct "view it" link in the approval email.
   // Votes and conversations flip the process in place, so their live id is
-  // just review.process_id.
-  let liveId = review.process_id;
+  // just review.process_id (already set above).
   if (proc.type === "civic.project") {
     const content = (proc.content ?? {}) as Record<string, unknown>;
     const project = await createProject(
@@ -301,6 +309,21 @@ export async function approveReview(
         },
       },
     });
+  }
+
+  } catch (workErr) {
+    // Posting failed after we claimed the review — revert review + process
+    // to pending_review so the admin can retry cleanly rather than hitting
+    // "Cannot approve review in status: approved".
+    await getDb()
+      .from("process_reviews")
+      .update({ status: "pending_review" as ReviewStatus })
+      .eq("id", reviewId);
+    await getDb()
+      .from("processes")
+      .update({ status: "pending_review" })
+      .eq("id", review.process_id);
+    throw workErr;
   }
 
   // Notify creator

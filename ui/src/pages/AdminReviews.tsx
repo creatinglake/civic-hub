@@ -122,9 +122,12 @@ export default function AdminReviews() {
       setDetail(refreshed);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Approve failed";
-      // Duplicate / double-submit: the review was already approved. Don't
-      // show a scary error — just reflect the already-live state.
-      if (msg.includes("already been approved")) {
+      // Already-approved (duplicate click, or a prior approve that succeeded):
+      // don't show a scary error — refresh to reflect the live state.
+      if (
+        msg.includes("already been approved") ||
+        msg.includes("Cannot approve review in status: approved")
+      ) {
         setActionMessage("This submission was already approved and posted.");
         const refreshed = await adminGetReview(routeId).catch(() => null);
         if (refreshed) setDetail(refreshed);
