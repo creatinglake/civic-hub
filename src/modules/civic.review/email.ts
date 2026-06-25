@@ -1,5 +1,25 @@
-import { sendEmail } from "../../services/mailer.js";
+import { sendEmail } from "../../utils/email.js";
 import { uiBaseUrl } from "../../utils/baseUrl.js";
+
+/**
+ * Send via Resend (the same path used by the digest and OTP sign-in) and
+ * surface failures loudly. The review module previously used the SMTP
+ * mailer, whose env vars aren't set in prod — so every review email
+ * silently fell back to console logging and never reached anyone.
+ */
+async function send(input: {
+  to: string;
+  subject: string;
+  html: string;
+  text: string;
+}): Promise<void> {
+  const result = await sendEmail(input);
+  if (!result.sent) {
+    console.error(
+      `[review/email] Failed to send "${input.subject}" to ${input.to}: ${result.error}`,
+    );
+  }
+}
 
 function processTypeLabel(type: string): string {
   const labels: Record<string, string> = {
@@ -22,8 +42,8 @@ export async function notifyCreatorSubmitted(input: {
   const ui = uiBaseUrl();
   const url = `${ui}/my-submissions/${input.review_id}`;
 
-  await sendEmail({
-    to: [input.creator_email],
+  await send({
+    to: input.creator_email,
     subject: `Your ${typeLabel} is in review`,
     html: `
       <p>Hi ${input.creator_name},</p>
@@ -46,8 +66,8 @@ export async function notifyAdminNewSubmission(input: {
   const ui = uiBaseUrl();
   const url = `${ui}/admin/reviews/${input.review_id}`;
 
-  await sendEmail({
-    to: [input.admin_email],
+  await send({
+    to: input.admin_email,
     subject: `New ${typeLabel} submitted for review by ${input.creator_name}`,
     html: `
       <p>${input.creator_name} submitted a new ${typeLabel} for review:</p>
@@ -70,8 +90,8 @@ export async function notifyCreatorChangesRequested(input: {
   const ui = uiBaseUrl();
   const url = `${ui}/my-submissions/${input.review_id}`;
 
-  await sendEmail({
-    to: [input.creator_email],
+  await send({
+    to: input.creator_email,
     subject: `Changes requested on your ${typeLabel}`,
     html: `
       <p>Hi ${input.creator_name},</p>
@@ -102,8 +122,8 @@ export async function notifyCreatorApproved(input: {
   const basePath = pathMap[input.process_type] || "/process";
   const url = `${ui}${basePath}/${input.process_id}`;
 
-  await sendEmail({
-    to: [input.creator_email],
+  await send({
+    to: input.creator_email,
     subject: `Your ${typeLabel} is now live!`,
     html: `
       <p>Hi ${input.creator_name},</p>
@@ -126,8 +146,8 @@ export async function notifyCreatorDeclined(input: {
   const ui = uiBaseUrl();
   const url = `${ui}/my-submissions/${input.review_id}`;
 
-  await sendEmail({
-    to: [input.creator_email],
+  await send({
+    to: input.creator_email,
     subject: `Your ${typeLabel} was not approved`,
     html: `
       <p>Hi ${input.creator_name},</p>
@@ -150,8 +170,8 @@ export async function notifyAdminResubmitted(input: {
   const ui = uiBaseUrl();
   const url = `${ui}/admin/reviews/${input.review_id}`;
 
-  await sendEmail({
-    to: [input.admin_email],
+  await send({
+    to: input.admin_email,
     subject: `${input.creator_name} revised their ${typeLabel}`,
     html: `
       <p>${input.creator_name} has revised and resubmitted their ${typeLabel}:</p>
@@ -170,8 +190,8 @@ export async function notifyAdminWithdrawn(input: {
 }): Promise<void> {
   const typeLabel = processTypeLabel(input.process_type);
 
-  await sendEmail({
-    to: [input.admin_email],
+  await send({
+    to: input.admin_email,
     subject: `${input.creator_name} withdrew their ${typeLabel}`,
     html: `
       <p>${input.creator_name} has withdrawn their ${typeLabel}:</p>
