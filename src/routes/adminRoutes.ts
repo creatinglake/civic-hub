@@ -1,4 +1,4 @@
-// Admin routes — proposal review and conversion.
+// Admin routes — proposal moderation and other admin surfaces.
 // Every route requires the authenticated user's email to be listed in
 // the CIVIC_ADMIN_EMAILS env var.
 
@@ -6,7 +6,6 @@ import { Router } from "express";
 import {
   handleAdminListProposals,
   handleAdminGetProposal,
-  handleConvertProposal,
   handleArchiveProposal,
 } from "../controllers/adminController.js";
 import {
@@ -62,7 +61,6 @@ router.post("/cleanup-orphaned-events", async (_req, res) => {
 // Proposals
 router.get("/proposals", handleAdminListProposals);
 router.get("/proposals/:id", handleAdminGetProposal);
-router.post("/proposals/:id/convert", handleConvertProposal);
 router.post("/proposals/:id/archive", handleArchiveProposal);
 
 // Vote results (renamed from /admin/briefs in Slice 8.5; the underlying

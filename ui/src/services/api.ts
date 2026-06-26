@@ -605,40 +605,6 @@ export function adminGetProposal(id: string): Promise<CivicProposalDetail> {
   return request("GET", `/admin/proposals/${id}`);
 }
 
-/** Convert an endorsed proposal to a civic.vote process */
-export interface ConvertProposalInput {
-  actor: string;
-  title?: string;
-  description?: string;
-  question?: string;
-  options?: string[];
-  sections?: ContentSection[];
-  key_tradeoff?: string;
-  learn_more_links?: ContentLink[];
-  community_input?: CommunityInputConfig;
-  after_vote?: AfterVoteInfo;
-  jurisdiction?: string;
-  support_threshold?: number;
-  voting_duration_ms?: number;
-}
-
-export interface ConvertProposalResult {
-  message: string;
-  proposal_id: string;
-  vote_process: {
-    id: string;
-    title: string;
-    status: string;
-  };
-}
-
-export function convertProposal(
-  proposalId: string,
-  input: ConvertProposalInput
-): Promise<ConvertProposalResult> {
-  return request("POST", `/admin/proposals/${proposalId}/convert`, input);
-}
-
 /** Archive a proposal */
 export function archiveProposal(proposalId: string): Promise<{ message: string }> {
   return request("POST", `/admin/proposals/${proposalId}/archive`);

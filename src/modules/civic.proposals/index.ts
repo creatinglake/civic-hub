@@ -285,35 +285,6 @@ export async function hasUserSupported(
 // --- Status transitions ----------------------------------------------------
 
 /**
- * Mark a proposal as converted (after admin creates a vote from it).
- * Called by the service layer, not directly by API consumers.
- */
-export async function markConverted(
-  proposalId: string,
-  voteProcessId?: string,
-): Promise<void> {
-  const proposal = await getProposal(proposalId);
-  if (!proposal) {
-    throw new Error(`Proposal not found: ${proposalId}`);
-  }
-  if (proposal.status !== "endorsed") {
-    throw new Error(
-      `Cannot convert proposal: must be in "endorsed" state, currently "${proposal.status}"`,
-    );
-  }
-
-  const { error } = await getDb()
-    .from("proposals")
-    .update({
-      status: "converted" as ProposalStatus,
-      converted_to_process_id: voteProcessId ?? null,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", proposalId);
-  if (error) throw new Error(`Proposals: ${error.message}`);
-}
-
-/**
  * Archive a proposal (admin action — reject or shelve).
  */
 export async function archiveProposal(proposalId: string): Promise<void> {
