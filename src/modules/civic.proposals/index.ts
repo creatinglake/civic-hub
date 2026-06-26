@@ -96,7 +96,7 @@ export async function createProposal(
     throw new Error("Proposal title is required");
   }
 
-  const id = generateId("prop");
+  const id = input.id ?? generateId("prop");
   const links = (input.optional_links ?? []).filter((l) => l.trim().length > 0);
 
   const row: Record<string, unknown> = {

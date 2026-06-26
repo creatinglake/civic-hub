@@ -13,6 +13,7 @@ import {
   emitProjectUpdated,
   emitProjectCommented,
   emitProjectSentimentChanged,
+  emitProjectArchived,
   type EmitEventFn,
 } from "./events.js";
 
@@ -71,7 +72,7 @@ export async function createProject(
     throw new Error("Project title is required");
   }
 
-  const id = generateId("proj");
+  const id = input.id ?? generateId("proj");
   const sources = (input.sources ?? []).filter((s) => s.trim().length > 0);
 
   const { data, error } = await getDb()
@@ -168,7 +169,11 @@ export async function updateProject(
   return rowToProject(data as ProjectRow);
 }
 
-export async function archiveProject(id: string, actor: string): Promise<void> {
+export async function archiveProject(
+  id: string,
+  actor: string,
+  emit: EmitEventFn,
+): Promise<void> {
   const project = await getProject(id);
   if (!project) throw new Error(`Project not found: ${id}`);
   if (project.user_id !== actor) {
@@ -180,6 +185,10 @@ export async function archiveProject(id: string, actor: string): Promise<void> {
     .update({ status: "archived" as ProjectStatus, updated_at: new Date().toISOString() })
     .eq("id", id);
   if (error) throw new Error(`Projects: ${error.message}`);
+
+  // Archive is a terminal lifecycle transition — emit an event so the change
+  // is recorded in the event log (the source of truth) rather than silent.
+  await emitProjectArchived({ project_id: id, emit }, actor);
 }
 
 // --- Project Updates -------------------------------------------------------

@@ -88,12 +88,13 @@ export async function createProcess(
   const id = input.id ?? generateId("proc");
   const initialState = handler.initializeState(input.state ?? {});
 
-  // Use the state's status if the handler sets one (e.g. civic.vote → "draft"),
-  // otherwise default to "open" (legacy civic.proposal).
+  // Use the state's status if the handler sets one (e.g. civic.vote → "draft").
+  // Handlers that don't declare a resting status (announcements, vote-results,
+  // deliberations) are created live, so default to "active".
   const stateStatus = (initialState as Record<string, unknown>).status as
     | ProcessStatus
     | undefined;
-  const status: ProcessStatus = stateStatus ?? ("open" as ProcessStatus);
+  const status: ProcessStatus = stateStatus ?? "active";
 
   const hubId = input.hubId ?? HUB_ID;
   const jurisdiction = input.jurisdiction ?? DEFAULT_JURISDICTION;
@@ -156,8 +157,9 @@ export async function createProcess(
   return process;
 }
 
-// Inject createProcess into the registry so handlers (e.g. civic.proposal
-// → civic.vote promotion) can spawn new processes without circular imports.
+// Inject createProcess into the registry so handlers (e.g. civic.vote spawning
+// a civic.vote_results record on close) can create processes without circular
+// imports.
 setProcessFactory(createProcess);
 
 // --- Read ------------------------------------------------------------------

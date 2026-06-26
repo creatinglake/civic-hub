@@ -56,10 +56,21 @@ export function bootDeliberation(): ProcessHandler {
 
   const host: PolisHostInterface = {
     async emitEvent(input) {
+      // The shared Polis handler carries the originating process id inside the
+      // event `data` (as `process_id` for lifecycle events, or
+      // `originating_process_id` for outcome delivery). Lift it to the
+      // top-level `process_id` so `GET /events?process_id=` filtering and
+      // orphan-event cleanup joins work, per the Civic Event spec.
+      const data = input.data as Record<string, unknown>;
+      const processId =
+        (typeof data.process_id === "string" && data.process_id) ||
+        (typeof data.originating_process_id === "string" &&
+          data.originating_process_id) ||
+        "";
       await emitEvent({
         event_type: input.event_type,
         actor: input.actor,
-        process_id: "",
+        process_id: processId,
         hub_id: HUB_ID,
         jurisdiction: input.jurisdiction || DEFAULT_JURISDICTION,
         data: input.data,

@@ -59,6 +59,21 @@ export async function emitProjectCommented(
   });
 }
 
+export async function emitProjectArchived(
+  ctx: EventContext,
+  actor: string,
+): Promise<void> {
+  await ctx.emit({
+    event_type: "civic.project.archived",
+    actor,
+    process_id: ctx.project_id,
+    hub_id: ctx.hub_id ?? HUB_ID,
+    jurisdiction: ctx.jurisdiction ?? "local",
+    action_url_path: `/project/${ctx.project_id}`,
+    data: { project: {} },
+  });
+}
+
 export async function emitProjectSentimentChanged(
   ctx: EventContext,
   actor: string,

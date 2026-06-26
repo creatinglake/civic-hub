@@ -214,10 +214,12 @@ export async function approveReview(
   }
   const updatedReview = claimedRows[0];
 
-  // The live id used for the approval email link. Declared out here so it
-  // survives past the try block below. Votes/conversations flip in place
-  // (process_id); proposals/projects get a fresh id assigned inside.
-  let liveId = review.process_id;
+  // The live id used for the approval email link. Every process type now keeps
+  // its single canonical `processes` row id through approval — votes and
+  // conversations flip the row in place, and proposals/projects create their
+  // child row keyed by the SAME id (no forking a new id). So liveId is always
+  // review.process_id.
+  const liveId = review.process_id;
 
   // We've claimed the review. If any posting step below fails, roll the claim
   // back so the review returns to pending_review instead of getting stuck as
@@ -245,15 +247,17 @@ export async function approveReview(
     process_snapshot: null,
   });
 
-  // For types with their own tables, create the actual row on approval.
-  // These get a fresh id distinct from the placeholder process row, so we
-  // track it to build a correct "view it" link in the approval email.
-  // Votes and conversations flip the process in place, so their live id is
-  // just review.process_id (already set above).
+  // For types with their own relational tables, create the child row on
+  // approval — keyed by the canonical process id (review.process_id) so the
+  // placeholder `processes` row becomes the permanent record and we don't fork
+  // a second id. The `processes` row's status was already flipped to live
+  // above. Votes and conversations carry all their state on the `processes`
+  // row, so they need no child row here.
   if (proc.type === "civic.project") {
     const content = (proc.content ?? {}) as Record<string, unknown>;
-    const project = await createProject(
+    await createProject(
       {
+        id: review.process_id,
         title: proc.title,
         description: proc.description ?? "",
         sources: (content.sources as string[]) ?? [],
@@ -264,13 +268,13 @@ export async function approveReview(
       },
       emitEvent,
     );
-    liveId = project.id;
   } else if (proc.type === "civic.proposal") {
     const content = (proc.content ?? {}) as Record<string, unknown>;
     const durationMs = (content.proposal_duration_ms as number) || 30 * 24 * 60 * 60 * 1000;
     const closesAt = new Date(Date.now() + durationMs).toISOString();
-    const proposal = await createProposal(
+    await createProposal(
       {
+        id: review.process_id,
         title: proc.title,
         description: proc.description ?? undefined,
         optional_links: (content.optional_links as string[]) ?? undefined,
@@ -281,7 +285,6 @@ export async function approveReview(
       },
       emitEvent,
     );
-    liveId = proposal.id;
   }
 
   // Emit review approved event (restricted)
