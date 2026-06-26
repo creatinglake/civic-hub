@@ -155,20 +155,6 @@ export async function clearActiveVoteKeysForProcess(
 }
 
 /**
- * @deprecated Use `recordOrUpdateVote`. Kept as a thin alias so any
- * external callers still compile during the slice rollout. New code
- * should use the explicit name.
- */
-export async function recordVote(
-  processId: string,
-  userId: string,
-  choice: string,
-): Promise<{ receipt_id: string }> {
-  const { receipt_id } = await recordOrUpdateVote(processId, userId, choice);
-  return { receipt_id };
-}
-
-/**
  * Look up a single receipt by exact ID.
  * Returns { receipt_id, choice } if found, null if not.
  * Does NOT return timestamps or any identifying info.

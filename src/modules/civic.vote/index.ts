@@ -279,10 +279,15 @@ export async function submitVote(
     throw new Error(`Cannot submit vote: process is in "${state.status}" state, not "active"`);
   }
 
-  // Auto-close if voting window has expired
-  if (state.voting_closes_at && new Date() > new Date(state.voting_closes_at)) {
-    state.status = "closed";
-    throw new Error("Cannot submit vote: voting window has expired");
+  // Auto-close if voting window has expired. Guard against a malformed
+  // voting_closes_at: an Invalid Date makes the comparison silently false,
+  // which would let votes through forever after the close time.
+  if (state.voting_closes_at) {
+    const closesAt = new Date(state.voting_closes_at).getTime();
+    if (Number.isFinite(closesAt) && Date.now() > closesAt) {
+      state.status = "closed";
+      throw new Error("Cannot submit vote: voting window has expired");
+    }
   }
 
   const methodKey = resolveMethod(state);

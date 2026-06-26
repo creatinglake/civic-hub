@@ -7,12 +7,17 @@ import { getRegisteredTypes } from "../processes/registry.js";
 
 export function handleDiscoveryManifest(_req: Request, res: Response): void {
   const hub = baseUrl();
+  // Spec §3.0 requires `jurisdictions` for indexer discovery. Sourced from
+  // env so each deployed hub advertises its own; defaults to "local" to match
+  // the jurisdiction the hub actually stamps on emitted events.
+  const jurisdiction = process.env.CIVIC_JURISDICTION ?? "local";
 
   const manifest = {
     name: "Civic Hub Reference Implementation",
     version: "0.1.0",
     description:
       "A minimal reference implementation of a Civic Hub backend for community governance",
+    jurisdictions: [jurisdiction],
     hub: {
       id: "civic-hub-local",
       type: "civic.hub",

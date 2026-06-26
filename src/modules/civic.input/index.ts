@@ -144,17 +144,6 @@ export async function getInputsByProcess(
   return (data ?? []).map((r) => rowToInput(r as InputRow));
 }
 
-/**
- * Count community inputs for a process.
- */
-export async function getInputCount(process_id: string): Promise<number> {
-  const { count, error } = await getDb()
-    .from("community_inputs")
-    .select("*", { count: "exact", head: true })
-    .eq("process_id", process_id);
-  if (error) throw new Error(`Input: ${error.message}`);
-  return count ?? 0;
-}
 
 /**
  * Get a single community input by ID, including moderation state.

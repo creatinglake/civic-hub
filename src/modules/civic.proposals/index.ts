@@ -281,25 +281,6 @@ export async function hasUserSupported(
   return (count ?? 0) > 0;
 }
 
-/**
- * Get the support records for a proposal.
- */
-export async function getProposalSupports(
-  proposalId: string,
-): Promise<ProposalSupport[]> {
-  const { data, error } = await getDb()
-    .from("proposal_supports")
-    .select("*")
-    .eq("proposal_id", proposalId)
-    .order("created_at", { ascending: true });
-  if (error) throw new Error(`Proposals: ${error.message}`);
-  return (data ?? []).map((row, i) => ({
-    id: `${row.proposal_id}-${i}`, // synthetic — DB uses composite PK
-    proposal_id: row.proposal_id,
-    user_id: row.user_id,
-    created_at: row.created_at,
-  }));
-}
 
 // --- Status transitions ----------------------------------------------------
 

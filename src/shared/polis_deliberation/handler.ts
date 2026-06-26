@@ -184,7 +184,9 @@ export function createPolisDeliberationHandler(
 
           if (state.deadline) {
             const deadlineTime = new Date(state.deadline).getTime();
-            if (Date.now() >= deadlineTime) {
+            // Guard Invalid Date: NaN comparisons are silently false, which
+            // would leave a past-deadline conversation open indefinitely.
+            if (Number.isFinite(deadlineTime) && Date.now() >= deadlineTime) {
               return handler.handleAction(process, {
                 ...action,
                 type: "close",

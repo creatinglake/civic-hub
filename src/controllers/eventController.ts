@@ -35,7 +35,12 @@ export async function handleGetEvents(
   res: Response,
 ): Promise<void> {
   const processId = req.query.process_id as string | undefined;
-  const eventType = req.query.event_type as string | undefined;
+  // Accept `type` as an alias for `event_type`: the hub's own API index
+  // (app.ts) advertised `?type=`, but only `event_type` was read — making
+  // the advertised filter a silent no-op. Support both.
+  const eventType = (req.query.event_type ?? req.query.type) as
+    | string
+    | undefined;
   const pretty = req.query.pretty === "true";
 
   try {
