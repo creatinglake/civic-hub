@@ -224,10 +224,19 @@ export async function approveReview(
     .single();
   if (procErr || !proc) throw new Error("Process not found for review");
 
-  // Determine the live status based on process type
-  // Resident-created votes start as "proposed" (need support threshold)
-  // Everything else goes "active"
-  const liveStatus = proc.type === "civic.vote" ? "proposed" : "active";
+  // Determine the live status based on process type:
+  //  - votes start "proposed" (gather support to threshold)
+  //  - conversations start "draft" — they need an explicit "Start" action to
+  //    create the live Polis conversation before participants can join, so the
+  //    UI shows a "Start Conversation" button (going straight to "active" would
+  //    show the participate panel with no Polis conversation behind it)
+  //  - everything else goes "active"
+  const liveStatus =
+    proc.type === "civic.vote"
+      ? "proposed"
+      : proc.type === "civic.polis_deliberation"
+        ? "draft"
+        : "active";
 
   // Atomically claim the review: flip pending_review → approved in a single
   // conditional update. Only the first caller matches the WHERE clause; any
