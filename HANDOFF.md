@@ -6,7 +6,17 @@ Updated after every Claude Code session. Records what was built, what's incomple
 
 ## Phase 1 — Process unification (Parts A/B/C) — 2026-06-25
 
-**Status:** Implemented on branch `phase-1-process-unification` (civic-hub is its own nested git repo). Four commits + HANDOFF. `npx tsc --noEmit` (backend + frontend) and `npx vitest run tests/unit/` (48 tests) pass. **Live verification PASSED against dev Supabase (`urfmvqhzmamigssqwsya`) on 2026-06-26** — see "Verification" below.
+**Status:** **MERGED to `main` and DEPLOYED to production (2026-06-26)** via PR #21. Verified on dev, then shipped. Votes, proposals, projects, the unified review→approve flow, and the proposed-vote phase all work on prod. `tsc` (backend + frontend) + 48 unit tests pass.
+
+### Post-deploy fixes (on `main`, deployed)
+- **Votes page** (`046b4e4`): stop rendering idea-board proposals in the Votes "Proposed Votes" section — they leaked in via the canonical `processes` row, rendered `NaN` endorsements (thin adapter has no support_count) and linked to `/process/:id` → blank page. Proposals show correctly on the Proposals tab. 
+- **Conversations** (`f877518`): approved conversations land in `draft` (not `active`) so they surface the "Start" path instead of a dead participate panel. (Interim — the Polis rework will replace the manual Start with auto-start-on-approval.)
+- **Prod proposal creation**: failed with `closes_at not in schema cache` — prod was missing the proposal-duration columns. Owner ran the idempotent `ALTER … ADD COLUMN IF NOT EXISTS closes_at / proposal_duration_ms` + `NOTIFY pgrst, 'reload schema'` on prod. Fixed.
+
+### Prod environment notes (learned 2026-06-26)
+- Prod (`nfhyypwoporfggqcerli`) has **legacy Supabase API keys disabled** — uses new `sb_secret_`/`sb_publishable_` keys. Dev (`urfmvqhzmamigssqwsya`) still uses legacy JWT.
+- Prod READ access for diagnosis is set up in gitignored `civic-hub/.env.prod` (`PROD_SUPABASE_*`). Prod is treated READ-ONLY; prod schema changes are handed to the owner as SQL.
+- **Conversations / Polis are NOT really working** — the integration is mock-only (real Polis never connected; bearer-vs-cookie auth mismatch; instance on Hetzner `5.161.68.87` currently unhealthy — `/createuser` blank). Owner wants this fixed for launch as a **dedicated effort** after the unification phases. Conversations are intentionally NOT hidden. See `memory/project_polis_status.md`.
 
 ### Verification (2026-06-26, dev Supabase)
 Ran an authenticated API walkthrough against the running dev hub. All confirmed: Part A unified read layer (`GET /process` 200, proposal visible as `civic.proposal`, **canonical id with no fork** — same `proc_` id on process + child row); Part C-7 convert route → 404; Part B one creation path (admin → `auto_approved=true`, resident → review queue + hidden from public list); step 8 vote lifecycle (approve → `proposed`, endorse increments support, **auto-activates `proposed→active` at threshold 5**) with the full event chain `created→proposed→threshold_met→started` in the feed; step 5 deliberation fix (all recent events carry a top-level `process_id`). Note: `GET /process/:id/state` on a pending-review process returns the vote's *internal* `state.status` (e.g. `draft`), which is the known dual-status quirk — harmless (the process is excluded from the public list + feed; only the admin review queue surfaces it).
