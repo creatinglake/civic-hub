@@ -288,6 +288,11 @@ export async function hasUserSupported(
 
 /**
  * Archive a proposal (admin action — reject or shelve).
+ *
+ * Flips BOTH the child `proposals` row and the canonical `processes` row to
+ * "archived" so the two stay in lockstep — otherwise an archived proposal would
+ * still surface in the unified read layer (getAllProcesses filters on the
+ * processes-row status, not the child row).
  */
 export async function archiveProposal(proposalId: string): Promise<void> {
   const proposal = await getProposal(proposalId);
@@ -298,14 +303,23 @@ export async function archiveProposal(proposalId: string): Promise<void> {
     throw new Error("Cannot archive a converted proposal");
   }
 
+  const now = new Date().toISOString();
   const { error } = await getDb()
     .from("proposals")
     .update({
       status: "archived" as ProposalStatus,
-      updated_at: new Date().toISOString(),
+      updated_at: now,
     })
     .eq("id", proposalId);
   if (error) throw new Error(`Proposals: ${error.message}`);
+
+  // Keep the canonical processes row in sync (no-op for any legacy proposal
+  // that predates the unified processes row).
+  const { error: procErr } = await getDb()
+    .from("processes")
+    .update({ status: "archived", updated_at: now })
+    .eq("id", proposalId);
+  if (procErr) throw new Error(`Proposals: failed to archive process row: ${procErr.message}`);
 }
 
 /**

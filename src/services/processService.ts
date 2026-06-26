@@ -318,6 +318,16 @@ export async function getProcessState(
   let process = await getProcess(processId);
   if (!process) return undefined;
 
+  // Lifecycle gate: the canonical processes-row status is the single source of
+  // truth for what's publicly fetchable. Processes still under review, or
+  // soft-deleted/archived (declined, withdrawn, archived projects/proposals),
+  // are not addressable by direct id — they're admin- or owner-facing only and
+  // surface through their own queues. This also avoids leaking the
+  // pending_review/internal-status mismatch via this read path.
+  if (process.status === "pending_review" || process.status === "archived") {
+    return undefined;
+  }
+
   // Lazily close the process if its deadline has elapsed.
   process = await autoCloseIfExpired(process);
 

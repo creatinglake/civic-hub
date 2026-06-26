@@ -180,11 +180,22 @@ export async function archiveProject(
     throw new Error("Only the project creator can archive this project");
   }
 
+  const now = new Date().toISOString();
   const { error } = await getDb()
     .from("projects")
-    .update({ status: "archived" as ProjectStatus, updated_at: new Date().toISOString() })
+    .update({ status: "archived" as ProjectStatus, updated_at: now })
     .eq("id", id);
   if (error) throw new Error(`Projects: ${error.message}`);
+
+  // Keep the canonical processes row in sync (source of truth for the unified
+  // read layer). Without this, an archived project would still surface in
+  // getAllProcesses, which filters on the processes-row status. No-op for any
+  // legacy project that predates the unified processes row.
+  const { error: procErr } = await getDb()
+    .from("processes")
+    .update({ status: "archived", updated_at: now })
+    .eq("id", id);
+  if (procErr) throw new Error(`Projects: failed to archive process row: ${procErr.message}`);
 
   // Archive is a terminal lifecycle transition — emit an event so the change
   // is recorded in the event log (the source of truth) rather than silent.

@@ -4,6 +4,38 @@ Updated after every Claude Code session. Records what was built, what's incomple
 
 ---
 
+## Phase 2 — One deadline-close + lifecycle alignment — 2026-06-26
+
+**Status:** Built + verified on **dev** (`urfmvqhzmamigssqwsya`). `tsc` (backend + frontend) clean; `vitest run tests/unit/` = 55 passed (+7 new). **NOT yet committed/merged/deployed** — awaiting owner review. **No DB migration needed** (all `status` columns are plain `TEXT`, no CHECK constraints; `"closed"` is a new value only).
+
+Implements `decisions/audit-2026-06-25-process-and-feed-consistency.md` §5 (Phase 2), addressing findings P3, P4, P7 + the dual-status note.
+
+### Part A — one lazy, type-agnostic deadline-close
+- **New optional `ProcessHandler.closeIfExpired(process)`** (`src/processes/types.ts`). Each handler owns its own deadline source, open-check, persistence, and lifecycle event — so process logic stays in the registry, not the service layer (CLAUDE.md constraint #1). `processService.autoCloseIfExpired` is now generic: it just calls `handler.closeIfExpired?.()` from the read paths (`listProcessSummaries` / `getProcessState`), best-effort (a failure is logged and the original process returned). Replaced the old vote-only implementation.
+- **Action-dispatcher injection** (`registry.setActionDispatcher`, mirrors `setProcessFactory`; wired in `processService` to `executeAction`). Lets vote/deliberation `closeIfExpired` dispatch their own persisted close action without importing `processService` (circular dep).
+- **Vote** (`voteProcess.ts`): `closeIfExpired` dispatches `process.close` when `state.status==="active"` and `voting_closes_at` has elapsed — same full close flow (tally, vote-results spawn, events) as before, just moved into the handler.
+- **Proposal** (P3 fixed): new `closeExpiredProposal()` (`modules/civic.proposals/index.ts`) flips the child `proposals` row **and** the canonical `processes` row to `"closed"` and emits **`civic.proposal.closed`** (new helper in `events.ts`). Wired via `proposalAdapter.closeIfExpired`. Proposals previously wrote `closes_at` on approval but nothing ever acted on it.
+- **Deliberation** (P4 fixed): `closeIfExpired` attached in `deliberationBoot.ts` dispatches the shared handler's `close` action when `state.deadline` has elapsed. **The Polis `closeDeliberation` call is now guarded** (`shared/polis_deliberation/handler.ts`): a 401/unreachable Polis is caught and logged so it can't wedge the local lifecycle transition. (Polis itself is still broken — separate track; see `memory/project_polis_status.md`. NOT verified live to avoid an external Polis call; verified by construction — same dispatch path as votes.)
+- **Guarded date parsing** (audit §4): new `src/utils/deadline.ts` `isPastDeadline()` — `Date.parse` + `Number.isFinite`, so a malformed/empty deadline fails safe (`false` = don't close) instead of a silent NaN no-op. Used by vote, deliberation, and proposal close. Unit-tested (`tests/unit/deadline.test.ts`).
+
+### Part B — terminal-vocabulary + dual-status alignment
+- **`ProposalStatus`** (`modules/civic.proposals/models.ts`): added canonical `"closed"`; documented the mapping (`submitted`↔canonical `active`, `closed`, `archived`); marked legacy `endorsed`/`converted` inert (kept so old rows still type-check).
+- **Single source of truth = the canonical `processes` row.** Terminal transitions now keep the child row and the `processes` row in lockstep: `archiveProposal` and `archiveProject` now **also flip the `processes` row to `"archived"`** (previously child-only → archived proposals/projects still leaked into `getAllProcesses`, which filters on the `processes`-row status). `closeExpiredProposal` writes both.
+- **`getProcessState` is now lifecycle-gated**: `pending_review` and `archived` processes return `undefined` (404) — not addressable by direct id. This also hides the pending-review internal-status mismatch from this read path. Vote `proposed`/`threshold_met` and conversation `draft` remain fetchable (the UI needs them).
+- **Frontend**: `ProposalDetail.tsx` (the live `/proposal/:id` page) now renders the new `"closed"` terminal status (badge + "discussion period has ended" notice; "Open until"→"Closed"; support/comment-form already gated to `submitted`). `.status-closed` CSS already existed.
+
+### Verification (2026-06-26, dev Supabase)
+`scripts/verifyPhase2Close.ts` (run: `node --env-file=.env --import tsx scripts/verifyPhase2Close.ts`) — 12/12 checks pass, throwaway rows cleaned: vote auto-closes on read + emits `civic.process.ended` + persists `closed`; malformed `voting_closes_at` (JSONB) keeps the vote `active` (guard works); proposal auto-closes on read + child & process rows `closed` + emits `civic.proposal.closed`; no-deadline proposal stays open; `pending_review` and `archived` not fetchable by id. (Deliberation close not exercised live — external Polis call.)
+
+### Incomplete / follow-ups
+- **Deliberation close not live-verified** — gated on a healthy Polis instance (separate track). The lifecycle/status transition + event + guard are in place; verify end-to-end once Polis is fixed.
+- **Legacy `/process/:id` proposal path** (`ui/src/pages/Process.tsx` `isProposal` branch + `ProposalCard`/`ProposalPanel`) still treats `status==="closed"` as "promoted to vote" — conversion-era dead UI (proposals route to `/proposal/:id` now; that path also renders `NaN` endorsements via the thin adapter). Left untouched this phase; clean up with the Phase 3 feed/UI work or a dedicated frontend pass.
+- **Open-state vocabulary mismatch remains by design**: a live proposal is `submitted` on its child row but `active` on the canonical row. Documented mapping rather than a rename; `/proposals` routes still speak the child vocabulary, the unified read layer speaks canonical.
+- **Lazy-close only fires on the unified read paths** (`listProcessSummaries`/`getProcessState`), matching the vote pattern. The dedicated `/proposals` list/detail routes don't trigger it themselves — fine in practice (any home/feed load closes elapsed proposals), but a direct `/proposals/:id` hit on a just-elapsed proposal could show it open until the next unified read. Centralizing in Phase 3 (`shared/feedActivity.ts`) is the natural fix.
+- Deferred per scope: feed/digest classifier centralization = Phase 3; Polis rework = separate track; event-type renaming / spec rewrites = Phase 4.
+
+---
+
 ## Phase 1 — Process unification (Parts A/B/C) — 2026-06-25
 
 **Status:** **MERGED to `main` and DEPLOYED to production (2026-06-26)** via PR #21. Verified on dev, then shipped. Votes, proposals, projects, the unified review→approve flow, and the proposed-vote phase all work on prod. `tsc` (backend + frontend) + 48 unit tests pass.

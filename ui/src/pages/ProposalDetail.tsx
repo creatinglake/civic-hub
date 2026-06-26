@@ -20,6 +20,7 @@ function formatDate(iso: string): string {
 function statusLabel(status: string): string {
   switch (status) {
     case "submitted": return "open";
+    case "closed": return "closed";
     case "endorsed": return "endorsed";
     case "converted": return "converted to vote";
     case "archived": return "archived";
@@ -30,6 +31,7 @@ function statusLabel(status: string): string {
 function statusClass(status: string): string {
   switch (status) {
     case "submitted": return "status-open";
+    case "closed": return "status-closed";
     case "endorsed": return "admin-status-endorsed";
     case "converted": return "admin-status-converted";
     case "archived": return "admin-status-archived";
@@ -107,8 +109,11 @@ export default function ProposalDetail() {
       <div className="process-meta">
         <span>Proposed by {proposal.submitted_by}</span>
         <span>Submitted {formatDate(proposal.created_at)}</span>
-        {proposal.closes_at && (
+        {proposal.closes_at && proposal.status === "submitted" && (
           <span>Open until {formatDate(proposal.closes_at)}</span>
+        )}
+        {proposal.closes_at && proposal.status === "closed" && (
+          <span>Closed {formatDate(proposal.closes_at)}</span>
         )}
       </div>
 
@@ -167,6 +172,15 @@ export default function ProposalDetail() {
       {proposal.status === "converted" && (
         <div className="proposal-converted-notice">
           <p>This proposal has been converted to an official vote.</p>
+        </div>
+      )}
+
+      {proposal.status === "closed" && (
+        <div className="proposal-archived-notice">
+          <p>
+            This proposal's discussion period has ended. It's no longer
+            accepting support, but the discussion below remains for reference.
+          </p>
         </div>
       )}
 
