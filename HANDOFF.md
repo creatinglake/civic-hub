@@ -4,6 +4,37 @@ Updated after every Claude Code session. Records what was built, what's incomple
 
 ---
 
+## Phase 1 — Process unification (Parts A/B/C) — 2026-06-25
+
+**Status:** Implemented on branch `phase-1-process-unification` (civic-hub is its own nested git repo). Four commits. `npx tsc --noEmit` (backend + frontend) and `npx vitest run tests/unit/` (48 tests) all pass. **Live full-flow verification (review→approve→post→feed for all four types) NOT yet run** — needs the dev hub + Supabase (pending env confirmation).
+
+Implements `decisions/audit-2026-06-25-process-and-feed-consistency.md` Phase 1 + the addenda. Owner decisions captured this session: **all votes** go through the proposed phase (resident AND admin), votes **auto-activate** at the support threshold, and **admin votes behave the same as residents'** (just auto-approved).
+
+### Part A — registry + canonical row (commit "Part A")
+- Thin `ProcessHandler` adapters for `civic.proposal` (`src/processes/proposalAdapter.ts`) and `civic.project` (`src/processes/projectAdapter.ts`), registered in `registry.ts`. All four types now visible to `getAllProcesses`/`listProcessSummaries`. Adapters expose canonical `processes`-row fields only (the sync handler read interface can't query the child tables); rich detail still served by the dedicated `/proposals` and `/projects` routes.
+- Permanent canonical `processes` row: on review approval, the proposal/project **child row is keyed by `review.process_id`** (no forking a new id). `createProposal`/`createProject` gained an optional `id`.
+- Deleted dead `processes/proposalProcess.ts` + its registry entry.
+- Removed the `"open"` ProcessStatus alias. **Finding (contradicts the audit's "dead alias" premise):** `"open"` was the live `createProcess` default for announcements/vote-results/deliberations (they don't declare a resting status). Nothing in the codebase compares to `"open"`, so removing it is runtime-safe; the `createProcess` fallback now defaults to `"active"`. Legacy `"open"` rows remain in the DB but are inert.
+- `archiveProject` now emits `civic.project.archived` (was a silent state change). NOTE: `archiveProject` still has no caller/route — the event fires once archive is wired up.
+- Deliberation events now carry top-level `process_id` (lifted from event `data` in `deliberationBoot.ts`), restoring `GET /events?process_id=` filtering + orphan-event joins.
+
+### Part C step 7 — retire proposal→vote conversion (commit "step 7")
+- Removed `handleConvertProposal`, the `POST /admin/proposals/:id/convert` route, dead `markConverted`/`emitProposalConverted`, and the frontend `convertProposal` client. `AdminProposals.tsx` is now moderation-only (list/detail/archive). Proposals are a pure idea board.
+
+### Part B + step 8 — one creation path; activate the vote proposed phase (commit "Part B + step 8")
+- `submitAsCreator()` (review module) is the single creation path for all four reviewable types: always submit for review, auto-approve when the creator is an admin. Removed the `if(isAdminEmail) create… else submit…` branches from the vote/proposal/project/conversation controllers. `submitForReview` gained a `notify` flag (suppresses "needs review" emails on auto-approve).
+- Uniform response `{ review_id, process_id, auto_approved }` (`CreateProcessResult` in `api.ts`); the four submit pages navigate to the live detail page when `auto_approved`, else to My Submissions.
+- Votes are created in `activation_mode: "proposal_required"` (was hardcoded `"direct"`). `approveReview` runs the vote's `process.propose` so its STATE enters `proposed` (addSupport gates on `state.status`). The existing `VotePanel` endorsement UI now lights up; the vote engine auto-activates at threshold.
+
+### Incomplete / follow-ups
+- **Live verification** of the four create→approve→feed flows + the vote propose→support→threshold→auto-activate→vote→close→results path.
+- **Dual status** on proposals/projects: the `processes` row holds a generic status (e.g. `active`) while the child table holds the type-specific status (`submitted`/`archived`). Reconciling status semantics + terminal vocabulary is Phase 2 (lifecycle alignment).
+- **Legacy `"open"` rows** in the DB are inert; clean up if/when convenient (not required).
+- Deferred per scope: feed-worthiness centralization (`shared/feedActivity.ts`) + digest parity = Phase 3; event-type renaming + spec rewrites = Phase 4.
+- Consider renaming the vote's early `proposed` state (e.g. `gathering_support`) to kill the residual collision with the Proposal process name.
+
+---
+
 ## Collaborative Admin Creation Review — 2026-06-24
 
 **Status:** Core system built. Backend + frontend + DB migration complete. TypeScript compiles clean. Needs browser testing and integration tests.
