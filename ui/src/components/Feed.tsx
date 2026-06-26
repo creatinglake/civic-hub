@@ -129,11 +129,20 @@ function kindFromEvent(event: CivicEvent): ProcessKind | null {
 
     return "generic";
   }
+  // Process creation that IS public feed activity — the "now official" card.
+  // Proposals post when created; conversations post when created. Votes do
+  // NOT post on civic.process.created (they post when they open / pass the
+  // support threshold), so created only surfaces for conversations — this is
+  // what prevents double-posting a vote as both "created" and "opened".
+  if (event.event_type === "civic.proposal.submitted") return "generic";
+  if (event.event_type === "civic.process.created") {
+    const data = event.data as { process?: { type?: string } };
+    return data?.process?.type === "civic.polis_deliberation" ? "generic" : null;
+  }
   // Known lifecycle events that don't produce feed cards — keep excluded.
   // MUST STAY IN SYNC with the digest filter in
   // civic-hub/src/modules/civic.digest/filter.ts.
   const EXCLUDED_TYPES = new Set([
-    "civic.process.created",
     "civic.process.updated",
     "civic.process.ended",
     "civic.process.aggregation_completed",
@@ -144,8 +153,7 @@ function kindFromEvent(event: CivicEvent): ProcessKind | null {
     "civic.process.action_taken",
     "civic.process.comment_added",
     "civic.process.proposal_created",
-    // Legacy proposal events — internal lifecycle, not feed-worthy.
-    "civic.proposal.submitted",
+    // Internal proposal lifecycle — not feed-worthy (creation is handled above).
     "civic.proposal.supported",
     "civic.proposal.endorsed",
     "civic.proposal.converted",

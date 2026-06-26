@@ -366,6 +366,43 @@ export function eventToPost(
       };
     }
 
+    // Proposal created — its public "now official" card. Links to the
+    // proposal page (the event's default action_url points at /process/:id,
+    // which is the wrong page for a proposal, so set href explicitly).
+    case "civic.proposal.submitted": {
+      const data = event.data as { proposal?: { title?: string } };
+      const title =
+        data.proposal?.title ?? getProcessTitle(event.process_id) ?? "New proposal";
+      return {
+        id: event.id,
+        title,
+        pillLabel: "New proposal",
+        pillKind: "generic",
+        summary: summaryFromDescription(getProcessDescription(event.process_id)),
+        timestamp: event.timestamp,
+        href: `/proposal/${event.process_id}`,
+      };
+    }
+
+    // Process created — only conversations post a "created" card here; votes
+    // post when they open (civic.process.started), so created is null for
+    // everything except civic.polis_deliberation to avoid double-posting.
+    case "civic.process.created": {
+      const data = event.data as { process?: { type?: string; title?: string } };
+      if (data.process?.type !== "civic.polis_deliberation") return null;
+      const title =
+        data.process?.title ?? getProcessTitle(event.process_id) ?? "New conversation";
+      return {
+        id: event.id,
+        title,
+        pillLabel: "New conversation",
+        pillKind: "generic",
+        summary: summaryFromDescription(getProcessDescription(event.process_id)),
+        timestamp: event.timestamp,
+        href: `/deliberation/${event.process_id}`,
+      };
+    }
+
     default: {
       const title = getProcessTitle(event.process_id) ?? "Activity";
       return {
