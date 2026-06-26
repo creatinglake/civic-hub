@@ -6,7 +6,12 @@ Updated after every Claude Code session. Records what was built, what's incomple
 
 ## Phase 1 — Process unification (Parts A/B/C) — 2026-06-25
 
-**Status:** Implemented on branch `phase-1-process-unification` (civic-hub is its own nested git repo). Four commits. `npx tsc --noEmit` (backend + frontend) and `npx vitest run tests/unit/` (48 tests) all pass. **Live full-flow verification (review→approve→post→feed for all four types) NOT yet run** — needs the dev hub + Supabase (pending env confirmation).
+**Status:** Implemented on branch `phase-1-process-unification` (civic-hub is its own nested git repo). Four commits + HANDOFF. `npx tsc --noEmit` (backend + frontend) and `npx vitest run tests/unit/` (48 tests) pass. **Live verification PASSED against dev Supabase (`urfmvqhzmamigssqwsya`) on 2026-06-26** — see "Verification" below.
+
+### Verification (2026-06-26, dev Supabase)
+Ran an authenticated API walkthrough against the running dev hub. All confirmed: Part A unified read layer (`GET /process` 200, proposal visible as `civic.proposal`, **canonical id with no fork** — same `proc_` id on process + child row); Part C-7 convert route → 404; Part B one creation path (admin → `auto_approved=true`, resident → review queue + hidden from public list); step 8 vote lifecycle (approve → `proposed`, endorse increments support, **auto-activates `proposed→active` at threshold 5**) with the full event chain `created→proposed→threshold_met→started` in the feed; step 5 deliberation fix (all recent events carry a top-level `process_id`). Note: `GET /process/:id/state` on a pending-review process returns the vote's *internal* `state.status` (e.g. `draft`), which is the known dual-status quirk — harmless (the process is excluded from the public list + feed; only the admin review queue surfaces it).
+
+**Dev DB was behind 3 migrations** (`20260623_vote_method`, `20260624_process_reviews`, `20260625_reviews_seen_at`) — applied to dev via the SQL editor during verification (prod already had them). The repo's Supabase CLI is linked to PROD (`nfhyypwoporfggqcerli`); dev is `urfmvqhzmamigssqwsya`. Verification left some throwaway test rows in dev (test users, drafts, one auto-activated vote, one proposal) — clear with `GET /debug/seed` if desired.
 
 Implements `decisions/audit-2026-06-25-process-and-feed-consistency.md` Phase 1 + the addenda. Owner decisions captured this session: **all votes** go through the proposed phase (resident AND admin), votes **auto-activate** at the support threshold, and **admin votes behave the same as residents'** (just auto-approved).
 
@@ -27,8 +32,7 @@ Implements `decisions/audit-2026-06-25-process-and-feed-consistency.md` Phase 1 
 - Votes are created in `activation_mode: "proposal_required"` (was hardcoded `"direct"`). `approveReview` runs the vote's `process.propose` so its STATE enters `proposed` (addSupport gates on `state.status`). The existing `VotePanel` endorsement UI now lights up; the vote engine auto-activates at threshold.
 
 ### Incomplete / follow-ups
-- **Live verification** of the four create→approve→feed flows + the vote propose→support→threshold→auto-activate→vote→close→results path.
-- **Dual status** on proposals/projects: the `processes` row holds a generic status (e.g. `active`) while the child table holds the type-specific status (`submitted`/`archived`). Reconciling status semantics + terminal vocabulary is Phase 2 (lifecycle alignment).
+- **Dual status** (now confirmed in verification): the `processes` row holds the lifecycle status (`pending_review`/`proposed`/`active`) while the vote's `state.status` and the proposal/project child rows hold their own status, and `GET /process/:id/state` returns the latter. Reconciling status semantics + terminal vocabulary is Phase 2 (lifecycle alignment). Consider also status-gating `getProcessState` so pending-review processes aren't fetchable by direct id (pre-existing, out of Phase 1 scope).
 - **Legacy `"open"` rows** in the DB are inert; clean up if/when convenient (not required).
 - Deferred per scope: feed-worthiness centralization (`shared/feedActivity.ts`) + digest parity = Phase 3; event-type renaming + spec rewrites = Phase 4.
 - Consider renaming the vote's early `proposed` state (e.g. `gathering_support`) to kill the residual collision with the Proposal process name.
