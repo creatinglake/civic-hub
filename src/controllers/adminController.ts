@@ -16,6 +16,7 @@ import {
   archiveProposal,
 } from "../modules/civic.proposals/index.js";
 import { emitProposalConverted } from "../modules/civic.proposals/events.js";
+import { DEFAULT_VOTING_DURATION_MS } from "../modules/civic.vote/index.js";
 import { createProcess } from "../services/processService.js";
 import { getAuthUser } from "../middleware/auth.js";
 import { getSupportThreshold } from "../services/hubSettings.js";
@@ -136,7 +137,7 @@ export async function handleConvertProposal(
         options: options ?? ["Yes", "No"],
         activation_mode: "proposal_required",
         support_threshold: support_threshold ?? await getSupportThreshold(),
-        voting_duration_ms: voting_duration_ms ?? 7 * 24 * 60 * 60 * 1000,
+        voting_duration_ms: voting_duration_ms ?? DEFAULT_VOTING_DURATION_MS,
         // Reference back to the original proposal
         source_proposal_id: proposalId,
       },

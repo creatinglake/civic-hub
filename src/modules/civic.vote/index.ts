@@ -75,8 +75,13 @@ export const PROCESS_DESCRIPTOR = {
   ],
 } as const;
 
-/** Default voting window: 3 days */
-const DEFAULT_VOTING_DURATION_MS = 3 * 24 * 60 * 60 * 1000;
+/**
+ * Default voting window (7 days) when a caller doesn't specify one. Owned by
+ * this portable module and re-used by the proposal→vote conversion path so the
+ * fallback is consistent. Distinct from a proposal's support-collection
+ * duration. Rarely fires — the creation UIs normally pass an explicit value.
+ */
+export const DEFAULT_VOTING_DURATION_MS = 7 * 24 * 60 * 60 * 1000;
 const DEFAULT_SUPPORT_THRESHOLD = 5;
 
 // --- Helpers -----------------------------------------------------------------
