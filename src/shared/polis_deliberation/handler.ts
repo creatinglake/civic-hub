@@ -95,7 +95,20 @@ export function createPolisDeliberationHandler(
         }
 
         case "close": {
-          await adapter.closeDeliberation(state.polis_conversation_id);
+          // Closing the conversation in Polis is best-effort: the Polis backend
+          // may be unreachable or unauthorized (see project_polis_status). A
+          // failure here MUST NOT wedge the local lifecycle transition — else a
+          // past-deadline conversation would stay "active" forever — so guard
+          // the call and proceed to close locally regardless. (Fixing Polis is
+          // a separate, dedicated track.)
+          try {
+            await adapter.closeDeliberation(state.polis_conversation_id);
+          } catch (err) {
+            console.warn(
+              `[polis-handler] closeDeliberation failed for "${state.polis_conversation_id}" — closing locally anyway:`,
+              err,
+            );
+          }
           process.status = "closed";
 
           state.summary_status = "generating";

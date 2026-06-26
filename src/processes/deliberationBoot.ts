@@ -4,6 +4,9 @@ import { createPolisSummarizer } from "../shared/polis_deliberation/summarizatio
 import { emitEvent } from "../events/eventEmitter.js";
 import { generateId } from "../utils/id.js";
 import { callClaude, DEFAULT_MODEL } from "../utils/anthropic.js";
+import { getActionDispatcher } from "./registry.js";
+import { isPastDeadline } from "../utils/deadline.js";
+import type { Process } from "../models/process.js";
 import type { ProcessHandler } from "./types.js";
 import type { PolisHostInterface } from "../shared/polis_deliberation/hostInterface.js";
 import type { PolisAdapter } from "../shared/polis_deliberation/adapter/types.js";
@@ -95,5 +98,32 @@ export function bootDeliberation(): ProcessHandler {
     polisBaseUrl,
   });
 
-  return shared as unknown as ProcessHandler;
+  const handler = shared as unknown as ProcessHandler;
+
+  // Lazy deadline-close: an active deliberation past its deadline runs the
+  // shared "close" action through the injected dispatcher (persists status +
+  // emits the lifecycle event). The shared handler's close guards its Polis
+  // call, so a down/unauthorized Polis backend can't wedge the transition.
+  // Wired here (not in the portable shared handler) so the shared module stays
+  // free of hub registry imports.
+  handler.closeIfExpired = async (process: Process): Promise<Process> => {
+    if (process.status !== "active") return process;
+    const deadline = (process.state as Record<string, unknown>).deadline as
+      | string
+      | null
+      | undefined;
+    if (!isPastDeadline(deadline)) return process;
+
+    console.log(
+      `[auto-close] Deliberation ${process.id} past deadline ${deadline}, closing now.`,
+    );
+    const { process: updated } = await getActionDispatcher()(process.id, {
+      type: "close",
+      actor: "system:auto-close",
+      payload: {},
+    });
+    return updated;
+  };
+
+  return handler;
 }

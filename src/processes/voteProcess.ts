@@ -29,7 +29,8 @@ import {
 import type { VoteResultsProcessState } from "../modules/civic.vote_results/index.js";
 import { emitVoteResultsAggregationCompleted } from "../modules/civic.vote_results/events.js";
 import { getInputsByProcess } from "../modules/civic.input/index.js";
-import { getProcessFactory, getProcessHandler } from "./registry.js";
+import { getProcessFactory, getProcessHandler, getActionDispatcher } from "./registry.js";
+import { isPastDeadline } from "../utils/deadline.js";
 
 // --- Helpers ---
 
@@ -289,6 +290,26 @@ const voteProcess: ProcessHandler = {
       createdBy: process.createdBy,
       status: process.status,
     });
+  },
+
+  // Lazy deadline-close: an active vote past its voting_closes_at runs the
+  // normal close action, which tallies, spawns the vote-results record, and
+  // emits the lifecycle events. Dispatched through the injected action
+  // dispatcher so the close is persisted exactly as a manual close would be.
+  async closeIfExpired(process: Process): Promise<Process> {
+    const state = getState(process);
+    if (state.status !== "active") return process;
+    if (!isPastDeadline(state.voting_closes_at)) return process;
+
+    console.log(
+      `[auto-close] Vote ${process.id} expired at ${state.voting_closes_at}, closing now.`,
+    );
+    const { process: updated } = await getActionDispatcher()(process.id, {
+      type: "process.close",
+      actor: "system:auto-close",
+      payload: {},
+    });
+    return updated;
   },
 };
 

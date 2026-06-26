@@ -24,7 +24,11 @@ import {
 } from "../models/process.js";
 import { emitEvent } from "../events/eventEmitter.js";
 import { generateId } from "../utils/id.js";
-import { getProcessHandler, setProcessFactory } from "../processes/registry.js";
+import {
+  getProcessHandler,
+  setProcessFactory,
+  setActionDispatcher,
+} from "../processes/registry.js";
 import { getDb } from "../db/client.js";
 
 const HUB_ID = "civic-hub-local";
@@ -162,6 +166,11 @@ export async function createProcess(
 // imports.
 setProcessFactory(createProcess);
 
+// Inject the action dispatcher so handlers can run their own close action
+// (lazy deadline-close) through the normal persisted-action path without a
+// circular import back into this module.
+setActionDispatcher(executeAction);
+
 // --- Read ------------------------------------------------------------------
 
 export async function getProcess(id: string): Promise<Process | undefined> {
@@ -253,44 +262,31 @@ export async function executeAction(
   return { process, result };
 }
 
-// --- Auto-close expired votes ----------------------------------------------
+// --- Lazy deadline-close ---------------------------------------------------
 
 /**
- * Lazy auto-close: if a vote's voting_closes_at has passed and it's
- * still "active", run the close action. This triggers the full close
- * flow (tally, vote-results spawning, events) without needing a cron.
- * Called from the read paths so the UI always sees the correct state.
+ * One type-agnostic lazy close. For ANY process whose deadline has elapsed and
+ * is still open, the registered handler's `closeIfExpired` performs the terminal
+ * transition (persist + emit) and returns the updated process. Handlers own
+ * their own deadline source and close action (vote → voting_closes_at; polis
+ * deliberation → deadline; proposal → proposals.closes_at); types without a
+ * deadline (projects) omit the hook and are returned unchanged.
+ *
+ * Called from the read paths so the UI always sees the correct state without a
+ * cron. Best-effort: a close failure (e.g. a race, or the Polis backend being
+ * down) is logged and the original process is returned so the read still works.
  */
 async function autoCloseIfExpired(process: Process): Promise<Process> {
-  if (
-    process.definition.type !== "civic.vote" ||
-    process.status !== "active"
-  ) {
-    return process;
-  }
+  const handler = getProcessHandler(process.definition.type);
+  if (!handler?.closeIfExpired) return process;
 
-  const state = process.state as Record<string, unknown>;
-  const closesAt = state.voting_closes_at as string | undefined;
-  if (!closesAt) return process;
-
-  if (new Date() <= new Date(closesAt)) return process;
-
-  // Vote has expired — close it via the normal action flow.
   try {
-    console.log(
-      `[auto-close] Vote ${process.id} expired at ${closesAt}, closing now.`,
-    );
-    const { process: updated } = await executeAction(process.id, {
-      type: "process.close",
-      actor: "system:auto-close",
-      payload: {},
-    });
-    return updated;
+    return await handler.closeIfExpired(process);
   } catch (err) {
-    // If close fails (e.g. already closed by a race), log and return
-    // the original process so the read still works.
     const msg = err instanceof Error ? err.message : "unknown error";
-    console.warn(`[auto-close] Failed to close vote ${process.id}: ${msg}`);
+    console.warn(
+      `[auto-close] Failed to close ${process.definition.type} ${process.id}: ${msg}`,
+    );
     return process;
   }
 }
@@ -299,7 +295,7 @@ async function autoCloseIfExpired(process: Process): Promise<Process> {
 
 export async function listProcessSummaries(): Promise<Record<string, unknown>[]> {
   const all = await getAllProcesses();
-  // Auto-close any expired votes before returning summaries.
+  // Lazily close any process whose deadline has elapsed before summarizing.
   const resolved = await Promise.all(all.map(autoCloseIfExpired));
   return resolved.map((p) => {
     const handler = getProcessHandler(p.definition.type);
@@ -322,7 +318,7 @@ export async function getProcessState(
   let process = await getProcess(processId);
   if (!process) return undefined;
 
-  // Auto-close if the vote has expired.
+  // Lazily close the process if its deadline has elapsed.
   process = await autoCloseIfExpired(process);
 
   const handler = getProcessHandler(process.definition.type);

@@ -29,6 +29,25 @@ export interface ProcessHandler {
 
   /** Produce a summary for list views */
   getSummary(process: Process): Record<string, unknown>;
+
+  /**
+   * Optional lazy deadline-close. Called on the read paths
+   * (listProcessSummaries / getProcessState) for every process. If this
+   * process has an elapsed deadline and is still open, perform the terminal
+   * transition — persist the new status AND emit the lifecycle event — then
+   * return the updated process. Otherwise return it unchanged.
+   *
+   * This is the single, type-agnostic close mechanism: each handler owns its
+   * own deadline source (voting_closes_at / deliberation deadline /
+   * proposals.closes_at), open-check, and close action, so process-specific
+   * logic stays in the registry rather than leaking into the service layer.
+   * Handlers for types without a deadline (e.g. projects) simply omit this.
+   *
+   * Implementations MUST guard date parsing (see utils/deadline.isPastDeadline)
+   * so a malformed deadline can't make the close silently never fire. They MUST
+   * be idempotent: re-reading an already-closed process is a no-op.
+   */
+  closeIfExpired?(process: Process): Promise<Process>;
 }
 
 /**
@@ -40,3 +59,18 @@ export interface ProcessHandler {
  * event store.
  */
 export type ProcessFactory = (input: CreateProcessInput) => Promise<Process>;
+
+/**
+ * Action-dispatcher type for executing a persisted action from within a handler.
+ * Injected by the service layer (mirrors ProcessFactory) so handlers can
+ * dispatch their own close action through the normal executeAction path —
+ * which mutates state, persists it, and emits lifecycle events — without
+ * importing processService directly (circular dependency).
+ *
+ * Used by lazy deadline-close (ProcessHandler.closeIfExpired) for types whose
+ * close runs through the generic action dispatcher (vote, deliberation).
+ */
+export type ActionDispatcher = (
+  processId: string,
+  action: ProcessAction,
+) => Promise<{ process: Process; result: Record<string, unknown> }>;

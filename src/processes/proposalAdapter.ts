@@ -19,6 +19,8 @@
 
 import { Process, ProcessAction } from "../models/process.js";
 import { ProcessHandler } from "./types.js";
+import { emitEvent } from "../events/eventEmitter.js";
+import { closeExpiredProposal } from "../modules/civic.proposals/index.js";
 
 const proposalAdapter: ProcessHandler = {
   type: "civic.proposal",
@@ -60,6 +62,18 @@ const proposalAdapter: ProcessHandler = {
       created_at: process.createdAt,
       created_by: process.createdBy,
     };
+  },
+
+  // Lazy deadline-close: when a live proposal's closes_at has elapsed, the
+  // module transitions it to "closed" (child row + canonical processes row) and
+  // emits civic.proposal.closed. The processes row is the source of truth for
+  // the canonical status carried here, so reflect the new status in-memory for
+  // the summary/read model produced right after this returns.
+  async closeIfExpired(process: Process): Promise<Process> {
+    if (process.status !== "active") return process;
+    const closed = await closeExpiredProposal(process.id, emitEvent);
+    if (closed) process.status = "closed";
+    return process;
   },
 };
 

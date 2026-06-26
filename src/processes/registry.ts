@@ -4,7 +4,7 @@
 // Each process type (e.g. civic.vote, civic.proposal) implements a handler.
 // Future work may allow dynamic loading, but for now this is static.
 
-import { ProcessHandler, ProcessFactory } from "./types.js";
+import { ProcessHandler, ProcessFactory, ActionDispatcher } from "./types.js";
 import voteProcess from "./voteProcess.js";
 import proposalAdapter from "./proposalAdapter.js";
 import projectAdapter from "./projectAdapter.js";
@@ -55,6 +55,25 @@ export function getProcessFactory(): ProcessFactory {
     throw new Error("Process factory not initialized — service layer must call setProcessFactory()");
   }
   return processFactory;
+}
+
+/**
+ * Action dispatcher — set by the service layer at startup (mirrors the process
+ * factory). Lets handlers dispatch a persisted action (e.g. their close action
+ * for lazy deadline-close) through executeAction without importing
+ * processService directly.
+ */
+let actionDispatcher: ActionDispatcher | null = null;
+
+export function setActionDispatcher(dispatcher: ActionDispatcher): void {
+  actionDispatcher = dispatcher;
+}
+
+export function getActionDispatcher(): ActionDispatcher {
+  if (!actionDispatcher) {
+    throw new Error("Action dispatcher not initialized — service layer must call setActionDispatcher()");
+  }
+  return actionDispatcher;
 }
 
 /**

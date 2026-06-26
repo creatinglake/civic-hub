@@ -6,8 +6,28 @@
 // GUARDRAIL: This module MUST NOT import from civic.vote or any vote-specific code.
 // Proposals live in their own data store and lifecycle.
 
-/** Proposal lifecycle states */
-export type ProposalStatus = "submitted" | "endorsed" | "converted" | "archived";
+/**
+ * Proposal lifecycle states.
+ *
+ * Canonical (aligned with the ProcessStatus terminal vocabulary):
+ *   - "submitted" — live/open on the idea board, gathering interest. Maps to
+ *     the canonical processes-row status "active".
+ *   - "closed"    — the deadline (closes_at) has elapsed; terminal. Maps to the
+ *     canonical processes-row status "closed".
+ *   - "archived"  — admin/moderation soft-delete; terminal. Maps to the
+ *     canonical processes-row status "archived".
+ *
+ * Legacy (inert — retained only so old rows and the retired conversion era
+ * still type-check; never set by current code):
+ *   - "endorsed"  — never set since Slice B removed auto-promotion.
+ *   - "converted" — the proposal→vote conversion was retired in Phase 1.
+ */
+export type ProposalStatus =
+  | "submitted"
+  | "closed"
+  | "archived"
+  | "endorsed"
+  | "converted";
 
 /** A civic proposal — a user-submitted idea for community consideration */
 export interface Proposal {

@@ -24,8 +24,10 @@ import type {
 import {
   emitProposalSubmitted,
   emitProposalSupported,
+  emitProposalClosed,
   type EmitEventFn,
 } from "./events.js";
+import { isPastDeadline } from "../../utils/deadline.js";
 
 export type {
   Proposal,
@@ -304,6 +306,52 @@ export async function archiveProposal(proposalId: string): Promise<void> {
     })
     .eq("id", proposalId);
   if (error) throw new Error(`Proposals: ${error.message}`);
+}
+
+/**
+ * Lazy deadline-close for a proposal. If the proposal is still open
+ * ("submitted") and its closes_at has elapsed (guarded against malformed
+ * timestamps), transition it to the terminal "closed" status, sync the
+ * canonical processes row, and emit a lifecycle event.
+ *
+ * Idempotent and safe to call on every read: a proposal not in "submitted",
+ * with no/future/invalid deadline, returns `false` and changes nothing.
+ * Returns `true` iff it actually closed the proposal.
+ */
+export async function closeExpiredProposal(
+  proposalId: string,
+  emit: EmitEventFn,
+): Promise<boolean> {
+  const proposal = await getProposal(proposalId);
+  if (!proposal) return false;
+  // Only an open proposal closes. "closed"/"archived"/legacy states are no-ops.
+  if (proposal.status !== "submitted") return false;
+  if (!isPastDeadline(proposal.closes_at)) return false;
+
+  const now = new Date().toISOString();
+  const { error } = await getDb()
+    .from("proposals")
+    .update({ status: "closed" as ProposalStatus, updated_at: now })
+    .eq("id", proposalId);
+  if (error) throw new Error(`Proposals: failed to close: ${error.message}`);
+
+  // Keep the canonical processes row in sync (source of truth for the unified
+  // read layer). No-op for any legacy proposal without a processes row.
+  const { error: procErr } = await getDb()
+    .from("processes")
+    .update({ status: "closed", updated_at: now })
+    .eq("id", proposalId);
+  if (procErr) throw new Error(`Proposals: failed to close process row: ${procErr.message}`);
+
+  console.log(`[auto-close] Proposal ${proposalId} past deadline ${proposal.closes_at}, closed.`);
+
+  await emitProposalClosed(
+    { proposal_id: proposalId, emit },
+    "system:auto-close",
+    { support_count: proposal.support_count },
+  );
+
+  return true;
 }
 
 // --- Read models -----------------------------------------------------------
