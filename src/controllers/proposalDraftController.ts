@@ -24,6 +24,8 @@ import { submitForReview } from "../modules/civic.review/index.js";
 
 const VALID_CATEGORIES = new Set(["issue", "idea", "project", "concern"]);
 const VALID_PHASES = new Set(["brainstorm", "review", "free_form"]);
+// Matches the proposal_drafts.proposal_duration_ms column default (90 days).
+const DEFAULT_PROPOSAL_DURATION_MS = 7776000000;
 
 function getHubConfig(): HubConfig {
   return {
@@ -343,9 +345,18 @@ export async function handleSubmitDraft(
       return;
     }
 
+    // Guard the duration: a missing/NaN value would make
+    // `new Date(Date.now() + NaN)` an Invalid Date and crash toISOString()
+    // with "Invalid time value". Fall back to the 90-day column default.
+    const durationCandidate = Number(draft.proposal_duration_ms);
+    const durationMs =
+      Number.isFinite(durationCandidate) && durationCandidate > 0
+        ? durationCandidate
+        : DEFAULT_PROPOSAL_DURATION_MS;
+
     try {
       if (isAdminEmail(user.email)) {
-        const closesAt = new Date(Date.now() + draft.proposal_duration_ms).toISOString();
+        const closesAt = new Date(Date.now() + durationMs).toISOString();
 
         const proposal = await createProposal(
           {
@@ -374,7 +385,7 @@ export async function handleSubmitDraft(
             optional_links: optionalLinks,
             category: draft.category ?? null,
             assistant_helped: draft.assistant_helped,
-            proposal_duration_ms: draft.proposal_duration_ms,
+            proposal_duration_ms: durationMs,
           },
         });
 

@@ -453,7 +453,10 @@ export default function ProposeDraft() {
             <p className="confirm-duration">
               This proposal will stay open for{" "}
               {DURATION_LABELS[draft.proposal_duration_ms] ??
-                `${Math.round(draft.proposal_duration_ms / (24 * 60 * 60 * 1000))} days`}.
+                (Number.isFinite(draft.proposal_duration_ms) &&
+                draft.proposal_duration_ms > 0
+                  ? `${Math.round(draft.proposal_duration_ms / (24 * 60 * 60 * 1000))} days`
+                  : "90 days")}.
             </p>
 
             <p className="confirm-finality-warning">
