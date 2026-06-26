@@ -60,7 +60,7 @@ export const PROCESS_DESCRIPTOR = {
   ],
   config_schema: {
     support_threshold: { type: "number", default: 5, description: "Endorsements required before activation" },
-    voting_duration_ms: { type: "number", default: 259200000, description: "Voting window duration in milliseconds (default: 3 days)" },
+    voting_duration_ms: { type: "number", default: 2592000000, description: "Voting window duration in milliseconds (default: 30 days)" },
     activation_mode: { type: "string", enum: ["direct", "proposal_required"], default: "direct", description: "Controls which lifecycle path is available" },
     method: { type: "string", enum: ["yes_no_unsure", "approval"], default: "yes_no_unsure", description: "Voting method (determines ballot shape and tally algorithm)" },
   },
@@ -76,12 +76,12 @@ export const PROCESS_DESCRIPTOR = {
 } as const;
 
 /**
- * Default voting window (7 days) when a caller doesn't specify one. Owned by
- * this portable module and re-used by the proposal→vote conversion path so the
- * fallback is consistent. Distinct from a proposal's support-collection
- * duration. Rarely fires — the creation UIs normally pass an explicit value.
+ * Default voting window (30 days) when a caller doesn't specify one. Owned by
+ * this portable module and re-used by every vote-creation path so the fallback
+ * is consistent. Distinct from a proposal's support-collection duration.
+ * Rarely fires — the creation UIs normally pass an explicit value.
  */
-export const DEFAULT_VOTING_DURATION_MS = 7 * 24 * 60 * 60 * 1000;
+export const DEFAULT_VOTING_DURATION_MS = 30 * 24 * 60 * 60 * 1000;
 const DEFAULT_SUPPORT_THRESHOLD = 5;
 
 // --- Helpers -----------------------------------------------------------------
