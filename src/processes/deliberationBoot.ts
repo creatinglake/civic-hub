@@ -70,12 +70,22 @@ export function bootDeliberation(): ProcessHandler {
         (typeof data.originating_process_id === "string" &&
           data.originating_process_id) ||
         "";
+      // Phase 3 — normalize the shared Polis handler's flat `process_type` /
+      // `originating_process_type` into the canonical `data.process.type` (via
+      // emitEvent's processType stamping) so the feed/digest classifier reads
+      // one field across the whole civic.process.* family.
+      const processType =
+        (typeof data.process_type === "string" && data.process_type) ||
+        (typeof data.originating_process_type === "string" &&
+          data.originating_process_type) ||
+        undefined;
       await emitEvent({
         event_type: input.event_type,
         actor: input.actor,
         process_id: processId,
         hub_id: HUB_ID,
         jurisdiction: input.jurisdiction || DEFAULT_JURISDICTION,
+        processType,
         data: input.data,
       });
     },

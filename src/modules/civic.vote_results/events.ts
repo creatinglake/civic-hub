@@ -21,6 +21,7 @@ export async function emitVoteResultsCreated(
     process_id: ctx.process_id,
     hub_id: ctx.hub_id,
     jurisdiction: ctx.jurisdiction,
+    processType: "civic.vote_results",
     action_url_path: voteResultsPath(ctx.process_id),
     data: {
       process: {
@@ -49,6 +50,7 @@ export async function emitVoteResultsAggregationCompleted(
     process_id: ctx.process_id,
     hub_id: ctx.hub_id,
     jurisdiction: ctx.jurisdiction,
+    processType: "civic.vote_results",
     action_url_path: voteResultsPath(ctx.process_id),
     data: {
       aggregation_method: "summarization",
@@ -70,6 +72,7 @@ export async function emitVoteResultsUpdated(
     process_id: ctx.process_id,
     hub_id: ctx.hub_id,
     jurisdiction: ctx.jurisdiction,
+    processType: "civic.vote_results",
     action_url_path: voteResultsPath(ctx.process_id),
     data: {
       vote_results: {
@@ -96,6 +99,7 @@ export async function emitVoteResultsOutcomeRecorded(
     process_id: ctx.process_id,
     hub_id: ctx.hub_id,
     jurisdiction: ctx.jurisdiction,
+    processType: "civic.vote_results",
     action_url_path: voteResultsPath(ctx.process_id),
     data: {
       outcome_type: "advisory",
@@ -126,6 +130,7 @@ export async function emitVoteResultsResultPublished(
     process_id: ctx.process_id,
     hub_id: ctx.hub_id,
     jurisdiction: ctx.jurisdiction,
+    processType: "civic.vote_results",
     action_url_path: voteResultsPath(ctx.process_id),
     data: {
       results_id: ctx.process_id,

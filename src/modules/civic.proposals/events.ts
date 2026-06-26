@@ -30,6 +30,7 @@ export async function emitProposalSubmitted(
     process_id: ctx.proposal_id,
     hub_id: ctx.hub_id ?? HUB_ID,
     jurisdiction: ctx.jurisdiction ?? "local",
+    processType: "civic.proposal",
     data: { proposal: data },
   });
 }
@@ -45,6 +46,7 @@ export async function emitProposalSupported(
     process_id: ctx.proposal_id,
     hub_id: ctx.hub_id ?? HUB_ID,
     jurisdiction: ctx.jurisdiction ?? "local",
+    processType: "civic.proposal",
     data: { proposal: data },
   });
 }
@@ -60,6 +62,7 @@ export async function emitProposalClosed(
     process_id: ctx.proposal_id,
     hub_id: ctx.hub_id ?? HUB_ID,
     jurisdiction: ctx.jurisdiction ?? "local",
+    processType: "civic.proposal",
     data: { proposal: data },
   });
 }
@@ -75,6 +78,7 @@ export async function emitProposalEndorsed(
     process_id: ctx.proposal_id,
     hub_id: ctx.hub_id ?? HUB_ID,
     jurisdiction: ctx.jurisdiction ?? "local",
+    processType: "civic.proposal",
     data: { proposal: data },
   });
 }

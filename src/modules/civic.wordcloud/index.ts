@@ -123,6 +123,7 @@ export async function activateWordcloud(
     process_id: ctx.process_id,
     hub_id: ctx.hub_id,
     jurisdiction: ctx.jurisdiction,
+    processType: "civic.wordcloud",
     action_url_path: `/wordcloud/${ctx.process_id}`,
     data: {
       process: {
@@ -205,6 +206,7 @@ export async function submitResponse(
     process_id: ctx.process_id,
     hub_id: ctx.hub_id,
     jurisdiction: ctx.jurisdiction,
+    processType: "civic.wordcloud",
     visibility: "restricted",
     action_url_path: `/wordcloud/${ctx.process_id}`,
     data: {
@@ -237,6 +239,7 @@ export async function snapshotWordcloud(
     process_id: ctx.process_id,
     hub_id: ctx.hub_id,
     jurisdiction: ctx.jurisdiction,
+    processType: "civic.wordcloud",
     action_url_path: `/wordcloud/${ctx.process_id}`,
     data: {
       wordcloud_snapshot: {
@@ -273,6 +276,7 @@ export async function closeWordcloud(
     process_id: ctx.process_id,
     hub_id: ctx.hub_id,
     jurisdiction: ctx.jurisdiction,
+    processType: "civic.wordcloud",
     action_url_path: `/wordcloud/${ctx.process_id}`,
     data: { process: { type: "civic.wordcloud" } },
   });
@@ -283,6 +287,7 @@ export async function closeWordcloud(
     process_id: ctx.process_id,
     hub_id: ctx.hub_id,
     jurisdiction: ctx.jurisdiction,
+    processType: "civic.wordcloud",
     action_url_path: `/wordcloud/${ctx.process_id}`,
     data: {
       wordcloud_result: {

@@ -39,6 +39,7 @@ export async function emitMeetingSummaryAggregationCompleted(
     process_id: ctx.process_id,
     hub_id: ctx.hub_id,
     jurisdiction: ctx.jurisdiction,
+    processType: "civic.meeting_summary",
     action_url_path: summaryPath(ctx.process_id),
     data: {
       aggregation_method: "summarization",
@@ -73,6 +74,7 @@ export async function emitMeetingSummaryUpdated(
     process_id: ctx.process_id,
     hub_id: ctx.hub_id,
     jurisdiction: ctx.jurisdiction,
+    processType: "civic.meeting_summary",
     action_url_path: summaryPath(ctx.process_id),
     data: {
       meeting_summary: {
@@ -105,6 +107,7 @@ export async function emitMeetingSummaryOutcomeRecorded(
     process_id: ctx.process_id,
     hub_id: ctx.hub_id,
     jurisdiction: ctx.jurisdiction,
+    processType: "civic.meeting_summary",
     action_url_path: summaryPath(ctx.process_id),
     data: {
       outcome_type: "informational",
@@ -130,6 +133,7 @@ export async function emitMeetingSummaryResultPublished(
     process_id: ctx.process_id,
     hub_id: ctx.hub_id,
     jurisdiction: ctx.jurisdiction,
+    processType: "civic.meeting_summary",
     action_url_path: summaryPath(ctx.process_id),
     data: {
       // `meeting_summary` is the primary discriminator used by Feed +

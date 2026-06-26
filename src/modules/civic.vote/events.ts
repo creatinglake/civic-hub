@@ -26,6 +26,7 @@ export async function emitProposed(
     process_id: ctx.process_id,
     hub_id: ctx.hub_id,
     jurisdiction: ctx.jurisdiction,
+    processType: "civic.vote",
     data: {
       process: {
         method: state.method ?? "yes_no_unsure",
@@ -47,6 +48,7 @@ export async function emitThresholdMet(
     process_id: ctx.process_id,
     hub_id: ctx.hub_id,
     jurisdiction: ctx.jurisdiction,
+    processType: "civic.vote",
     data: {
       process: {
         support_count: state.support_count,
@@ -67,6 +69,7 @@ export async function emitStarted(
     process_id: ctx.process_id,
     hub_id: ctx.hub_id,
     jurisdiction: ctx.jurisdiction,
+    processType: "civic.vote",
     data: {
       process: {
         method: state.method ?? "yes_no_unsure",
@@ -90,6 +93,7 @@ export async function emitVoteSubmitted(
     process_id: ctx.process_id,
     hub_id: ctx.hub_id,
     jurisdiction: ctx.jurisdiction,
+    processType: "civic.vote",
     data: {
       vote: { option: ballot, previous_vote: previous_ballot },
     },
@@ -107,6 +111,7 @@ export async function emitEnded(
     process_id: ctx.process_id,
     hub_id: ctx.hub_id,
     jurisdiction: ctx.jurisdiction,
+    processType: "civic.vote",
     data: {
       result: {
         tally: result.tally,
@@ -137,6 +142,7 @@ export async function emitAggregationCompleted(
     process_id: ctx.process_id,
     hub_id: ctx.hub_id,
     jurisdiction: ctx.jurisdiction,
+    processType: "civic.vote",
     data: {
       aggregation_method: methodKey ?? DEFAULT_METHOD,
       participant_count,
@@ -157,6 +163,7 @@ export async function emitResultPublished(
     process_id: ctx.process_id,
     hub_id: ctx.hub_id,
     jurisdiction: ctx.jurisdiction,
+    processType: "civic.vote",
     data: {
       result: {
         tally: result.tally,

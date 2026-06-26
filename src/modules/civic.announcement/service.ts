@@ -263,6 +263,7 @@ export async function removeAnnouncement(
     process_id: ctx.process_id,
     hub_id: ctx.hub_id,
     jurisdiction: ctx.jurisdiction,
+    processType: "civic.announcement",
     visibility: "restricted",
     action_url_path: `/announcement/${ctx.process_id}`,
     data: {
@@ -298,6 +299,7 @@ export async function restoreAnnouncement(
     process_id: ctx.process_id,
     hub_id: ctx.hub_id,
     jurisdiction: ctx.jurisdiction,
+    processType: "civic.announcement",
     visibility: "restricted",
     action_url_path: `/announcement/${ctx.process_id}`,
     data: {

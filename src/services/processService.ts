@@ -250,6 +250,7 @@ export async function executeAction(
       process_id: process.id,
       hub_id: process.hubId,
       jurisdiction: process.jurisdiction,
+      processType: process.definition.type,
       data: {
         process: {
           previous_status: previousStatus,

@@ -32,6 +32,12 @@ export async function emitEvent(input: CreateEventInput): Promise<CivicEvent> {
   // external source (Floyd's news post, etc.) rather than an internal page.
   const path = input.action_url_path ?? `/process/${input.process_id}`;
   const isAbsolute = /^https?:\/\//i.test(path);
+  // Phase 3 (audit §2) — stamp the canonical process type into
+  // `data.process.type` so the shared classifier can discriminate the
+  // civic.process.<verb> family on one field. Merge-safe: never overwrites a
+  // type a caller already set in `data.process`, and preserves any other
+  // fields already on `data.process` (vote events carry method/options there).
+  const data = stampProcessType(input.data, input.processType);
   const event: CivicEvent = {
     id: generateId("evt"),
     version: "1.0",
@@ -50,7 +56,7 @@ export async function emitEvent(input: CreateEventInput): Promise<CivicEvent> {
       hub_id: input.hub_id,
       hub_url: hub,
     },
-    data: input.data,
+    data,
     meta: {
       visibility: input.visibility ?? "public",
     },
@@ -65,4 +71,23 @@ export async function emitEvent(input: CreateEventInput): Promise<CivicEvent> {
   console.log(`[event] ${event.event_type} by ${event.actor} (${event.id})`);
 
   return event;
+}
+
+/**
+ * Merge `processType` into `data.process.type` without clobbering an existing
+ * type or other fields already on `data.process`. Returns the input unchanged
+ * when no processType is supplied (or it's already present) so callers that
+ * don't set it pay nothing.
+ */
+function stampProcessType(
+  data: Record<string, unknown>,
+  processType: string | undefined,
+): Record<string, unknown> {
+  if (!processType) return data;
+  const existing = data.process as Record<string, unknown> | undefined;
+  if (existing && typeof existing.type === "string") return data;
+  return {
+    ...data,
+    process: { ...(existing ?? {}), type: processType },
+  };
 }

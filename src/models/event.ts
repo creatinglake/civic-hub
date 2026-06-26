@@ -52,6 +52,17 @@ export interface CreateEventInput {
   data: Record<string, unknown>;
   dedupe_key?: string;
   visibility?: "public" | "restricted";
+  /**
+   * Phase 3 (audit §2) — the canonical process type for this event, e.g.
+   * "civic.vote". emitEvent stamps it into `data.process.type` so the shared
+   * feed-worthiness classifier (shared/feedActivity.ts) can discriminate the
+   * civic.process.<verb> family on ONE field instead of sniffing the shape of
+   * `data`. Backwards-compatible and never clobbers an explicit type a caller
+   * already set in `data.process`. Every civic.process.* emitter SHOULD pass
+   * this; non-feed-worthy events carry it for backend uniformity but stay out
+   * of the feed (the classifier is an allowlist, not driven by this field).
+   */
+  processType?: string;
   action_url_path?: string; // e.g. "/brief/abc123"; defaults to "/process/:id"
   /**
    * Slice 13 — explicit ISO 8601 timestamp override. Only used by sync

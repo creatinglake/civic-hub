@@ -48,6 +48,7 @@ export async function emitAnnouncementCreated(
     process_id: ctx.process_id,
     hub_id: ctx.hub_id,
     jurisdiction: ctx.jurisdiction,
+    processType: "civic.announcement",
     action_url_path: actionPathFor(ctx, state),
     data: {
       announcement: {
@@ -83,6 +84,7 @@ export async function emitAnnouncementResultPublished(
     process_id: ctx.process_id,
     hub_id: ctx.hub_id,
     jurisdiction: ctx.jurisdiction,
+    processType: "civic.announcement",
     action_url_path: actionPathFor(ctx, state),
     data: {
       announcement: {
@@ -109,6 +111,7 @@ export async function emitAnnouncementUpdated(
     process_id: ctx.process_id,
     hub_id: ctx.hub_id,
     jurisdiction: ctx.jurisdiction,
+    processType: "civic.announcement",
     action_url_path: announcementPath(ctx.process_id),
     data: {
       announcement: {

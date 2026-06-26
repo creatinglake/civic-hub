@@ -22,6 +22,7 @@ export async function emitProjectCreated(
     process_id: ctx.project_id,
     hub_id: ctx.hub_id ?? HUB_ID,
     jurisdiction: ctx.jurisdiction ?? "local",
+    processType: "civic.project",
     action_url_path: `/project/${ctx.project_id}`,
     data: { project: data },
   });
@@ -38,6 +39,7 @@ export async function emitProjectUpdated(
     process_id: ctx.project_id,
     hub_id: ctx.hub_id ?? HUB_ID,
     jurisdiction: ctx.jurisdiction ?? "local",
+    processType: "civic.project",
     action_url_path: `/project/${ctx.project_id}`,
     data: { project: data },
   });
@@ -54,6 +56,7 @@ export async function emitProjectCommented(
     process_id: ctx.project_id,
     hub_id: ctx.hub_id ?? HUB_ID,
     jurisdiction: ctx.jurisdiction ?? "local",
+    processType: "civic.project",
     action_url_path: `/project/${ctx.project_id}`,
     data: { project: data },
   });
@@ -69,6 +72,7 @@ export async function emitProjectArchived(
     process_id: ctx.project_id,
     hub_id: ctx.hub_id ?? HUB_ID,
     jurisdiction: ctx.jurisdiction ?? "local",
+    processType: "civic.project",
     action_url_path: `/project/${ctx.project_id}`,
     data: { project: {} },
   });
@@ -85,6 +89,7 @@ export async function emitProjectSentimentChanged(
     process_id: ctx.project_id,
     hub_id: ctx.hub_id ?? HUB_ID,
     jurisdiction: ctx.jurisdiction ?? "local",
+    processType: "civic.project",
     action_url_path: `/project/${ctx.project_id}`,
     data: { project: data },
   });

@@ -156,6 +156,8 @@ export interface EmitEventFn {
     hub_id: string;
     jurisdiction: string;
     data: Record<string, unknown>;
+    /** Phase 3 — canonical process type, stamped into data.process.type. */
+    processType?: string;
     action_url_path?: string;
     timestamp?: string;
   }): Promise<unknown>;
