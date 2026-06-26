@@ -234,7 +234,15 @@ export function unsupportVote(processId: string, actor: string): Promise<ActionR
 
 // --- Civic Proposals (separate from civic.vote process) ---
 
-export type CivicProposalStatus = "submitted" | "endorsed" | "converted" | "archived";
+export type CivicProposalStatus =
+  | "submitted"
+  | "endorsed"
+  | "converted"
+  | "archived"
+  // Phase 2 added the canonical terminal "closed" status (deadline-close) to
+  // the backend ProposalStatus and ProposalDetail.tsx renders it; mirror it
+  // here so the `status === "closed"` comparisons type-check.
+  | "closed";
 
 /** Proposal summary (from GET /proposals list) */
 export interface CivicProposalSummary {
