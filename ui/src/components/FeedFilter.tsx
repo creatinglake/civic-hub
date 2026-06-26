@@ -1,6 +1,10 @@
 import { useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 import hub from "../config/hub";
+import {
+  classifyActivity,
+  type ClassifierEvent,
+} from "../../../src/shared/feedActivity";
 import "./FeedFilter.css";
 
 /**
@@ -123,49 +127,18 @@ export default function FeedFilter({ active, onChange }: Props) {
 }
 
 /**
- * Build the predicate Feed.tsx::Props.filter expects from the active
- * filter key. We re-implement the kind discrimination here (mirror of
- * Feed.tsx::kindFromEvent) rather than import it — keeps the filter
- * component decoupled, and the duplicated logic is small and stable.
+ * Build the predicate Feed.tsx::Props.filter expects from the active filter
+ * key. Phase 3 — the filter category is just the shared classifier's
+ * `surface` field (the FeedFilterKeys are aligned to ActivitySurface), so the
+ * filter, the inclusion gate, and the rendered pills can no longer disagree.
+ * This was previously a fourth hand-maintained copy of the data-shape ladder
+ * and the source of the "filter shows fewer items than All" drift.
  */
 export function buildFilterPredicate(
   key: FeedFilterKey,
-): ((event: { event_type: string; data: Record<string, unknown> }) => boolean) | undefined {
+): ((event: ClassifierEvent) => boolean) | undefined {
   if (key === "all") return undefined;
-  return (event) => {
-    if (event.event_type === "civic.process.started") {
-      return key === "activity";
-    }
-    if (event.event_type === "civic.process.result_published") {
-      const data = event.data as {
-        announcement?: unknown;
-        meeting_summary?: unknown;
-        summary_id?: unknown;
-        results_id?: unknown;
-        brief_id?: unknown;
-        result?: unknown;
-        wordcloud_snapshot?: unknown;
-        wordcloud_result?: unknown;
-      };
-      if (data.wordcloud_snapshot !== undefined || data.wordcloud_result !== undefined) {
-        return key === "activity";
-      }
-      if (data.announcement !== undefined) return key === "announcement";
-      if (
-        data.meeting_summary !== undefined ||
-        typeof data.summary_id === "string"
-      ) {
-        return key === "meeting_summary";
-      }
-      if (
-        typeof data.results_id === "string" ||
-        typeof data.brief_id === "string"
-      ) {
-        return key === "activity";
-      }
-    }
-    return false;
-  };
+  return (event) => classifyActivity(event)?.surface === key;
 }
 
 /**

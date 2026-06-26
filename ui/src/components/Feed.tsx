@@ -8,9 +8,14 @@ import {
   getEvents,
   getMeetingSummary,
   getProcessState,
+  getProjectDetail,
   getPublicVoteResults,
   getWordcloud,
 } from "../services/api";
+import {
+  classifyActivity,
+  type ActivityKind,
+} from "../../../src/shared/feedActivity";
 import FeedPost, {
   eventToPost,
   relativeTime,
@@ -38,16 +43,7 @@ interface Props {
   emptyFilteredAction?: { label: string; onClick: () => void } | null;
 }
 
-type ProcessKind =
-  | "civic.vote"
-  | "civic.vote_results"
-  | "civic.announcement"
-  | "civic.meeting_summary"
-  | "civic.wordcloud"
-  | "generic";
-
 interface ProcessMeta {
-  type?: ProcessKind;
   title?: string;
   description?: string;
   /**
@@ -61,10 +57,10 @@ interface ProcessMeta {
    * Slice 10 — engagement counts surfaced as a metadata line on the
    * card. Each post type fills a different subset:
    *
-   *   civic.vote            → totalVotes
-   *   civic.vote_results    → totalVotes (= participation_count) + commentsCount
-   *   civic.announcement    → editCount + lastEditedAt (ISO)
-   *   civic.meeting_summary → blockCount + maxStartSeconds (for duration)
+   *   vote-open      → totalVotes
+   *   vote-results   → totalVotes (= participation_count) + commentsCount
+   *   announcement   → editCount + lastEditedAt (ISO)
+   *   meeting        → blockCount + maxStartSeconds (for duration)
    *
    * eventToPost reads from these and builds the engagement string.
    */
@@ -74,92 +70,6 @@ interface ProcessMeta {
   lastEditedAt?: string | null;
   blockCount?: number;
   maxStartSeconds?: number | null;
-}
-
-/**
- * Discriminate the underlying process type for an event from its data.
- *
- * - civic.process.started is only emitted by civic.vote today.
- * - civic.process.result_published is emitted by multiple process types;
- *   we use the event's data shape to tell them apart.
- *
- * Slice 8.5 changes:
- *   - Vote `result_published` events return `null` (not rendered in
- *     feed/digest — they duplicate the vote-results post). The event
- *     stays on the audit log but doesn't surface a feed item.
- *   - Vote-results `result_published` is discriminated by `data.results_id`
- *     (new) or the legacy `data.brief_id`. Both fields are accepted
- *     indefinitely so old events keep working without rewriting.
- */
-function kindFromEvent(event: CivicEvent): ProcessKind | null {
-  // Review-lifecycle events (submit / request_changes / approve / etc.) are
-  // restricted, so residents never receive them — but admins DO (the events
-  // endpoint includes restricted events for them, for the moderation log).
-  // They are private review correspondence, not public activity, so never
-  // render them as feed cards regardless of who is viewing.
-  if (event.event_type.startsWith("civic.review.")) return null;
-  if (event.event_type === "civic.process.started") {
-    const data = event.data as { process?: { type?: string } };
-    if (data?.process?.type === "civic.wordcloud") return "civic.wordcloud";
-    return "civic.vote";
-  }
-  if (event.event_type === "civic.process.result_published") {
-    const data = event.data as {
-      brief_id?: unknown;
-      results_id?: unknown;
-      result?: unknown;
-      announcement?: unknown;
-      meeting_summary?: unknown;
-      summary_id?: unknown;
-      wordcloud_snapshot?: unknown;
-      wordcloud_result?: unknown;
-    };
-    if (data?.wordcloud_snapshot !== undefined || data?.wordcloud_result !== undefined) return "civic.wordcloud";
-    if (data?.announcement !== undefined) return "civic.announcement";
-    if (data?.meeting_summary !== undefined || typeof data?.summary_id === "string") {
-      return "civic.meeting_summary";
-    }
-    if (typeof data?.results_id === "string" || typeof data?.brief_id === "string") {
-      return "civic.vote_results";
-    }
-    // Vote `result_published` (data.result present, no results_id /
-    // brief_id) — INTENTIONALLY EXCLUDED from the feed. See FeedPost
-    // for the matching filter on the rendering side.
-    if (data?.result !== undefined) return null;
-
-    return "generic";
-  }
-  // Process creation that IS public feed activity — the "now official" card.
-  // Proposals post when created; conversations post when created. Votes do
-  // NOT post on civic.process.created (they post when they open / pass the
-  // support threshold), so created only surfaces for conversations — this is
-  // what prevents double-posting a vote as both "created" and "opened".
-  if (event.event_type === "civic.proposal.submitted") return "generic";
-  if (event.event_type === "civic.process.created") {
-    const data = event.data as { process?: { type?: string } };
-    return data?.process?.type === "civic.polis_deliberation" ? "generic" : null;
-  }
-  // Known lifecycle events that don't produce feed cards — keep excluded.
-  // MUST STAY IN SYNC with the digest filter in
-  // civic-hub/src/modules/civic.digest/filter.ts.
-  const EXCLUDED_TYPES = new Set([
-    "civic.process.updated",
-    "civic.process.ended",
-    "civic.process.aggregation_completed",
-    "civic.process.outcome_recorded",
-    "civic.process.proposed",
-    "civic.process.threshold_met",
-    "civic.process.vote_submitted",
-    "civic.process.action_taken",
-    "civic.process.comment_added",
-    "civic.process.proposal_created",
-    // Internal proposal lifecycle — not feed-worthy (creation is handled above).
-    "civic.proposal.supported",
-    "civic.proposal.endorsed",
-    "civic.proposal.converted",
-  ]);
-  if (EXCLUDED_TYPES.has(event.event_type)) return null;
-  return "generic";
 }
 
 export default function Feed({ filter, emptyFilteredAction }: Props) {
@@ -197,20 +107,14 @@ export default function Feed({ filter, emptyFilteredAction }: Props) {
   }, []);
 
   // Slice 13 fix — pre-filter to events that produce a feed post before
-  // applying the user-facing type filter or paginating.
-  //
-  // Background: each rendered card maps to a single `civic.process.started`
-  // (vote-open) or `civic.process.result_published` (everything else)
-  // event. The events feed also contains `civic.process.created`,
-  // `civic.process.aggregation_completed`, `civic.process.updated`, etc.
-  // that don't render. Without this pre-filter, those non-renderable
-  // events count against the PAGE_SIZE budget and can starve the visible
-  // window — most acutely when synced events are backdated and the
-  // most-recent N events become a cluster of `created` events from the
-  // sync run.
+  // applying the user-facing type filter or paginating. Phase 3 — the
+  // feed-worthiness gate is now the single shared classifier; an event is
+  // renderable iff classifyActivity returns non-null. Without this pre-filter,
+  // non-renderable events (created/updated/aggregation_completed, etc.) count
+  // against the PAGE_SIZE budget and can starve the visible window.
   const renderableEvents = useMemo(
     () => {
-      const base = events.filter((e) => kindFromEvent(e) !== null);
+      const base = events.filter((e) => classifyActivity(e) !== null);
       return filter ? base.filter(filter) : base;
     },
     [events, filter],
@@ -226,14 +130,14 @@ export default function Feed({ filter, emptyFilteredAction }: Props) {
   // or cancel requests.
   const inFlight = useRef<Set<string>>(new Set());
   useEffect(() => {
-    const needed: Array<{ id: string; kind: ProcessKind }> = [];
+    const needed: Array<{ id: string; kind: ActivityKind }> = [];
     for (const ev of visibleEvents) {
-      const kind = kindFromEvent(ev);
-      if (!kind) continue;
+      const activity = classifyActivity(ev);
+      if (!activity) continue;
       if (!ev.process_id) continue;
       if (ev.process_id in processMeta) continue;
       if (inFlight.current.has(ev.process_id)) continue;
-      needed.push({ id: ev.process_id, kind });
+      needed.push({ id: ev.process_id, kind: activity.kind });
     }
     if (needed.length === 0) return;
 
@@ -241,84 +145,100 @@ export default function Feed({ filter, emptyFilteredAction }: Props) {
 
     for (const { id, kind } of needed) {
       let lookup: Promise<ProcessMeta | null>;
-      if (kind === "civic.vote") {
-        lookup = getProcessState(id).then((state) => {
-          if (state.type !== "civic.vote") return null;
-          const vote = state as VoteState;
-          return {
-            type: "civic.vote" as const,
-            title: vote.title,
-            description: vote.description,
-            totalVotes: vote.total_votes ?? 0,
-          };
-        });
-      } else if (kind === "civic.vote_results") {
-        lookup = getPublicVoteResults(id).then((vr) => ({
-          type: "civic.vote_results" as const,
-          title: vr.title,
-          description: vr.admin_notes ?? undefined,
-          imageUrl: vr.image_url ?? null,
-          imageAlt: vr.image_alt ?? null,
-          totalVotes: vr.participation_count,
-          commentsCount: vr.comments?.length ?? 0,
-        }));
-      } else if (kind === "civic.meeting_summary") {
-        lookup = getMeetingSummary(id).then((s) => {
-          // The longest start_time_seconds across all blocks gives a
-          // reasonable lower bound for meeting duration; videos still
-          // run past the last marked topic, so this is "at least this
-          // long" rather than exact. Acceptable for the engagement line.
-          const starts = (s.blocks ?? [])
-            .map((b) => b.start_time_seconds)
-            .filter((n): n is number => typeof n === "number");
-          const maxStart = starts.length > 0 ? Math.max(...starts) : null;
-          return {
-            type: "civic.meeting_summary" as const,
-            title: s.meeting_title,
-            description: undefined,
-            blockCount: s.blocks?.length ?? 0,
-            maxStartSeconds: maxStart,
-          };
-        });
-      } else if (kind === "civic.wordcloud") {
-        lookup = getWordcloud(id).then((wc) => ({
-          type: "civic.wordcloud" as const,
-          title: wc.title,
-          description: wc.description,
-          totalVotes: wc.submission_count,
-        }));
-      } else if (kind === "generic") {
-        lookup = getProcessState(id).then((state) => ({
-          type: "generic" as const,
-          title: state.title as string | undefined,
-          description: state.description as string | undefined,
-        }));
-      } else {
-        // civic.announcement — body serves as the feed summary.
-        // Slice 11: when an admin has removed the announcement, push
-        // its id into removedProcessIds so the post-builder filter
-        // drops it. The presence of the removal still cooperates
-        // with the meta cache (resolved to {}) so we don't refetch.
-        lookup = getAnnouncement(id).then((a) => {
-          if (a.moderation?.removed) {
-            setRemovedProcessIds((prev) => {
-              if (prev.has(id)) return prev;
-              const next = new Set(prev);
-              next.add(id);
-              return next;
-            });
-            return null;
-          }
-          return {
-            type: "civic.announcement" as const,
-            title: a.title,
-            description: a.body,
-            imageUrl: a.image_url ?? null,
-            imageAlt: a.image_alt ?? null,
-            editCount: a.edit_count ?? 0,
-            lastEditedAt: a.last_edited_at ?? null,
-          };
-        });
+      switch (kind) {
+        case "vote-open":
+          lookup = getProcessState(id).then((state) => {
+            if (state.type !== "civic.vote") return null;
+            const vote = state as VoteState;
+            return {
+              title: vote.title,
+              description: vote.description,
+              totalVotes: vote.total_votes ?? 0,
+            };
+          });
+          break;
+        case "vote-results":
+          lookup = getPublicVoteResults(id).then((vr) => ({
+            title: vr.title,
+            description: vr.admin_notes ?? undefined,
+            imageUrl: vr.image_url ?? null,
+            imageAlt: vr.image_alt ?? null,
+            totalVotes: vr.participation_count,
+            commentsCount: vr.comments?.length ?? 0,
+          }));
+          break;
+        case "meeting":
+          lookup = getMeetingSummary(id).then((s) => {
+            // The longest start_time_seconds across all blocks gives a
+            // reasonable lower bound for meeting duration; videos still
+            // run past the last marked topic, so this is "at least this
+            // long" rather than exact. Acceptable for the engagement line.
+            const starts = (s.blocks ?? [])
+              .map((b) => b.start_time_seconds)
+              .filter((n): n is number => typeof n === "number");
+            const maxStart = starts.length > 0 ? Math.max(...starts) : null;
+            return {
+              title: s.meeting_title,
+              description: undefined,
+              blockCount: s.blocks?.length ?? 0,
+              maxStartSeconds: maxStart,
+            };
+          });
+          break;
+        case "wordcloud":
+          lookup = getWordcloud(id).then((wc) => ({
+            title: wc.title,
+            description: wc.description,
+            totalVotes: wc.submission_count,
+          }));
+          break;
+        case "project-created":
+        case "project-updated":
+          // Phase 3 fix — projects previously fell through to getAnnouncement(id)
+          // and 404'd; fetch the real project detail (title + banner image).
+          lookup = getProjectDetail(id).then((p) => ({
+            title: p.title,
+            description: p.description,
+            imageUrl: p.banner_image_url ?? null,
+            imageAlt: p.banner_image_alt ?? null,
+          }));
+          break;
+        case "proposal":
+        case "proposal-closed":
+        case "conversation":
+        case "conversation-results":
+          // Title/description served by the canonical processes-row read model.
+          lookup = getProcessState(id).then((state) => ({
+            title: state.title as string | undefined,
+            description: state.description as string | undefined,
+          }));
+          break;
+        case "announcement":
+        case "announcement-author":
+          // body serves as the feed summary. Slice 11: when an admin has
+          // removed the announcement, push its id into removedProcessIds so the
+          // post-builder filter drops it. The presence of the removal still
+          // cooperates with the meta cache (resolved to {}) so we don't refetch.
+          lookup = getAnnouncement(id).then((a) => {
+            if (a.moderation?.removed) {
+              setRemovedProcessIds((prev) => {
+                if (prev.has(id)) return prev;
+                const next = new Set(prev);
+                next.add(id);
+                return next;
+              });
+              return null;
+            }
+            return {
+              title: a.title,
+              description: a.body,
+              imageUrl: a.image_url ?? null,
+              imageAlt: a.image_alt ?? null,
+              editCount: a.edit_count ?? 0,
+              lastEditedAt: a.last_edited_at ?? null,
+            };
+          });
+          break;
       }
 
       lookup
@@ -344,7 +264,6 @@ export default function Feed({ filter, emptyFilteredAction }: Props) {
   const posts: FeedPostView[] = useMemo(() => {
     const getTitle = (id: string) => processMeta[id]?.title;
     const getDescription = (id: string) => processMeta[id]?.description;
-    const getType = (id: string) => processMeta[id]?.type;
     const out: FeedPostView[] = [];
     for (const ev of visibleEvents) {
       // Slice 11 — drop posts whose underlying announcement has been
@@ -354,7 +273,7 @@ export default function Feed({ filter, emptyFilteredAction }: Props) {
       // Wait for metadata before rendering — prevents "Untitled vote"
       // flash while process title is still loading.
       if (ev.process_id && !(ev.process_id in processMeta)) continue;
-      const post = eventToPost(ev, getDescription, getTitle, getType);
+      const post = eventToPost(ev, getDescription, getTitle);
       if (!post) continue;
       const meta = processMeta[ev.process_id];
       out.push({
@@ -501,9 +420,12 @@ function buildEngagement(
       const noun = n === 1 ? "response" : "responses";
       return `${formatCount(n)} ${noun} so far`;
     }
+    case "proposal":
+    case "proposal-closed":
     case "project-created":
     case "project-updated":
-    case "generic":
+    case "conversation":
+    case "conversation-results":
       return null;
   }
 }

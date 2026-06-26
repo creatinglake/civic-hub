@@ -2,28 +2,19 @@ import { Link } from "react-router-dom";
 import type { CivicEvent } from "../services/api";
 import { useIsWideViewport } from "../hooks/useIsWideViewport";
 import hub from "../config/hub";
+import {
+  classifyActivity,
+  type Activity,
+  type ActivityKind,
+} from "../../../src/shared/feedActivity";
 
 /**
- * Color/label kinds for the per-post type pill. Each maps to a token in
- * theme.css (--pill-<kind>-bg / --pill-<kind>-fg).
- *
- * Slice 8.5 collapsed the previous "brief" and "vote-results" kinds
- * into a single "vote-results" pill — they were rendered separately
- * before, but residents shouldn't see two posts per closed vote ("Civic
- * Brief delivered" and "Vote results published"). The new feed shows
- * exactly one "Vote results: <title>" post per closed vote, sourced
- * from the civic.vote_results process's result_published event.
+ * Color/label kind for the per-post type pill. Phase 3 — this IS the shared
+ * classifier's ActivityKind: the gate, the renderer, the filter, and the email
+ * digest all speak one vocabulary, so they can no longer drift. Each kind maps
+ * to a token in theme.css / Feed.css (--pill-<kind>-* and .feed-pill--<kind>).
  */
-export type FeedPillKind =
-  | "vote-open"
-  | "vote-results"
-  | "announcement"          // admin-authored announcements (default)
-  | "announcement-author"   // non-admin author (Board, committees, etc.)
-  | "meeting"
-  | "wordcloud"
-  | "project-created"
-  | "project-updated"
-  | "generic";
+export type FeedPillKind = ActivityKind;
 
 /**
  * Display model for a feed post. Constructed from a CivicEvent by the Feed
@@ -63,358 +54,136 @@ interface Props {
 }
 
 /**
- * Cached process-type discriminator. The Feed container fetches process
- * detail lazily and caches the type here so eventToPost can branch
- * cleanly. Includes "civic.brief" as a legacy alias — process rows
- * still have the new type after the migration, but cached metadata or
- * federated events from older hubs may carry the old name.
+ * Build a feed post from a civic event.
+ *
+ * Phase 3 — feed-worthiness, pill, kind, and href all come from the single
+ * shared `classifyActivity` (src/shared/feedActivity.ts). This function no
+ * longer discriminates process types by sniffing `data` shape; it only turns
+ * the classifier's verdict into a renderable view, deriving the title and
+ * summary (which need fetched per-process metadata) from the getters the Feed
+ * container supplies. Returns null when the event is not feed-worthy.
  */
-type FeedProcessKind =
-  | "civic.vote"
-  | "civic.vote_results"
-  | "civic.brief" // legacy alias — normalize to "civic.vote_results"
-  | "civic.announcement"
-  | "civic.meeting_summary"
-  | "civic.wordcloud"
-  | "civic.project"
-  | "generic";
-
 export function eventToPost(
   event: CivicEvent,
   getProcessDescription: (processId: string) => string | undefined,
   getProcessTitle: (processId: string) => string | undefined,
-  getProcessType: (processId: string) => FeedProcessKind | undefined,
 ): FeedPostView | null {
-  switch (event.event_type) {
-    case "civic.process.started": {
-      const data = event.data as { process?: { type?: string } };
-      const cachedType = getProcessType(event.process_id);
+  const activity = classifyActivity(event);
+  if (!activity) return null;
 
-      if (data?.process?.type === "civic.wordcloud" || cachedType === "civic.wordcloud") {
-        const title = getProcessTitle(event.process_id) ?? "Word Cloud";
-        return {
-          id: event.id,
-          title,
-          pillLabel: "Word cloud",
-          pillKind: "wordcloud",
-          summary: summaryFromDescription(getProcessDescription(event.process_id)),
-          timestamp: event.timestamp,
-          href: `/wordcloud/${event.process_id}`,
-        };
-      }
+  const { title, summary, authorName } = buildTitleSummary(
+    activity,
+    event,
+    getProcessTitle,
+    getProcessDescription,
+  );
 
-      const title = getProcessTitle(event.process_id) ?? "Untitled vote";
+  return {
+    id: event.id,
+    title,
+    pillLabel: activity.pill,
+    pillKind: activity.kind,
+    summary,
+    timestamp: event.timestamp,
+    href: activity.href,
+    authorName: authorName ?? null,
+  };
+}
+
+/**
+ * Derive the title/summary/author for a card from its classified kind plus the
+ * event payload and the lazily-fetched per-process metadata. Pure presentation
+ * — the feed-worthiness decision already happened in classifyActivity.
+ */
+function buildTitleSummary(
+  activity: Activity,
+  event: CivicEvent,
+  getTitle: (id: string) => string | undefined,
+  getDescription: (id: string) => string | undefined,
+): { title: string; summary: string; authorName?: string | null } {
+  const id = event.process_id;
+  const data = event.data as Record<string, unknown>;
+  const descSummary = summaryFromDescription(getDescription(id));
+
+  switch (activity.kind) {
+    case "vote-open":
+      return { title: getTitle(id) ?? "Untitled vote", summary: descSummary };
+
+    case "vote-results": {
+      const headline =
+        typeof data.headline_result === "string" ? data.headline_result : "";
       return {
-        id: event.id,
-        title,
-        pillLabel: "Vote open",
-        pillKind: "vote-open",
-        summary: summaryFromDescription(getProcessDescription(event.process_id)),
-        timestamp: event.timestamp,
-        href: event.action_url,
+        title: getTitle(id) ?? "Vote results",
+        // Summary carries context; the participation/comment counts live on
+        // the engagement line so the two don't both say "N residents voted".
+        summary: headline || `Delivered to the ${hub.governing_body_name}.`,
       };
     }
 
-    case "civic.process.result_published": {
-      const data = event.data as {
-        // Vote-results discriminator. Slice 8.5 emits `results_id` on
-        // new events; older events emitted before the rename carry
-        // `brief_id`. Either field signals "this is a vote-results
-        // post". Both are accepted indefinitely so no events have to
-        // be rewritten in place.
-        results_id?: string;
-        brief_id?: string;
-        result?: { total_votes?: number };
-        participation_count?: number;
-        headline_result?: string;
-        announcement?: {
-          id?: string;
-          title?: string;
-          author_role?: string;
-          author_display_name?: string | null;
-          /**
-           * Slice 13 — provenance for synced-from-external announcements.
-           * When `source.origin === "floyd-news"`, the card was ingested
-           * by the Floyd-news-sync cron rather than authored by a hub
-           * admin. We reuse the regular announcement pill color (orange
-           * "Admin announcement" palette) so synced cards visually
-           * group with admin-authored ones — they still match the
-           * "Announcements" filter pill the same way.
-           */
-          source?: {
-            origin?: string;
-            share_url?: string;
-            ingested_at?: string;
-          } | null;
-        };
-        meeting_summary?: {
-          id?: string;
-          meeting_title?: string;
-          meeting_date?: string;
-          block_count?: number;
-        };
-        summary_id?: string;
-        meeting_date?: string;
-        meeting_title?: string;
-        block_count?: number;
-      };
+    case "wordcloud":
+      return { title: getTitle(id) ?? "Word Cloud", summary: descSummary };
 
-      const cachedType = getProcessType(event.process_id);
-
-      // Word cloud snapshot/result
-      if (
-        (data as { wordcloud_snapshot?: unknown; wordcloud_result?: unknown })
-          .wordcloud_snapshot !== undefined ||
-        (data as { wordcloud_snapshot?: unknown; wordcloud_result?: unknown })
-          .wordcloud_result !== undefined ||
-        cachedType === "civic.wordcloud"
-      ) {
-        const title = getProcessTitle(event.process_id) ?? "Word Cloud";
-        return {
-          id: event.id,
-          title,
-          pillLabel: "Word cloud",
-          pillKind: "wordcloud" as const,
-          summary: summaryFromDescription(getProcessDescription(event.process_id)),
-          timestamp: event.timestamp,
-          href: `/wordcloud/${event.process_id}`,
-        };
-      }
-
-      // Announcement — pill carries the role-aware label so the title
-      // remains pure announcement content.
-      if (data.announcement || cachedType === "civic.announcement") {
-        const title =
-          data.announcement?.title ??
-          getProcessTitle(event.process_id) ??
-          "Announcement";
-        const rawLabel = data.announcement?.author_role;
-        // Legacy "board" → "Board member"; lowercase "admin" → "Admin";
-        // any other free-form label is shown verbatim ("Planning
-        // Committee", etc.). Falls back to "Admin" when unset.
-        const normalized =
-          rawLabel === "board"
-            ? "Board member"
-            : rawLabel === "admin" || !rawLabel
-            ? "Admin"
-            : rawLabel;
-        const isAdmin = normalized === "Admin";
-        // Slice 13 — synced-from-external announcements carry
-        // source.origin = "floyd-news". They reuse the admin
-        // announcement palette (orange) so they group with the
-        // standard "Announcements" filter visually. The label reads
-        // as the syncing organization ("Floyd County Gov") to
-        // distinguish the source.
-        const isSynced = data.announcement?.source?.origin === "floyd-news";
-        // Pill carries just the role; the section context already
-        // says "Announcement" (filter pill / digest section header),
-        // so a trailing " announcement" suffix would be redundant
-        // and was making longer roles wrap rows. "Government" is
-        // abbreviated to "Gov" via abbreviateGovernment for the
-        // same width reason. Future polish: per-kind icons —
-        // tracked in civic-hub#11.
-        // MUST stay in sync with the digest-side helper in
-        // civic-hub/src/modules/civic.digest/service.ts.
-        const pillLabel = abbreviateGovernment(normalized);
-        const authorDisplayName = data.announcement?.author_display_name ?? null;
-        return {
-          id: event.id,
-          title,
-          pillLabel,
-          // Non-admin authors (Board members, committees, etc.) get a
-          // distinct pill + card border color so residents can tell
-          // which announcements come from elected officials vs the
-          // hub administrator. Synced announcements (Floyd County
-          // Government cron) use the admin palette so they don't get
-          // confused with elected-official posts.
-          pillKind: isAdmin || isSynced ? "announcement" : "announcement-author",
-          summary: summaryFromDescription(
-            getProcessDescription(event.process_id),
-          ),
-          timestamp: event.timestamp,
-          href: event.action_url,
-          authorName: authorDisplayName,
-        };
-      }
-
-      // Meeting summary
-      const isMeetingSummary =
-        data.meeting_summary !== undefined ||
-        typeof data.summary_id === "string" ||
-        cachedType === "civic.meeting_summary";
-
-      if (isMeetingSummary) {
-        const meetingDate =
-          data.meeting_summary?.meeting_date ?? data.meeting_date ?? "";
-        const blockCount =
-          typeof data.meeting_summary?.block_count === "number"
-            ? data.meeting_summary.block_count
-            : typeof data.block_count === "number"
-            ? data.block_count
-            : null;
-        const meetingTitle =
-          data.meeting_summary?.meeting_title ??
-          data.meeting_title ??
-          getProcessTitle(event.process_id);
-        // Meeting date is appended to the title so the card reads as a
-        // single line like "Board of Supervisors Regular Meeting — Apr 28,
-        // 2026". This avoids a redundant standalone date line above the
-        // engagement row and the publication timestamp at the bottom.
-        const dateStr = meetingDate ? formatMeetingDate(meetingDate) : "";
-        const baseTitle = meetingTitle || "Meeting summary";
-        const title = dateStr ? `${baseTitle} — ${dateStr}` : baseTitle;
-        void blockCount;
-        const summary = "";
-        return {
-          id: event.id,
-          title,
-          pillLabel: `${hub.governing_body_short} meeting summary`,
-          pillKind: "meeting",
-          summary,
-          timestamp: event.timestamp,
-          href: event.action_url,
-        };
-      }
-
-      // Vote results — accept either the new results_id or the legacy
-      // brief_id discriminator. cachedType bridges the same naming gap
-      // for stored process metadata.
-      const isVoteResults =
-        typeof data.results_id === "string" ||
-        typeof data.brief_id === "string" ||
-        cachedType === "civic.vote_results" ||
-        cachedType === "civic.brief";
-
-      if (isVoteResults) {
-        const title = getProcessTitle(event.process_id) ?? "Vote results";
-        // Slice 10: the summary now carries context (the headline
-        // result or a "delivered to the Board" indicator), and the
-        // engagement line below carries the participation count +
-        // comment count. Splitting them avoids the duplication that
-        // showed up when both lines said "N residents voted".
-        const summary = data.headline_result
-          ? String(data.headline_result)
-          : `Delivered to the ${hub.governing_body_name}.`;
-        return {
-          id: event.id,
-          title,
-          pillLabel: "Vote results",
-          pillKind: "vote-results",
-          summary,
-          timestamp: event.timestamp,
-          href: event.action_url,
-        };
-      }
-
-      // Vote process result_published — INTENTIONALLY NOT RENDERED.
-      //
-      // Closing a vote with the civic.vote_results module registered
-      // produces TWO result_published events: one from the vote-results
-      // record (above) and one from the underlying vote (here). The
-      // vote event is preserved on the event log for audit / federation
-      // purposes — but residents would see two posts per close, which
-      // is the redundancy Slice 8.5 was created to eliminate. Filter
-      // it out by returning null. (data.result identifies the vote
-      // event uniquely; vote-results events carry results_id/brief_id
-      // and are caught above.)
-      if (data.result !== undefined || cachedType === "civic.vote") {
-        return null;
-      }
-
-      // Unknown shape — a new process type emitting result_published
-      // without updating this discrimination ladder. Surface a generic
-      // card so future process types render automatically.
+    case "announcement":
+    case "announcement-author": {
+      const ann = data.announcement as
+        | { title?: string; author_display_name?: string | null }
+        | undefined;
       return {
-        id: event.id,
-        title: getProcessTitle(event.process_id) ?? "Activity",
-        pillLabel: "Activity",
-        pillKind: "generic",
-        summary: summaryFromDescription(getProcessDescription(event.process_id)),
-        timestamp: event.timestamp,
-        href: event.action_url,
+        title: ann?.title ?? getTitle(id) ?? "Announcement",
+        summary: descSummary,
+        authorName: ann?.author_display_name ?? null,
       };
     }
 
-    case "civic.project.created": {
-      const data = event.data as { project?: { title?: string } };
-      const title = data.project?.title ?? getProcessTitle(event.process_id) ?? "New project";
+    case "meeting": {
+      const ms = data.meeting_summary as
+        | { meeting_title?: string; meeting_date?: string }
+        | undefined;
+      const meetingDate =
+        ms?.meeting_date ??
+        (typeof data.meeting_date === "string" ? data.meeting_date : "") ??
+        "";
+      const meetingTitle =
+        ms?.meeting_title ??
+        (typeof data.meeting_title === "string" ? data.meeting_title : undefined) ??
+        getTitle(id);
+      const baseTitle = meetingTitle || "Meeting summary";
+      const dateStr = meetingDate ? formatMeetingDate(meetingDate) : "";
+      return { title: dateStr ? `${baseTitle} — ${dateStr}` : baseTitle, summary: "" };
+    }
+
+    case "proposal": {
+      const prop = data.proposal as { title?: string } | undefined;
       return {
-        id: event.id,
-        title,
-        pillLabel: "New project",
-        pillKind: "project-created",
-        summary: summaryFromDescription(getProcessDescription(event.process_id)),
-        timestamp: event.timestamp,
-        href: event.action_url,
+        title: prop?.title ?? getTitle(id) ?? "New proposal",
+        summary: descSummary,
       };
     }
 
-    case "civic.project.comment_added":
-    case "civic.project.sentiment_changed":
-      return null;
+    case "proposal-closed":
+      return { title: getTitle(id) ?? "Proposal", summary: descSummary };
 
-    case "civic.project.updated": {
-      const title = getProcessTitle(event.process_id) ?? "Project update";
+    case "project-created": {
+      const proj = data.project as { title?: string } | undefined;
       return {
-        id: event.id,
-        title,
-        pillLabel: "Project update",
-        pillKind: "project-updated",
-        summary: "",
-        timestamp: event.timestamp,
-        href: event.action_url,
+        title: proj?.title ?? getTitle(id) ?? "New project",
+        summary: descSummary,
       };
     }
 
-    // Proposal created — its public "now official" card. Links to the
-    // proposal page (the event's default action_url points at /process/:id,
-    // which is the wrong page for a proposal, so set href explicitly).
-    case "civic.proposal.submitted": {
-      const data = event.data as { proposal?: { title?: string } };
-      const title =
-        data.proposal?.title ?? getProcessTitle(event.process_id) ?? "New proposal";
+    case "project-updated":
+      return { title: getTitle(id) ?? "Project update", summary: "" };
+
+    case "conversation": {
+      const proc = data.process as { title?: string } | undefined;
       return {
-        id: event.id,
-        title,
-        pillLabel: "New proposal",
-        pillKind: "generic",
-        summary: summaryFromDescription(getProcessDescription(event.process_id)),
-        timestamp: event.timestamp,
-        href: `/proposal/${event.process_id}`,
+        title: proc?.title ?? getTitle(id) ?? "New conversation",
+        summary: descSummary,
       };
     }
 
-    // Process created — only conversations post a "created" card here; votes
-    // post when they open (civic.process.started), so created is null for
-    // everything except civic.polis_deliberation to avoid double-posting.
-    case "civic.process.created": {
-      const data = event.data as { process?: { type?: string; title?: string } };
-      if (data.process?.type !== "civic.polis_deliberation") return null;
-      const title =
-        data.process?.title ?? getProcessTitle(event.process_id) ?? "New conversation";
-      return {
-        id: event.id,
-        title,
-        pillLabel: "New conversation",
-        pillKind: "generic",
-        summary: summaryFromDescription(getProcessDescription(event.process_id)),
-        timestamp: event.timestamp,
-        href: `/deliberation/${event.process_id}`,
-      };
-    }
-
-    default: {
-      const title = getProcessTitle(event.process_id) ?? "Activity";
-      return {
-        id: event.id,
-        title,
-        pillLabel: "Activity",
-        pillKind: "generic",
-        summary: summaryFromDescription(getProcessDescription(event.process_id)),
-        timestamp: event.timestamp,
-        href: event.action_url,
-      };
-    }
+    case "conversation-results":
+      return { title: getTitle(id) ?? "Conversation results", summary: descSummary };
   }
 }
 
@@ -422,20 +191,6 @@ function summaryFromDescription(description: string | undefined): string {
   if (!description) return "";
   const firstLine = description.split(/\r?\n/).find((l) => l.trim().length > 0);
   return firstLine?.trim() ?? "";
-}
-
-/**
- * Width-saver for announcement pill labels. Replaces the standalone
- * word "Government" with "Gov" so labels like "Floyd County Government"
- * render as "Floyd County Gov" — keeps the role recognizable while
- * shaving the chars that were causing pills to wrap rows on the feed
- * and in the email digest.
- *
- * MUST stay in sync with the email-side helper in
- * civic-hub/src/modules/civic.digest/service.ts.
- */
-function abbreviateGovernment(label: string): string {
-  return label.replace(/\bGovernment\b/gi, "Gov");
 }
 
 /**

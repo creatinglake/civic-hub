@@ -5,24 +5,25 @@
 // a fully-formed DigestEmail ready to hand to the mailer, or null when
 // the user has no new activity to report.
 //
-// Email rendering mirrors the web feed (Slice 8): title-first per item,
-// a colored pill on the right indicating the post type, and a 1-line
-// summary below. Pill colors are inlined as hex literals — email clients
-// don't read CSS variables — and intentionally match the --pill-*
-// tokens defined in the UI's theme.css.
+// Phase 3 — feed-worthiness, kind, pill label, and link all come from the
+// single shared classifier (src/shared/feedActivity.ts), the same one the web
+// feed uses. The digest groups the classifier's kinds into email sections and
+// renders each with a pill color that mirrors the feed's per-kind palette
+// (inlined as hex literals — email clients don't read CSS variables).
 
 import {
-  classifyItemKind,
-  isDigestRenderable,
-  sortDigestItems,
-} from "./filter.js";
+  classifyActivity,
+  type Activity,
+  type ActivityKind,
+  type ClassifierEvent,
+} from "../../shared/feedActivity.js";
+import { sortDigestItems } from "./filter.js";
 import type {
   DigestAssemblyInput,
   DigestEmail,
   DigestEvent,
   DigestHubContext,
   DigestItem,
-  DigestItemKind,
 } from "./models.js";
 
 // --- Assembly ---------------------------------------------------------------
@@ -31,10 +32,6 @@ import type {
  * Turn a user + a list of events into a ready-to-send digest email.
  * Returns null when nothing survives filtering — the caller skips the
  * send and does NOT advance `last_digest_sent_at`.
- *
- * Events are assumed to be scoped to the user's "since" window already;
- * this function applies the digest-renderable filter as a second layer
- * of defense.
  */
 export function assembleDigestForUser(
   input: DigestAssemblyInput,
@@ -43,10 +40,11 @@ export function assembleDigestForUser(
   const thumbnails = input.process_thumbnails ?? {};
   const items: DigestItem[] = [];
   for (const event of input.events) {
-    if (!isDigestRenderable(event)) continue;
-    const kind = classifyItemKind(event);
-    if (!kind) continue;
-    items.push(eventToItem(event, kind, titles, thumbnails));
+    const activity = classifyActivity(event as ClassifierEvent);
+    if (!activity) continue;
+    items.push(
+      eventToItem(event, activity, titles, thumbnails, input.hub.ui_base_url),
+    );
   }
 
   if (items.length === 0) return null;
@@ -66,106 +64,98 @@ export function assembleDigestForUser(
   };
 }
 
+/**
+ * Absolutize a classifier href for email. The classifier returns either an
+ * absolute URL (the event's own action_url, possibly an external link) or a
+ * relative SPA path (wordcloud/proposal/conversation pages). Email links must
+ * be absolute, so prefix relative paths with the hub UI base.
+ */
+function absolutize(href: string, uiBase: string): string {
+  if (/^https?:\/\//i.test(href)) return href;
+  return `${uiBase.replace(/\/$/, "")}${href}`;
+}
+
 function eventToItem(
   event: DigestEvent,
-  kind: DigestItemKind,
+  activity: Activity,
   titles: Record<string, string>,
   thumbnails: Record<string, string>,
+  uiBase: string,
 ): DigestItem {
+  const { title, summary } = digestTitleSummary(activity, event, titles);
+  return {
+    kind: activity.kind,
+    title,
+    // Pill label is the classifier's — identical to the feed card pill.
+    pill_label: activity.pill,
+    summary,
+    action_url: absolutize(activity.href, uiBase),
+    timestamp: event.timestamp,
+    thumbnail_url: event.process_id
+      ? thumbnails[event.process_id] ?? null
+      : null,
+  };
+}
+
+/**
+ * Derive the title + 1-line summary for a digest row from its classified kind
+ * and the event payload (falling back to the caller-supplied process_titles
+ * map). Mirrors the feed's per-kind copy, kept digest-flavored (the email has
+ * no fetched description, so summaries are short canned strings or payload
+ * data). Pure presentation — feed-worthiness already happened upstream.
+ */
+function digestTitleSummary(
+  activity: Activity,
+  event: DigestEvent,
+  titles: Record<string, string>,
+): { title: string; summary: string } {
   const d = event.data as {
     process?: { title?: unknown };
-    announcement?: { title?: unknown; body_preview?: unknown; author_role?: unknown };
-    brief_id?: unknown;
+    announcement?: { title?: unknown; body_preview?: unknown };
+    proposal?: { title?: unknown };
+    project?: { title?: unknown };
     headline_result?: unknown;
     participation_count?: unknown;
-    result?: { total_votes?: unknown };
-    meeting_summary?: {
-      meeting_title?: unknown;
-      meeting_date?: unknown;
-      block_count?: unknown;
-    };
+    meeting_summary?: { meeting_title?: unknown; meeting_date?: unknown; block_count?: unknown };
     meeting_title?: unknown;
     meeting_date?: unknown;
     block_count?: unknown;
   };
 
-  // Prefer the event payload (authoritative at emit-time); fall back to
-  // the caller-supplied process_titles map (covers civic.vote and
-  // civic.vote_results events, whose emitted payloads don't include
-  // the title). Last-ditch: a generic label so the digest still renders.
-  const rawTitle =
+  const fromPayload =
     (typeof d?.announcement?.title === "string" && d.announcement.title) ||
+    (typeof d?.proposal?.title === "string" && d.proposal.title) ||
+    (typeof d?.project?.title === "string" && d.project.title) ||
     (typeof d?.process?.title === "string" && d.process.title) ||
-    (event.process_id && titles[event.process_id]) ||
     null;
+  const fromMap = event.process_id ? titles[event.process_id] : null;
+  const rawTitle = fromPayload || fromMap || null;
 
-  let title: string;
-  let summary: string;
-  let pill_label: string;
+  switch (activity.kind) {
+    case "vote-open":
+      return { title: rawTitle ?? "New vote open", summary: "New vote now open — cast your ballot." };
 
-  switch (kind) {
-    case "vote_opened": {
-      title = rawTitle ?? "New vote open";
-      summary = "New vote now open — cast your ballot.";
-      pill_label = "Vote open";
-      break;
-    }
-    case "vote_results_published": {
-      // Vote-results posts replace the previous "vote_result_published"
-      // (raw vote close) and "brief_published" (admin-reviewed delivery)
-      // pair — a single post per closed vote, sourced from the
-      // civic.vote_results record.
+    case "vote-results": {
       const count =
-        typeof d?.participation_count === "number"
-          ? d.participation_count
-          : 0;
+        typeof d?.participation_count === "number" ? d.participation_count : 0;
       const noun = count === 1 ? "resident" : "residents";
       const headline =
         typeof d?.headline_result === "string" ? d.headline_result : "";
-      title = rawTitle ?? "Vote results";
-      summary = headline
-        ? `${count} ${noun} voted — ${headline}`
-        : `${count} ${noun} voted — delivered to the Board.`;
-      pill_label = "Vote results";
-      break;
+      return {
+        title: rawTitle ?? "Vote results",
+        summary: headline
+          ? `${count} ${noun} voted — ${headline}`
+          : `${count} ${noun} voted — delivered to the Board.`,
+      };
     }
-    case "announcement": {
-      const preview =
-        typeof d?.announcement?.body_preview === "string"
-          ? d.announcement.body_preview
-          : "";
-      title = rawTitle ?? "New announcement";
-      summary = truncate(preview, 160);
-      // Pill label carries just the role; the digest section header
-      // ("ANNOUNCEMENTS") and the feed filter pill ("Announcements")
-      // already supply the type context, so a trailing " announcement"
-      // suffix is redundant and made longer pills (notably "Floyd
-      // County Government announcement") wrap rows in the email digest.
-      // "Government" is abbreviated to "Gov" for the same width reason.
-      // Future polish: pair the pill label with a per-kind icon
-      // (megaphone / ballot / etc.) — tracked in civic-hub#11.
-      const rawRole =
-        typeof d?.announcement?.author_role === "string"
-          ? d.announcement.author_role
-          : null;
-      const normalized =
-        rawRole === "board"
-          ? "Board member"
-          : rawRole === "admin" || !rawRole
-          ? "Admin"
-          : rawRole;
-      pill_label = abbreviateGovernment(normalized);
-      break;
-    }
-    case "meeting_summary_published": {
+
+    case "meeting": {
       const meetingDate =
-        (typeof d?.meeting_summary?.meeting_date === "string" &&
-          d.meeting_summary.meeting_date) ||
+        (typeof d?.meeting_summary?.meeting_date === "string" && d.meeting_summary.meeting_date) ||
         (typeof d?.meeting_date === "string" && d.meeting_date) ||
         "";
       const meetingTitle =
-        (typeof d?.meeting_summary?.meeting_title === "string" &&
-          d.meeting_summary.meeting_title) ||
+        (typeof d?.meeting_summary?.meeting_title === "string" && d.meeting_summary.meeting_title) ||
         (typeof d?.meeting_title === "string" && d.meeting_title) ||
         rawTitle ||
         "Board meeting";
@@ -173,28 +163,45 @@ function eventToItem(
         typeof d?.meeting_summary?.block_count === "number"
           ? d.meeting_summary.block_count
           : typeof d?.block_count === "number"
-          ? d.block_count
-          : 0;
-      const dateLabel = formatMeetingDate(meetingDate);
+            ? d.block_count
+            : 0;
       const topicsNoun = blockCount === 1 ? "topic" : "topics";
-      title = meetingTitle;
-      summary = `${dateLabel} · ${blockCount} ${topicsNoun} covered.`;
-      pill_label = "Meeting summary";
-      break;
+      return {
+        title: meetingTitle,
+        summary: `${formatMeetingDate(meetingDate)} · ${blockCount} ${topicsNoun} covered.`,
+      };
     }
-  }
 
-  return {
-    kind,
-    title,
-    pill_label,
-    summary,
-    action_url: event.action_url,
-    timestamp: event.timestamp,
-    thumbnail_url: event.process_id
-      ? thumbnails[event.process_id] ?? null
-      : null,
-  };
+    case "announcement":
+    case "announcement-author": {
+      const preview =
+        typeof d?.announcement?.body_preview === "string"
+          ? d.announcement.body_preview
+          : "";
+      return { title: rawTitle ?? "New announcement", summary: truncate(preview, 160) };
+    }
+
+    case "wordcloud":
+      return { title: rawTitle ?? "Word cloud", summary: "New word cloud open — share your response." };
+
+    case "proposal":
+      return { title: rawTitle ?? "New proposal", summary: "A new idea is open for support and discussion." };
+
+    case "proposal-closed":
+      return { title: rawTitle ?? "Proposal", summary: "The discussion period has ended." };
+
+    case "project-created":
+      return { title: rawTitle ?? "New project", summary: "A new community project was posted." };
+
+    case "project-updated":
+      return { title: rawTitle ?? "Project update", summary: "A community project has a new update." };
+
+    case "conversation":
+      return { title: rawTitle ?? "New conversation", summary: "Join the conversation and share your view." };
+
+    case "conversation-results":
+      return { title: rawTitle ?? "Conversation results", summary: "The conversation has concluded — see the results." };
+  }
 }
 
 // --- Subject ----------------------------------------------------------------
@@ -213,29 +220,77 @@ function buildSubject(
   return `${hub.hub_name} — ${dateLabel} update (${itemCount} ${noun})`;
 }
 
-// --- HTML formatting --------------------------------------------------------
+// --- Sections ---------------------------------------------------------------
 
-const GROUP_LABELS: Record<DigestItemKind, string> = {
-  vote_opened: "New votes open",
-  vote_results_published: "New vote results",
-  meeting_summary_published: "New meeting summaries",
-  announcement: "Announcements",
+type DigestSection =
+  | "votes_open"
+  | "vote_results"
+  | "meeting_summaries"
+  | "announcements"
+  | "word_clouds"
+  | "proposals"
+  | "projects"
+  | "conversations";
+
+/** Which email section each classifier kind renders under. */
+const SECTION_OF: Record<ActivityKind, DigestSection> = {
+  "vote-open": "votes_open",
+  "vote-results": "vote_results",
+  meeting: "meeting_summaries",
+  announcement: "announcements",
+  "announcement-author": "announcements",
+  wordcloud: "word_clouds",
+  proposal: "proposals",
+  "proposal-closed": "proposals",
+  "project-created": "projects",
+  "project-updated": "projects",
+  conversation: "conversations",
+  "conversation-results": "conversations",
 };
 
+const SECTION_LABELS: Record<DigestSection, string> = {
+  votes_open: "New votes open",
+  vote_results: "New vote results",
+  meeting_summaries: "New meeting summaries",
+  announcements: "Announcements",
+  word_clouds: "Word clouds",
+  proposals: "Proposals",
+  projects: "Projects",
+  conversations: "Conversations",
+};
+
+const SECTION_ORDER: DigestSection[] = [
+  "votes_open",
+  "vote_results",
+  "meeting_summaries",
+  "announcements",
+  "word_clouds",
+  "proposals",
+  "projects",
+  "conversations",
+];
+
+// --- HTML formatting --------------------------------------------------------
+
 /**
- * Per-kind pill background/foreground hex pairs. Mirrors the
- * --pill-<kind>-bg / --pill-<kind>-fg tokens in the UI's theme.css.
- * Inlined as literals because email clients don't honor CSS vars.
- *
- * The vote_results_published pair uses the same teal that was
- * --pill-brief-* before the Slice 8.5 rename — color family
- * intentionally preserved.
+ * Per-kind pill background/foreground hex pairs. Mirror the
+ * --pill-<kind>-* tokens (and the Phase-3 additions) in the UI's
+ * theme.css / Feed.css. Inlined as literals because email clients don't
+ * honor CSS vars.
  */
-const PILL_COLORS: Record<DigestItemKind, { bg: string; fg: string }> = {
-  vote_opened:                { bg: "#e0ecfc", fg: "#1e3a5f" },
-  vote_results_published:     { bg: "#d4ede8", fg: "#0f5a55" },
-  meeting_summary_published:  { bg: "#d9ecd9", fg: "#0f4a26" },
-  announcement:               { bg: "#fbe5d3", fg: "#8c3210" },
+const PILL_COLORS: Record<ActivityKind, { bg: string; fg: string }> = {
+  "vote-open": { bg: "#e0ecfc", fg: "#1e3a5f" },
+  "vote-results": { bg: "#d4ede8", fg: "#0f5a55" },
+  meeting: { bg: "#d9ecd9", fg: "#0f4a26" },
+  announcement: { bg: "#fbe5d3", fg: "#8c3210" },
+  "announcement-author": { bg: "#e4ddf0", fg: "#3a2c5e" },
+  wordcloud: { bg: "#e0f2f1", fg: "#00695c" },
+  proposal: { bg: "#ede7f6", fg: "#5e35b1" },
+  "proposal-closed": { bg: "#ece9f1", fg: "#5b517a" },
+  "project-created": { bg: "#e3f2fd", fg: "#1565c0" },
+  "project-updated": { bg: "#e3f2fd", fg: "#1565c0" },
+  conversation: { bg: "#e8eaf6", fg: "#3949ab" },
+  "conversation-results": { bg: "#e6e9f3", fg: "#3f4a86" },
 };
 
 // Both stacks fall back through the OS sans family so email clients
@@ -251,12 +306,12 @@ export function formatDigestHtml(
   hub: DigestHubContext,
   subject: string,
 ): string {
-  const grouped = groupByKind(items);
+  const grouped = groupBySection(items);
   const sections: string[] = [];
-  for (const kind of Object.keys(GROUP_LABELS) as DigestItemKind[]) {
-    const group = grouped.get(kind);
+  for (const section of SECTION_ORDER) {
+    const group = grouped.get(section);
     if (!group || group.length === 0) continue;
-    sections.push(renderGroupHtml(GROUP_LABELS[kind], group, kind));
+    sections.push(renderSectionHtml(SECTION_LABELS[section], group));
   }
 
   return `<!DOCTYPE html>
@@ -280,22 +335,15 @@ export function formatDigestHtml(
 </html>`;
 }
 
-function renderGroupHtml(
-  label: string,
-  items: DigestItem[],
-  kind: DigestItemKind,
-): string {
-  const { bg, fg } = PILL_COLORS[kind];
+function renderSectionHtml(label: string, items: DigestItem[]): string {
   // Each row is a <table> wrapped in a single <a display:block> so the
   // entire row — title, summary, pill, and the whitespace between — is
-  // one click target. The HTML5 spec allows anchors to wrap flow
-  // content including tables, and major email clients (Apple Mail,
-  // Gmail web/mobile, Outlook 365, Outlook desktop) all honor it.
-  // Inner anchors are removed (nested anchors are invalid). The
-  // chevron column on the right signals interactivity without the
-  // blue-underlined-link look — the row reads as a tappable card.
+  // one click target. The pill color is per-row (item.kind) so a section
+  // with mixed kinds (e.g. admin + board announcements) colors each
+  // correctly.
   const rows = items
     .map((item) => {
+      const { bg, fg } = PILL_COLORS[item.kind];
       const thumbCell = item.thumbnail_url
         ? `
               <td valign="top" width="60" style="padding:0 12px 0 0;">
@@ -342,12 +390,12 @@ export function formatDigestText(
   hub: DigestHubContext,
   subject: string,
 ): string {
-  const grouped = groupByKind(items);
+  const grouped = groupBySection(items);
   const sections: string[] = [];
-  for (const kind of Object.keys(GROUP_LABELS) as DigestItemKind[]) {
-    const group = grouped.get(kind);
+  for (const section of SECTION_ORDER) {
+    const group = grouped.get(section);
     if (!group || group.length === 0) continue;
-    const label = GROUP_LABELS[kind].toUpperCase();
+    const label = SECTION_LABELS[section].toUpperCase();
     const rows = group
       .map((item) => {
         // Plain-text counterpart: pill label trails the title in
@@ -378,12 +426,13 @@ export function formatDigestText(
 
 // --- Helpers ----------------------------------------------------------------
 
-function groupByKind(items: DigestItem[]): Map<DigestItemKind, DigestItem[]> {
-  const out = new Map<DigestItemKind, DigestItem[]>();
+function groupBySection(items: DigestItem[]): Map<DigestSection, DigestItem[]> {
+  const out = new Map<DigestSection, DigestItem[]>();
   for (const item of items) {
-    const list = out.get(item.kind) ?? [];
+    const section = SECTION_OF[item.kind];
+    const list = out.get(section) ?? [];
     list.push(item);
-    out.set(item.kind, list);
+    out.set(section, list);
   }
   return out;
 }
@@ -404,23 +453,6 @@ function escapeAttr(s: string): string {
 function truncate(s: string, max: number): string {
   if (s.length <= max) return s;
   return s.slice(0, max - 1).trimEnd() + "…";
-}
-
-/**
- * Width-saver for announcement pill labels. Replaces the standalone word
- * "Government" with "Gov" so labels like "Floyd County Government" render
- * as "Floyd County Gov" — keeps the role recognizable while shaving the
- * ~5 chars that were causing pills to wrap rows in the email digest.
- *
- * Case-insensitive match; replacement is always "Gov" (rendered uppercase
- * by the pill's CSS in the email and in the feed).
- *
- * MUST stay in sync with the feed-side helper in
- * civic-hub/ui/src/components/FeedPost.tsx so email + feed pills look
- * identical for the same author.
- */
-function abbreviateGovernment(label: string): string {
-  return label.replace(/\bGovernment\b/gi, "Gov");
 }
 
 /**

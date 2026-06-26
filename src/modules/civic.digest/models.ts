@@ -12,6 +12,14 @@
 // civic.announcement, civic.brief, civic.auth, or any hub infrastructure
 // module (events/, db/, services/, controllers/). Event filtering is
 // performed on the generic CivicEvent shape only.
+//
+// Phase 3 exception: the digest imports the ONE shared, dependency-free
+// feed-worthiness classifier (src/shared/feedActivity.ts) so the email
+// digest and the web feed share a single source of truth. This is pure
+// logic — no DB, network, or process coupling — and is exactly the
+// "pull both sides into a shared module" the old filter.ts header asked for.
+
+import type { ActivityKind } from "../../shared/feedActivity.js";
 
 /** Minimal view of a CivicEvent the digest needs — mirrors models/event.ts. */
 export interface DigestEvent {
@@ -50,22 +58,12 @@ export interface DigestHubContext {
 }
 
 /**
- * Grouping categories surfaced in the email body. Order matters for
- * rendering.
- *
- * Slice 8.5 changes:
- *   - "brief_published" → "vote_results_published" to match the
- *     civic.brief → civic.vote_results module rename.
- *   - "vote_result_published" was REMOVED. Vote-process result_published
- *     events are now excluded from the digest entirely; the vote-results
- *     publication covers them. The kind is gone from the union because
- *     no code path produces it anymore.
+ * A digest item's kind. Phase 3 — this IS the shared classifier's
+ * ActivityKind, so the email digest and the web feed classify and label
+ * events identically (no more feed↔digest drift). The digest groups these
+ * kinds into sections for the email body (see civic.digest/service.ts).
  */
-export type DigestItemKind =
-  | "vote_opened"
-  | "vote_results_published"
-  | "announcement"
-  | "meeting_summary_published";
+export type DigestItemKind = ActivityKind;
 
 /** A single row in the digest — one renderable civic event. */
 export interface DigestItem {

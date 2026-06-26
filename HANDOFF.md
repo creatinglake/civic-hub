@@ -4,6 +4,39 @@ Updated after every Claude Code session. Records what was built, what's incomple
 
 ---
 
+## Phase 3 — Shared feed-worthiness classifier (feed ↔ digest parity) — 2026-06-26
+
+**Status:** Built + verified on **dev** (`urfmvqhzmamigssqwsya`). `tsc` (backend + frontend) clean; `vitest run tests/unit/` = **86 passed** (+31 new); `vite build` clean. **NOT yet committed/merged/deployed** — awaiting owner review. **No DB migration needed** (adds an optional `data.process.type` field to emitted event payloads; events are append-only JSONB).
+
+Implements `decisions/audit-2026-06-25-process-and-feed-consistency.md` §2 (Phase 3). Collapses the **four** drifting copies of the "what's feed-worthy" decision into ONE shared classifier.
+
+### Part A — the shared classifier + one discriminator field
+- **New `src/shared/feedActivity.ts`** — `classifyActivity(event) → { surface, kind, pill, href } | null`, the single source of truth, zero-dependency and framework-agnostic so BOTH runtimes import it (Vite frontend by relative path `../../../src/shared/feedActivity`; Node backend via `src/**/*`). It's an explicit **allowlist (default-closed)**: only named event types produce a card; everything else returns null. This is the seam for future admin-configurable feed-worthiness ([[project_feed_classifier]]).
+- **`data.process.type` discriminator (owner chose "all" — full uniformity).** `emitEvent` gained an optional `processType` that it stamps into `data.process.type` (merge-safe, never clobbers an existing type). Added `processType` to **every** `civic.process.*` / `civic.proposal.*` / `civic.project.*` emitter (vote, vote_results, announcement, meeting_summary, wordcloud, proposals, projects, processService generic `updated`, + Polis normalized via the deliberationBoot host adapter from its flat `process_type`). The classifier reads `data.process.type` first, falling back to the legacy data-shape ladders for historical events. **Key property:** the field is purely a discriminator — adding it to non-feed-worthy events (comment_added, vote_submitted, moderation, …) does NOT surface them (the allowlist decides). Verified live: every emitted event now carries `data.process.type`. (Exception: `civic.input` comment/moderation events omit it — the cross-cutting input module doesn't know the host process type locally and these are never feed-worthy.)
+
+### Part B — route all four consumers through the classifier
+- **Feed gate** (`Feed.tsx`): `renderableEvents = events.filter(e => classifyActivity(e) !== null)`. Removed the old `kindFromEvent`/`ProcessKind`/`EXCLUDED_TYPES` Set.
+- **Feed metadata loop** (`Feed.tsx`): keys on `activity.kind`; **added the missing project branch** (`getProjectDetail`) — fixes the 404 where project cards fell through to `getAnnouncement(id)`.
+- **Feed renderer** (`FeedPost.tsx`): `eventToPost` now calls `classifyActivity`, reads `.pill/.kind/.href`, and only derives title/summary (which need fetched metadata). No more data-shape `switch`; **no bland "Activity" fallthrough** for known types. `FeedPillKind = ActivityKind` (one vocabulary). Dropped the duplicated `abbreviateGovernment` (now in the classifier).
+- **Filter predicate** (`FeedFilter.tsx`): `buildFilterPredicate(key) = e => classifyActivity(e)?.surface === key` — was a *fourth* hand-maintained ladder and the cause of the observed "filter shows fewer items than All" bug (created/outcome/proposal events passed the gate but failed the filter). Fixed.
+- **Digest** (`civic.digest/filter.ts` + `service.ts` + `models.ts`): `isDigestRenderable`/`classifyItemKind` delegate to the classifier; `DigestItemKind = ActivityKind`. Email groups kinds into 8 sections, per-row pill colors mirror the feed palette, and relative hrefs (wordcloud/proposal/conversation) are absolutized against the hub UI base. **Digest now reaches feed parity** — proposals, projects, conversations, and word clouds reach email for the first time. Fixed the **wordcloud mislabel** (`started` → always `vote_opened` before) and the **`civic.outcome_delivered` orphan**. New CSS pill tokens added for proposal / proposal-closed / conversation / conversation-results (`Feed.css`).
+
+### Part C — "closed" cards (owner-selected: proposal closed + conversation results)
+- `civic.proposal.closed` (Phase 2's deadline-close) → **"Proposal closed"** card. `civic.outcome_delivered` (deliberation close) → **"Conversation results"** card — both in feed + digest. Vote close stays as the existing vote-results card (raw vote `result_published` kept excluded — no double-post). Project archive intentionally NOT carded (owner's choice).
+
+### Verification (2026-06-26, dev)
+- `scripts/verifyPhase3.ts` (run: `npx tsx scripts/verifyPhase3.ts`): runs the REAL classifier + digest assembler over a representative event set (current + legacy shapes) → 17 render with correct surface/kind/pill/href, 9 correctly excluded (no bland Activity), filter surfaces agree, digest spans all 8 sections (parity). Writes `/tmp/phase3-digest.html`.
+- **Browser eyeball (dev Supabase):** feed renders real cards — VOTE OPEN (real description + engagement), WORD CLOUD (real "60 responses"), NEW CONVERSATION ×2, CONVERSATION RESULTS (Part C) — no runtime errors, no bland Activity. `?type=activity` → all 5; `?type=announcement` → 0 (filters agree with pills). Digest HTML eyeballed: all 8 sections + correct pills.
+- 31 new unit tests: `tests/unit/feedActivity.test.ts` (classifier) + `tests/unit/digest-parity.test.ts`.
+
+### Incomplete / follow-ups
+- **Dev data was disrupted during verification.** `GET /debug/seed` is **broken**: its process-wipe fails on a FK from `wordcloud_submissions` (it deletes `processes` before child tables). This left the event store empty mid-verify; I restored a working feed by additively emitting 5 events for the 7 surviving processes. **Follow-up:** fix the seed reset to delete child tables (wordcloud_submissions, etc.) before `processes`. Dev currently has 7 processes + 5 synthetic feed events (not the full original fixture).
+- **Meeting-summary card pill** is now the canonical "Meeting summary" on both feed and digest (was `"{BoS} meeting summary"` on the feed only). Minor parity-driven wording change — say the word to restore the governing-body prefix on the feed card.
+- **`data.process.type` not on `civic.input` events** (comment_added + 2 moderation) — deliberate (host type not known at that layer; never feed-worthy). Add by threading the host type if full uniformity is wanted later.
+- Deferred per scope: event-type renaming to `civic.<type>.<verb>` + the full 38-site sweep of `data.process.type` into the rename = Phase 4; spec rewrites = Phase 4; admin-configurable classifier = future; Polis rework = separate track (not touched; seed-conversation browsing not regressed).
+
+---
+
 ## Phase 2 — One deadline-close + lifecycle alignment — 2026-06-26
 
 **Status:** Built + verified on **dev** (`urfmvqhzmamigssqwsya`). `tsc` (backend + frontend) clean; `vitest run tests/unit/` = 55 passed (+7 new). **NOT yet committed/merged/deployed** — awaiting owner review. **No DB migration needed** (all `status` columns are plain `TEXT`, no CHECK constraints; `"closed"` is a new value only).
