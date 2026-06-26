@@ -1,6 +1,5 @@
 import { Request, Response } from "express";
-import { getAuthUser, isAdminEmail } from "../middleware/auth.js";
-import { emitEvent } from "../events/eventEmitter.js";
+import { getAuthUser } from "../middleware/auth.js";
 import {
   createDraft,
   getDraft,
@@ -19,8 +18,7 @@ import {
   type Phase,
   type Category,
 } from "../modules/civic.proposal_assistant/index.js";
-import { createProposal } from "../modules/civic.proposals/index.js";
-import { submitForReview } from "../modules/civic.review/index.js";
+import { submitAsCreator } from "../modules/civic.review/index.js";
 
 const VALID_CATEGORIES = new Set(["issue", "idea", "project", "concern"]);
 const VALID_PHASES = new Set(["brainstorm", "review", "free_form"]);
@@ -355,31 +353,16 @@ export async function handleSubmitDraft(
         : DEFAULT_PROPOSAL_DURATION_MS;
 
     try {
-      if (isAdminEmail(user.email)) {
-        const closesAt = new Date(Date.now() + durationMs).toISOString();
-
-        const proposal = await createProposal(
-          {
-            title: draft.title.trim(),
-            description: fullDescription || undefined,
-            optional_links: optionalLinks.length > 0 ? optionalLinks : undefined,
-            submitted_by: user.id,
-            category: draft.category ?? undefined,
-            assistant_helped: draft.assistant_helped,
-            closes_at: closesAt,
-          },
-          emitEvent,
-        );
-
-        res.status(201).json({ proposal });
-      } else {
-        const creatorName = user.display_name || user.email.split("@")[0];
-        const result = await submitForReview({
+      // One creation path: always submit for review; admins are auto-approved
+      // (no review wait). The proposal's closes_at is derived from
+      // proposal_duration_ms inside the approval flow.
+      const result = await submitAsCreator(
+        {
           process_type: "civic.proposal",
           title: draft.title.trim(),
           description: fullDescription || "",
           creator_id: user.id,
-          creator_name: creatorName,
+          creator_name: user.display_name || user.email.split("@")[0],
           creator_email: user.email,
           content: {
             optional_links: optionalLinks,
@@ -387,10 +370,11 @@ export async function handleSubmitDraft(
             assistant_helped: draft.assistant_helped,
             proposal_duration_ms: durationMs,
           },
-        });
+        },
+        user.email,
+      );
 
-        res.status(201).json({ review_id: result.review.id });
-      }
+      res.status(201).json(result);
     } catch (workErr) {
       // The create failed after we claimed — release the draft for retry.
       await setDraftStatus(id, "drafting").catch(() => {});

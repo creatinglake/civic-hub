@@ -257,10 +257,10 @@ export default function ProposeDraftVote() {
     setError(null);
     try {
       const result = await apiSubmitVoteDraft(draft.id);
-      if (result.review_id) {
-        navigate(`/my-submissions/${result.review_id}`, { state: { submitted: true } });
-      } else {
+      if (result.auto_approved) {
         navigate(`/process/${result.process_id}`);
+      } else {
+        navigate(`/my-submissions/${result.review_id}`, { state: { submitted: true } });
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Submit failed");

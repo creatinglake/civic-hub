@@ -1,5 +1,5 @@
 import type { Request, Response } from "express";
-import { getAuthUser, isAdminEmail } from "../middleware/auth.js";
+import { getAuthUser } from "../middleware/auth.js";
 import { getPolisAdapter } from "../processes/deliberationBoot.js";
 import * as processService from "../services/processService.js";
 import type { PolisDeliberationState } from "../shared/polis_deliberation/types.js";
@@ -11,7 +11,7 @@ import {
   advanceMockStatement,
   addMockStatement,
 } from "../debug/seedDeliberationMocks.js";
-import { submitForReview } from "../modules/civic.review/index.js";
+import { submitAsCreator } from "../modules/civic.review/index.js";
 
 async function getConversationId(processId: string): Promise<string> {
   const process = await processService.getProcess(processId);
@@ -154,30 +154,21 @@ export async function handleCreateDeliberation(req: Request, res: Response): Pro
       ...(seed_statements?.length ? { seed_statements } : {}),
     };
 
-    if (isAdminEmail(user.email)) {
-      const process = await processService.createProcess({
-        definition: { type: "civic.polis_deliberation", version: "1.0" },
-        title: title || topic,
-        description: description || framing,
-        createdBy: user.id,
-        state: statePayload,
-      });
-
-      res.status(201).json(process);
-    } else {
-      const creatorName = user.display_name || user.email.split("@")[0];
-      const result = await submitForReview({
+    // One creation path: always submit for review; admins are auto-approved.
+    const result = await submitAsCreator(
+      {
         process_type: "civic.polis_deliberation",
         title: title || topic,
         description: description || framing,
         creator_id: user.id,
-        creator_name: creatorName,
+        creator_name: user.display_name || user.email.split("@")[0],
         creator_email: user.email,
         state: statePayload,
-      });
+      },
+      user.email,
+    );
 
-      res.status(201).json({ review_id: result.review.id });
-    }
+    res.status(201).json(result);
   } catch (err: any) {
     handleError(res, err);
   }

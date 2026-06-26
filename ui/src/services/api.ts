@@ -386,9 +386,21 @@ export function reviewDraft(draftId: string): Promise<DraftAssistantResult> {
   return request("POST", `/proposals/drafts/${draftId}/review`);
 }
 
+/**
+ * Result of creating any reviewable process. Creation always flows through the
+ * one path: submit for review, then auto-approve when the creator is an admin.
+ * `auto_approved` tells the UI whether the process is already live (navigate to
+ * its detail page) or pending review (navigate to My Submissions).
+ */
+export interface CreateProcessResult {
+  review_id: string;
+  process_id: string;
+  auto_approved: boolean;
+}
+
 export function submitDraft(
   draftId: string,
-): Promise<{ proposal?: CivicProposalDetail; review_id?: string }> {
+): Promise<CreateProcessResult> {
   return request("POST", `/proposals/drafts/${draftId}/submit`);
 }
 
@@ -449,7 +461,7 @@ export function reviewVoteDraft(draftId: string): Promise<VoteDraftAssistantResu
 
 export function submitVoteDraft(
   draftId: string,
-): Promise<{ process_id?: string; review_id?: string }> {
+): Promise<CreateProcessResult> {
   return request("POST", `/votes/drafts/${draftId}/submit`);
 }
 
@@ -588,7 +600,7 @@ export function reviewProjectDraft(draftId: string): Promise<ProjectDraftAssista
 
 export function submitProjectDraft(
   draftId: string,
-): Promise<{ project_id?: string; review_id?: string }> {
+): Promise<CreateProcessResult> {
   return request("POST", `/projects/drafts/${draftId}/submit`);
 }
 
@@ -1447,7 +1459,7 @@ export function createDeliberation(input: {
   deadline?: string;
   participation_threshold?: number;
   seed_statements?: string[];
-}): Promise<unknown> {
+}): Promise<CreateProcessResult> {
   return request("POST", "/deliberations", input);
 }
 

@@ -1,6 +1,5 @@
 import { Request, Response } from "express";
-import { emitEvent } from "../events/eventEmitter.js";
-import { getAuthUser, isAdminEmail } from "../middleware/auth.js";
+import { getAuthUser } from "../middleware/auth.js";
 import {
   createProjectDraft,
   getProjectDraft,
@@ -17,8 +16,7 @@ import {
   type DraftState,
   type Phase,
 } from "../modules/civic.proposal_assistant/index.js";
-import { createProject } from "../modules/civic.projects/index.js";
-import { submitForReview } from "../modules/civic.review/index.js";
+import { submitAsCreator } from "../modules/civic.review/index.js";
 
 const VALID_PHASES = new Set(["brainstorm", "review", "free_form"]);
 
@@ -295,30 +293,14 @@ export async function handleSubmitProjectDraft(
       .map((l) => l.trim())
       .filter((l) => l.length > 0);
 
-    if (isAdminEmail(user.email)) {
-      const project = await createProject(
-        {
-          title: draft.title.trim(),
-          description: draft.description.trim(),
-          sources,
-          user_id: user.id,
-          assistant_helped: draft.assistant_helped,
-          banner_image_url: draft.banner_image_url,
-          banner_image_alt: draft.banner_image_alt,
-        },
-        emitEvent,
-      );
-
-      await setProjectDraftStatus(id, "submitted");
-      res.status(201).json({ project_id: project.id });
-    } else {
-      const creatorName = user.display_name || user.email.split("@")[0];
-      const result = await submitForReview({
+    // One creation path: always submit for review; admins are auto-approved.
+    const result = await submitAsCreator(
+      {
         process_type: "civic.project",
         title: draft.title.trim(),
         description: draft.description.trim(),
         creator_id: user.id,
-        creator_name: creatorName,
+        creator_name: user.display_name || user.email.split("@")[0],
         creator_email: user.email,
         content: {
           sources,
@@ -326,11 +308,12 @@ export async function handleSubmitProjectDraft(
           banner_image_url: draft.banner_image_url ?? null,
           banner_image_alt: draft.banner_image_alt ?? null,
         },
-      });
+      },
+      user.email,
+    );
 
-      await setProjectDraftStatus(id, "submitted");
-      res.status(201).json({ review_id: result.review.id });
-    }
+    await setProjectDraftStatus(id, "submitted");
+    res.status(201).json(result);
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
     console.error("[project-submit]", message);
