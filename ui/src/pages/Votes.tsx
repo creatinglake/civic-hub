@@ -7,12 +7,10 @@ import {
   type ProcessSummary,
   type PublishedVoteResultsSummary,
   type VoteSummary,
-  type ProposalSummary,
 } from "../services/api";
 import HubInfo from "../components/HubInfo";
 import ProcessPicker from "../components/ProcessPicker";
 import ProcessCard from "../components/ProcessCard";
-import ProposalCard from "../components/ProposalCard";
 
 /**
  * Slice 12 — Votes-page filter pills mirror the home-feed pattern.
@@ -99,13 +97,10 @@ export default function Votes() {
     )
     .sort((a, b) => b.support_count - a.support_count);
 
-  const legacyProposals = processes
-    .filter((p): p is ProposalSummary => p.type === "civic.proposal")
-    .sort((a, b) => b.support_count - a.support_count);
-
-  const hasAnyProposals =
-    proposedVotes.length > 0 ||
-    legacyProposals.length > 0;
+  // Idea-board proposals (civic.proposal) are NOT proposed votes — they live
+  // on the Proposals tab (Propose.tsx), fetched from the dedicated proposals
+  // API. The Votes page shows only civic.vote processes.
+  const hasAnyProposals = proposedVotes.length > 0;
 
   // Section visibility — derived from the active filter.
   const showActive = activeFilter === "all" || activeFilter === "active";
@@ -210,15 +205,6 @@ export default function Votes() {
                       </Link>
                     </li>
                   ))}
-
-                  {legacyProposals.map((p) => (
-                    <li key={p.id}>
-                      <Link to={`/process/${p.id}`} className="process-link">
-                        <ProposalCard proposal={p} />
-                      </Link>
-                    </li>
-                  ))}
-
                 </ul>
               )}
             </section>
