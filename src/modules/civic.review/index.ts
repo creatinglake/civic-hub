@@ -11,6 +11,7 @@ export type {
 
 export {
   submitForReview,
+  submitAsCreator,
   approveReview,
   requestChanges,
   declineReview,

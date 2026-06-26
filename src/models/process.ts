@@ -9,9 +9,7 @@ export type ProcessStatus =
   | "closed"
   | "finalized"
   | "pending_review"
-  | "archived"
-  // Legacy aliases — kept for backward compatibility with civic.proposal
-  | "open";
+  | "archived";
 
 export interface ProcessDefinition {
   type: string; // e.g., "civic.vote"

@@ -64,17 +64,3 @@ export async function emitProposalEndorsed(
   });
 }
 
-export async function emitProposalConverted(
-  ctx: EventContext,
-  actor: string,
-  data: { vote_process_id: string; vote_title: string },
-): Promise<void> {
-  await ctx.emit({
-    event_type: "civic.proposal.converted",
-    actor,
-    process_id: ctx.proposal_id,
-    hub_id: ctx.hub_id ?? HUB_ID,
-    jurisdiction: ctx.jurisdiction ?? "local",
-    data: { proposal: data },
-  });
-}

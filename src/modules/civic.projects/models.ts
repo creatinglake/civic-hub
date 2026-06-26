@@ -43,6 +43,13 @@ export interface ProjectComment {
 }
 
 export interface CreateProjectInput {
+  /**
+   * Optional fixed id. The review-approval flow passes the canonical
+   * `processes` row id here so the project child row shares one id with its
+   * process record (no forking a new id on approval). Omitted for any other
+   * caller, which mints a fresh `proj_` id.
+   */
+  id?: string;
   title: string;
   description?: string;
   sources?: string[];

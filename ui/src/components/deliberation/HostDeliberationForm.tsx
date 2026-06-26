@@ -38,9 +38,11 @@ export default function HostDeliberationForm({ onCreated, onCancel, onSubmittedF
         ...(deadline ? { deadline: new Date(deadline).toISOString() } : {}),
         ...(threshold ? { participation_threshold: parseInt(threshold, 10) } : {}),
         ...(seeds.length > 0 ? { seed_statements: seeds } : {}),
-      }) as Record<string, unknown>;
-      if (result.review_id && onSubmittedForReview) {
-        onSubmittedForReview(result.review_id as string);
+      });
+      if (result.auto_approved) {
+        onCreated();
+      } else if (onSubmittedForReview) {
+        onSubmittedForReview(result.review_id);
       } else {
         onCreated();
       }

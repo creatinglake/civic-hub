@@ -6,7 +6,8 @@
 
 import { ProcessHandler, ProcessFactory } from "./types.js";
 import voteProcess from "./voteProcess.js";
-import proposalProcess from "./proposalProcess.js";
+import proposalAdapter from "./proposalAdapter.js";
+import projectAdapter from "./projectAdapter.js";
 import voteResultsProcess from "./voteResultsProcess.js";
 import announcementProcess from "./announcementProcess.js";
 import meetingSummaryProcess from "./meetingSummaryProcess.js";
@@ -30,7 +31,8 @@ import wordcloudProcess from "./wordcloudProcess.js";
 // migrated by 20260427000000_rename_civic_brief_to_vote_results.sql.
 const processRegistry: Record<string, ProcessHandler> = {
   "civic.vote": voteProcess,
-  "civic.proposal": proposalProcess,
+  "civic.proposal": proposalAdapter,
+  "civic.project": projectAdapter,
   "civic.vote_results": voteResultsProcess,
   "civic.announcement": announcementProcess,
   "civic.meeting_summary": meetingSummaryProcess,

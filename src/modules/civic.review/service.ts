@@ -20,6 +20,7 @@ import {
   notifyAdminWithdrawn,
 } from "./email.js";
 import { emitEvent } from "../../events/eventEmitter.js";
+import { executeAction } from "../../services/processService.js";
 import { createProject } from "../civic.projects/index.js";
 import { createProposal } from "../civic.proposals/index.js";
 
@@ -51,7 +52,12 @@ function takeSnapshot(process: {
 
 export async function submitForReview(
   input: SubmitForReviewInput,
+  opts: { notify?: boolean } = {},
 ): Promise<{ review: ProcessReview; process_id: string }> {
+  // Auto-approved admin submissions skip the "under review" notifications
+  // (the submission is approved in the same request, so a "needs review" email
+  // would be misleading). The approval flow sends its own notification.
+  const notify = opts.notify ?? true;
   const handler = getProcessHandler(input.process_type);
   const processId = generateId("proc");
   const reviewId = generateId("rev");
@@ -140,35 +146,62 @@ export async function submitForReview(
     },
   });
 
-  // Notifications (best-effort — don't fail the submission)
-  try {
-    await notifyCreatorSubmitted({
-      creator_email: input.creator_email,
-      creator_name: input.creator_name,
-      process_type: input.process_type,
-      title: input.title,
-      review_id: reviewId,
-    });
-  } catch (e) {
-    console.warn("[review] Failed to notify creator:", e);
-  }
-
-  try {
-    const admins = getAdminEmails();
-    for (const admin of admins) {
-      await notifyAdminNewSubmission({
-        admin_email: admin,
+  // Notifications (best-effort — don't fail the submission). Suppressed when
+  // the caller will auto-approve (admin self-submission).
+  if (notify) {
+    try {
+      await notifyCreatorSubmitted({
+        creator_email: input.creator_email,
         creator_name: input.creator_name,
         process_type: input.process_type,
         title: input.title,
         review_id: reviewId,
       });
+    } catch (e) {
+      console.warn("[review] Failed to notify creator:", e);
     }
-  } catch (e) {
-    console.warn("[review] Failed to notify admin:", e);
+
+    try {
+      const admins = getAdminEmails();
+      for (const admin of admins) {
+        await notifyAdminNewSubmission({
+          admin_email: admin,
+          creator_name: input.creator_name,
+          process_type: input.process_type,
+          title: input.title,
+          review_id: reviewId,
+        });
+      }
+    } catch (e) {
+      console.warn("[review] Failed to notify admin:", e);
+    }
   }
 
   return { review: reviewData as ProcessReview, process_id: processId };
+}
+
+/**
+ * The single creation path for every reviewable process type (vote, proposal,
+ * project, conversation). A process is created the SAME way regardless of who
+ * creates it: always submit for review, then auto-approve when the creator is
+ * an admin (their submission simply skips the review wait). There are no
+ * separate admin-only create branches.
+ *
+ * Returns a uniform response: `review_id` always; `process_id` is the canonical
+ * id; `auto_approved` tells the caller/UI whether the process is already live.
+ */
+export async function submitAsCreator(
+  input: SubmitForReviewInput,
+  creatorEmail: string,
+): Promise<{ review_id: string; process_id: string; auto_approved: boolean }> {
+  const isAdmin = getAdminEmails().includes(creatorEmail.trim().toLowerCase());
+  const { review, process_id } = await submitForReview(input, {
+    notify: !isAdmin,
+  });
+  if (isAdmin) {
+    await approveReview(review.id, input.creator_id);
+  }
+  return { review_id: review.id, process_id, auto_approved: isAdmin };
 }
 
 // --- Admin actions ---
@@ -214,10 +247,12 @@ export async function approveReview(
   }
   const updatedReview = claimedRows[0];
 
-  // The live id used for the approval email link. Declared out here so it
-  // survives past the try block below. Votes/conversations flip in place
-  // (process_id); proposals/projects get a fresh id assigned inside.
-  let liveId = review.process_id;
+  // The live id used for the approval email link. Every process type now keeps
+  // its single canonical `processes` row id through approval — votes and
+  // conversations flip the row in place, and proposals/projects create their
+  // child row keyed by the SAME id (no forking a new id). So liveId is always
+  // review.process_id.
+  const liveId = review.process_id;
 
   // We've claimed the review. If any posting step below fails, roll the claim
   // back so the review returns to pending_review instead of getting stuck as
@@ -245,15 +280,17 @@ export async function approveReview(
     process_snapshot: null,
   });
 
-  // For types with their own tables, create the actual row on approval.
-  // These get a fresh id distinct from the placeholder process row, so we
-  // track it to build a correct "view it" link in the approval email.
-  // Votes and conversations flip the process in place, so their live id is
-  // just review.process_id (already set above).
+  // For types with their own relational tables, create the child row on
+  // approval — keyed by the canonical process id (review.process_id) so the
+  // placeholder `processes` row becomes the permanent record and we don't fork
+  // a second id. The `processes` row's status was already flipped to live
+  // above. Votes and conversations carry all their state on the `processes`
+  // row, so they need no child row here.
   if (proc.type === "civic.project") {
     const content = (proc.content ?? {}) as Record<string, unknown>;
-    const project = await createProject(
+    await createProject(
       {
+        id: review.process_id,
         title: proc.title,
         description: proc.description ?? "",
         sources: (content.sources as string[]) ?? [],
@@ -264,13 +301,13 @@ export async function approveReview(
       },
       emitEvent,
     );
-    liveId = project.id;
   } else if (proc.type === "civic.proposal") {
     const content = (proc.content ?? {}) as Record<string, unknown>;
     const durationMs = (content.proposal_duration_ms as number) || 30 * 24 * 60 * 60 * 1000;
     const closesAt = new Date(Date.now() + durationMs).toISOString();
-    const proposal = await createProposal(
+    await createProposal(
       {
+        id: review.process_id,
         title: proc.title,
         description: proc.description ?? undefined,
         optional_links: (content.optional_links as string[]) ?? undefined,
@@ -281,7 +318,6 @@ export async function approveReview(
       },
       emitEvent,
     );
-    liveId = proposal.id;
   }
 
   // Emit review approved event (restricted)
@@ -308,6 +344,28 @@ export async function approveReview(
           title: proc.title,
         },
       },
+    });
+  }
+
+  // Votes are approved into their "proposed" phase: drive the vote's own
+  // lifecycle so its STATE machine enters `proposed` (the process row status
+  // was set above, but addSupport gates on state.status, which createVoteState
+  // leaves at "draft"). This is what activates the "support a proposed vote"
+  // mechanism; at the support threshold the vote auto-activates. A vote
+  // explicitly configured for "direct" activation (admin/dev tooling) is
+  // activated straight away instead.
+  if (proc.type === "civic.vote") {
+    const mode = (proc.state as Record<string, unknown> | null)?.config;
+    const activationMode =
+      mode && typeof mode === "object"
+        ? (mode as Record<string, unknown>).activation_mode
+        : undefined;
+    const action =
+      activationMode === "direct" ? "process.activate" : "process.propose";
+    await executeAction(review.process_id, {
+      type: action,
+      actor: review.creator_id,
+      payload: {},
     });
   }
 

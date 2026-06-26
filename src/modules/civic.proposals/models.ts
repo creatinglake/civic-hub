@@ -35,6 +35,13 @@ export interface ProposalSupport {
 
 /** Input for creating a new proposal */
 export interface CreateProposalInput {
+  /**
+   * Optional fixed id. The review-approval flow passes the canonical
+   * `processes` row id here so the proposal child row shares one id with its
+   * process record (no forking a new id on approval). Omitted for any other
+   * caller, which mints a fresh `prop_` id.
+   */
+  id?: string;
   title: string;
   description?: string;
   optional_links?: string[];

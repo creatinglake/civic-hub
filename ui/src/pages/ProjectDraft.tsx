@@ -238,10 +238,10 @@ export default function ProjectDraft() {
     setError(null);
     try {
       const result = await apiSubmitProjectDraft(draft.id);
-      if (result.review_id) {
-        navigate(`/my-submissions/${result.review_id}`, { state: { submitted: true } });
+      if (result.auto_approved) {
+        navigate(`/project/${result.process_id}`);
       } else {
-        navigate(`/project/${result.project_id}`);
+        navigate(`/my-submissions/${result.review_id}`, { state: { submitted: true } });
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Submit failed");
