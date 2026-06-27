@@ -6,7 +6,9 @@ Updated after every Claude Code session. Records what was built, what's incomple
 
 ## Phase 3 — Shared feed-worthiness classifier (feed ↔ digest parity) — 2026-06-26
 
-**Status:** Built + verified on **dev** (`urfmvqhzmamigssqwsya`). `tsc` (backend + frontend) clean; `vitest run tests/unit/` = **86 passed** (+31 new); `vite build` clean. **NOT yet committed/merged/deployed** — awaiting owner review. **No DB migration needed** (adds an optional `data.process.type` field to emitted event payloads; events are append-only JSONB).
+**Status:** **MERGED to `main` and DEPLOYED to production (2026-06-26).** Verified on dev, then shipped. `tsc -b` (frontend) + `tsc --noEmit` (backend) clean; `vitest run tests/unit/` = **86 passed** (+31 new); `vite build` clean. **No DB migration needed** (adds an optional `data.process.type` field to emitted event payloads; events are append-only JSONB).
+
+**Deploy note (2026-06-26):** The first push failed the Vercel build on a **pre-existing Phase 2 bug** — `ProposalDetail.tsx` compares `proposal.status === "closed"` but `"closed"` was never added to the frontend `CivicProposalStatus` union (Phase 2 added it backend-only). It went unnoticed because the frontend was being "verified" with `cd ui && npx tsc --noEmit`, which **type-checks nothing** here (`ui/tsconfig.json` is `files:[]` + project references; only `tsc -b` checks the app — now recorded in `memory/project_ui_typecheck_command.md`). Because this bug entered in Phase 2, **every Vercel build since Phase 2 had been failing** — so Phase 2 had never actually deployed despite being on `main`. The fix (commit `552cab3`, add `"closed"` to `CivicProposalStatus`) unblocked the build, and **Phase 2 + Phase 3 went live together**. Two follow-up commits also shipped the same day: `de98d5b` (meeting-summary card pill prefixed with `governing_body_short` so it matches the feed filter pill — the classifier label stays the canonical "Meeting summary" that the email digest uses) and `80282b0` (`engines.node` 20.x → 24.x to clear Vercel's Node-20 deprecation). All builds green; no regressions observed on prod.
 
 Implements `decisions/audit-2026-06-25-process-and-feed-consistency.md` §2 (Phase 3). Collapses the **four** drifting copies of the "what's feed-worthy" decision into ONE shared classifier.
 
@@ -31,7 +33,8 @@ Implements `decisions/audit-2026-06-25-process-and-feed-consistency.md` §2 (Pha
 
 ### Incomplete / follow-ups
 - **Dev data was disrupted during verification.** `GET /debug/seed` is **broken**: its process-wipe fails on a FK from `wordcloud_submissions` (it deletes `processes` before child tables). This left the event store empty mid-verify; I restored a working feed by additively emitting 5 events for the 7 surviving processes. **Follow-up:** fix the seed reset to delete child tables (wordcloud_submissions, etc.) before `processes`. Dev currently has 7 processes + 5 synthetic feed events (not the full original fixture).
-- **Meeting-summary card pill** is now the canonical "Meeting summary" on both feed and digest (was `"{BoS} meeting summary"` on the feed only). Minor parity-driven wording change — say the word to restore the governing-body prefix on the feed card.
+- **Meeting-summary card pill** — RESOLVED (`de98d5b`): the feed card pill is prefixed with `governing_body_short` ("BoS meeting summary") to match the feed filter pill ("BoS meeting summaries"). The classifier's label stays the canonical hub-agnostic "Meeting summary", which the email digest uses — so feed card + feed filter agree, while the digest reads "Meeting summary" (a separate surface; pre-existing, owner OK with it).
+- **Frontend verification MUST use `tsc -b`** (or `npm run build`), not `npx tsc --noEmit` — the latter checks nothing in `ui/`. See `memory/project_ui_typecheck_command.md`. The backend `npx tsc --noEmit` at the repo root IS valid.
 - **`data.process.type` not on `civic.input` events** (comment_added + 2 moderation) — deliberate (host type not known at that layer; never feed-worthy). Add by threading the host type if full uniformity is wanted later.
 - Deferred per scope: event-type renaming to `civic.<type>.<verb>` + the full 38-site sweep of `data.process.type` into the rename = Phase 4; spec rewrites = Phase 4; admin-configurable classifier = future; Polis rework = separate track (not touched; seed-conversation browsing not regressed).
 
@@ -39,7 +42,7 @@ Implements `decisions/audit-2026-06-25-process-and-feed-consistency.md` §2 (Pha
 
 ## Phase 2 — One deadline-close + lifecycle alignment — 2026-06-26
 
-**Status:** Built + verified on **dev** (`urfmvqhzmamigssqwsya`). `tsc` (backend + frontend) clean; `vitest run tests/unit/` = 55 passed (+7 new). **NOT yet committed/merged/deployed** — awaiting owner review. **No DB migration needed** (all `status` columns are plain `TEXT`, no CHECK constraints; `"closed"` is a new value only).
+**Status:** **MERGED to `main` and DEPLOYED to production (2026-06-26)** — but note it did NOT actually reach prod until the Phase 3 session: Phase 2 introduced a frontend type error (`ProposalDetail.tsx` `=== "closed"` without `"closed"` in `CivicProposalStatus`) that silently failed every Vercel build from Phase 2 onward. Fixed in commit `552cab3`, after which Phase 2 + Phase 3 deployed together. `tsc` (backend + frontend) clean; `vitest run tests/unit/` = 55 passed (+7 new). **No DB migration needed** (all `status` columns are plain `TEXT`, no CHECK constraints; `"closed"` is a new value only).
 
 Implements `decisions/audit-2026-06-25-process-and-feed-consistency.md` §5 (Phase 2), addressing findings P3, P4, P7 + the dual-status note.
 
