@@ -81,7 +81,14 @@ export function eventToPost(
   return {
     id: event.id,
     title,
-    pillLabel: activity.pill,
+    // The classifier's pill label is canonical/hub-agnostic ("Meeting
+    // summary"), which the email digest uses. On the feed card we prefix the
+    // governing body so the card pill matches the feed's filter pill
+    // (`${governing_body_short} meeting summaries`).
+    pillLabel:
+      activity.kind === "meeting"
+        ? `${hub.governing_body_short} meeting summary`
+        : activity.pill,
     pillKind: activity.kind,
     summary,
     timestamp: event.timestamp,
