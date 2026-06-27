@@ -4,6 +4,46 @@ Updated after every Claude Code session. Records what was built, what's incomple
 
 ---
 
+## Polis JWT Auth + Word Cloud Seed + Draft Cleanup — 2026-06-27
+
+**Status:** Polis real connection **WORKING** in production. Word cloud seeded. Draft deliberations removed from public page. Pushed to `main`, Vercel auto-deploying.
+
+### Polis JWT Authentication (config-only, no code changes)
+- **Problem:** `POLIS_AUTH_TOKEN` was never set; all deliberation API calls returned 401. The adapter code (`polisAdapter.ts`) was correctly shaped but the token was missing.
+- **Root cause:** Polis uses a hybrid JWT auth middleware that checks tokens against 4 types in order: XID → Anonymous → Standard User → OIDC. Each type requires specific claims — a plain JWT without type markers gets "Token does not match any known JWT type" rejection.
+- **Fix:** Generated a **Standard User JWT** (RS256, 10-year expiry) on the Hetzner server (5.161.68.87) inside the `polis-prod-server-1` Docker container, signed with the private key at `/app/keys/jwt-private.pem`. Required claims: `standard_user_participant: true`, `oidc_sub`, `sub: "user:..."`, `iss: "https://polis.civic.social/"`, `aud: "participants"`, `uid: 1`.
+- **Env var:** `POLIS_AUTH_TOKEN` set in Vercel production env vars. `POLIS_BASE_URL` defaults to `https://polis.civic.social` in code (`src/processes/deliberationBoot.ts:25`).
+- **Token rotation:** Token expires ~2036. Set a calendar reminder for annual rotation as good practice. To regenerate: SSH into Hetzner box, run the JWT generation script inside the container, update Vercel env var.
+
+### Verified working
+- Creating real Polis conversations from floyd.civic.social
+- Submitting statements/comments after conversation starts
+- Agree/Disagree/Pass voting on statements
+- Existing seed conversations (Flock Camera `proc_delib_flock_001`) still work via mock layer
+
+### Known bugs (not fixed this session)
+- **Seed statements not appearing:** Initial seed statements entered during conversation creation don't reach Polis. Comments submitted *after* starting the conversation work fine. Likely a bug in the handler's "start" action — seed statement submission may happen before the Polis conversation ID is available.
+- **Other test data in production:** Several test proposals/votes exist (`proc_e1234c800c2c41dc`, `proc_add2a6156c3641fe`, `proc_25501c89bc994888`, `proc_f9f91616c9cf4cd9`, `proc_f8c72d30763041e8`). Can't delete due to `review_turns` append-only trigger. Could close them like the test conversations.
+
+### Draft section removed from Deliberations page
+- Removed the "Draft" section, "Start Conversation" button, `handleStart()`, `startDeliberation` import, and `startingId` state from `ui/src/pages/Deliberations.tsx`.
+- Conversations should go through the admin review/approval flow (via ProcessPicker → `/deliberations/new`) like all other process types, not be started from a public-facing button.
+- Three test conversations (`proc_dd4ffa81bae14031`, `proc_42dc361615664443`, `proc_7e467a64d5044d1b`) closed in production DB.
+
+### Word cloud production seed
+- Created `scripts/seedProdWordcloud.ts` — seeds "What do you love about Floyd?" word cloud (`proc_wordcloud_floyd_001`) with 30 submissions.
+- **Key detail:** Word cloud module stores `status` inside the `state` JSONB field (not just the process-level `status` column). Both must be `"active"` for the frontend submission form to appear. Initial seed was missing `state.status`, which hid the form.
+- Supports `--remove` flag for cleanup.
+
+### Production demo data inventory (all process types)
+- **Proposals:** Community Farm Stand, Jacksonville Trail Extension
+- **Projects:** Floyd County Community Skate Park (with banner image)
+- **Conversations:** Flock Camera (seed/mock data)
+- **Word cloud:** "What do you love about Floyd?" (30 real submissions)
+- **Seed scripts:** `seedProdDemo.ts`, `seedProdConversation.ts`, `seedProdWordcloud.ts`
+
+---
+
 ## Phase 3 — Shared feed-worthiness classifier (feed ↔ digest parity) — 2026-06-26
 
 **Status:** **MERGED to `main` and DEPLOYED to production (2026-06-26).** Verified on dev, then shipped. `tsc -b` (frontend) + `tsc --noEmit` (backend) clean; `vitest run tests/unit/` = **86 passed** (+31 new); `vite build` clean. **No DB migration needed** (adds an optional `data.process.type` field to emitted event payloads; events are append-only JSONB).
