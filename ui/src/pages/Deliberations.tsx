@@ -4,7 +4,6 @@ import { useAuth } from "../context/AuthContext";
 import type { DeliberationSummary } from "../services/api";
 import {
   listDeliberations,
-  startDeliberation,
 } from "../services/api";
 import HubInfo from "../components/HubInfo";
 import ProcessPicker from "../components/ProcessPicker";
@@ -15,7 +14,6 @@ export default function Deliberations() {
   const [processes, setProcesses] = useState<DeliberationSummary[]>([]);
   const [showPicker, setShowPicker] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [startingId, setStartingId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -36,26 +34,6 @@ export default function Deliberations() {
   const completed = processes.filter(
     (p) => p.lifecycle === "closed" || p.lifecycle === "finalized",
   );
-  const draft = processes.filter((p) => p.lifecycle === "draft");
-
-  async function handleStart(processId: string, topic: string) {
-    const confirmed = window.confirm(
-      `Start the deliberation "${topic}"?\n\nThis will create a live Polis conversation that participants can join immediately.`,
-    );
-    if (!confirmed) return;
-
-    setStartingId(processId);
-    try {
-      await startDeliberation(processId);
-      await load();
-    } catch (err: any) {
-      alert(
-        `Failed to start deliberation: ${err.message ?? "Unknown error"}`,
-      );
-    } finally {
-      setStartingId(null);
-    }
-  }
 
   return (
     <div className="page page-home">
@@ -83,28 +61,7 @@ export default function Deliberations() {
 
       {loading && <p className="section deliberations-loading">Loading...</p>}
 
-      {!loading && draft.length > 0 && isAdmin && (
-        <section className="section">
-          <h2 className="section-title">Draft</h2>
-          {draft.map((p) => (
-            <div key={p.process_id} className="deliberation-draft-card">
-              <div className="draft-card-content">
-                <span className="draft-topic">{p.topic}</span>
-                <span className="draft-badge">Draft</span>
-              </div>
-              <button
-                className="start-deliberation-btn"
-                disabled={startingId === p.process_id}
-                onClick={() => handleStart(p.process_id, p.topic)}
-              >
-                {startingId === p.process_id
-                  ? "Starting..."
-                  : "Start Conversation"}
-              </button>
-            </div>
-          ))}
-        </section>
-      )}
+      {/* Drafts are managed through the admin review flow, not shown here */}
 
       {!loading && active.length > 0 && (
         <section className="section">
