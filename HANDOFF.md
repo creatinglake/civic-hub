@@ -4,6 +4,25 @@ Updated after every Claude Code session. Records what was built, what's incomple
 
 ---
 
+## Phase 5 — Test the spine (logic-level) — 2026-06-30
+
+**Status:** **MERGED to `main` and DEPLOYED (commit `3df3571`).** Behavior-preserving refactor + new tests. Backend `tsc --noEmit` + frontend `tsc -b` clean; `vitest run tests/unit/` = **101 passed** (+15).
+
+Implements `decisions/audit-2026-06-25-process-and-feed-consistency.md` §5 (Phase 5), partially — see scope note.
+
+- **Extracted `processService`'s lifecycle DECISIONS into a pure, DB-free `src/services/processLifecycle.ts`** and routed processService through them (behavior-identical): `resolveInitialStatus` (create → `stateStatus ?? "active"`), `isPubliclyFetchable` (hides `pending_review`/`archived`), `isActionable` (rejects `finalized`), `shouldEmitStatusUpdate` (emit `civic.process.updated` only on a real status change), and `NON_PUBLIC_STATUSES` + `nonPublicStatusFilter()` — the latter derives the `getAllProcesses` PostgREST `in`-list from the same constant the fetch gate uses, so the query and the gate can't drift.
+- **Tests** (idiomatic — pure logic, no DB mock, matching `transitions.ts`/`methods.ts`/`deadline.ts`/`feedActivity.ts`): `tests/unit/processLifecycle.test.ts` (all five decisions + a query↔gate lockstep assertion), `rowToProcess` (now exported — field mapping + null-column defaults), and `tests/unit/voteResultsLifecycle.test.ts` (the `vote_results` publication state machine `pending → approved → published` — `canEdit`/`canApprove`/`isPublished`/`assertPublicationTransition`, previously an entirely untested core handler).
+
+### Scope note — what's covered vs not
+- **Covered:** the lifecycle *decision logic* of the process spine (the audit's headline "no tests on `processService`" gap) + the vote-results publication state machine. This is the risky logic; the DB calls are now thin wrappers around tested decisions.
+- **Deliberately NOT done:** true DB-integration tests of the handler methods and processService's insert/update/query I/O. The codebase has **zero DB-mock infrastructure** (every existing test is pure logic); a hand-rolled fake Supabase client risks testing the fake, not the code. The review state machine was already well-covered (16 cases in `review-transitions.test.ts`). Building a DB-mock harness is a separate decision (fragility tradeoffs) — recommended to skip, or do post-launch if ever.
+- **Important:** these are **local unit tests** of pure logic — they are NOT run by the Vercel build (which is only `tsc -b && vite build`) and there is no CI test run. Run them by hand (`npx vitest run tests/unit/`) before committing. End-to-end confidence in the *running* site comes from manual browser/dev verification + the `scripts/verify*.ts` scripts, not this suite.
+
+### Phase 0 leftovers — already resolved (verified this session)
+The two trivial code items from the audit §3 were already done by a prior pass: `GET /events?type=` now accepts `type` as an alias for `event_type` (`eventController.ts`), and the discovery manifest already emits `jurisdictions` (`discoveryController.ts`). No work needed.
+
+---
+
 ## Polis JWT Auth + Word Cloud Seed + Draft Cleanup — 2026-06-27
 
 **Status:** Polis real connection **WORKING** in production. Word cloud seeded. Draft deliberations removed from public page. Pushed to `main`, Vercel auto-deploying.
