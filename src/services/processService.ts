@@ -30,13 +30,20 @@ import {
   setActionDispatcher,
 } from "../processes/registry.js";
 import { getDb } from "../db/client.js";
+import {
+  resolveInitialStatus,
+  isPubliclyFetchable,
+  isActionable,
+  shouldEmitStatusUpdate,
+  nonPublicStatusFilter,
+} from "./processLifecycle.js";
 
 const HUB_ID = "civic-hub-local";
 const DEFAULT_JURISDICTION = "local";
 
 // --- Row <-> model mapping -------------------------------------------------
 
-interface ProcessRow {
+export interface ProcessRow {
   id: string;
   type: string;
   process_version: string;
@@ -55,7 +62,7 @@ interface ProcessRow {
   updated_at: string;
 }
 
-function rowToProcess(row: ProcessRow): Process {
+export function rowToProcess(row: ProcessRow): Process {
   const definition: ProcessDefinition = {
     type: row.type,
     version: row.process_version,
@@ -98,7 +105,7 @@ export async function createProcess(
   const stateStatus = (initialState as Record<string, unknown>).status as
     | ProcessStatus
     | undefined;
-  const status: ProcessStatus = stateStatus ?? "active";
+  const status: ProcessStatus = resolveInitialStatus(stateStatus);
 
   const hubId = input.hubId ?? HUB_ID;
   const jurisdiction = input.jurisdiction ?? DEFAULT_JURISDICTION;
@@ -188,7 +195,7 @@ export async function getAllProcesses(): Promise<Process[]> {
   const { data, error } = await getDb()
     .from("processes")
     .select("*")
-    .not("status", "in", '("pending_review","archived")')
+    .not("status", "in", nonPublicStatusFilter())
     .order("created_at", { ascending: false });
   if (error) throw new Error(`ProcessService: ${error.message}`);
   return (data ?? []).map((r) => rowToProcess(r as ProcessRow));
@@ -205,7 +212,7 @@ export async function executeAction(
     throw new Error(`Process not found: ${processId}`);
   }
 
-  if (process.status === "finalized") {
+  if (!isActionable(process.status)) {
     throw new Error(
       `Process ${processId} is finalized and cannot accept actions`,
     );
@@ -243,7 +250,7 @@ export async function executeAction(
   process.updatedAt = now;
 
   // Emit process.updated only when a meaningful state change occurred.
-  if (process.status !== previousStatus) {
+  if (shouldEmitStatusUpdate(previousStatus, process.status)) {
     await emitEvent({
       event_type: "civic.process.updated",
       actor: action.actor,
@@ -325,7 +332,7 @@ export async function getProcessState(
   // are not addressable by direct id — they're admin- or owner-facing only and
   // surface through their own queues. This also avoids leaking the
   // pending_review/internal-status mismatch via this read path.
-  if (process.status === "pending_review" || process.status === "archived") {
+  if (!isPubliclyFetchable(process.status)) {
     return undefined;
   }
 
