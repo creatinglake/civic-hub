@@ -79,10 +79,10 @@ const hub = {
    */
   intro_body:
     import.meta.env.VITE_HUB_INTRO_BODY ??
-    "This is where Floyd County residents weigh in on local issues, read Board of Supervisors meeting summaries, and stay in the loop between elections.",
+    "This is where Floyd County residents keep up with county government, raise topics that matter, help make sense of issues together, and have conversations to see where our community stands.",
   residency_intro:
     import.meta.env.VITE_HUB_RESIDENCY_INTRO ??
-    "To participate in Floyd County civic processes, please confirm your residency and review the policies below.",
+    "To participate in the Floyd Civic Hub, please confirm your residency and review the policies below.",
   /**
    * When true, the UI shows demo-specific affordances (e.g. the
    * bypass-code hint on the sign-in modal). Set only on demo/preview

@@ -527,10 +527,10 @@ export default function WordCloud() {
 
       {isOnboarding && !wc.has_submitted && (
         <div className="wordcloud-onboarding-banner">
-          <h2>Welcome! You're all set.</h2>
+          <h2>One quick thing before you dive in</h2>
           <p>
-            Before you explore, we'd love to hear from you. This is optional
-            — add a word or phrase below, or skip to the feed.
+            This is optional — tell us in a few words what you love about
+            Floyd, or skip straight to the feed.
           </p>
         </div>
       )}
