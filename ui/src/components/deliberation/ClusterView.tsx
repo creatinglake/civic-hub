@@ -12,9 +12,9 @@ export default function ClusterView({ clusters }: Props) {
       <div className="cluster-view-header">
         <h4 className="cluster-view-title">Opinion Groups</h4>
         <span className="cluster-view-meta">
-          {clusters.participant_count} participants &middot;{" "}
-          {clusters.statement_count} statements &middot;{" "}
-          {clusters.groups.length} groups
+          {clusters.participant_count} participant{clusters.participant_count !== 1 ? "s" : ""} &middot;{" "}
+          {clusters.statement_count} statement{clusters.statement_count !== 1 ? "s" : ""} &middot;{" "}
+          {clusters.groups.length} group{clusters.groups.length !== 1 ? "s" : ""}
         </span>
       </div>
 
@@ -26,7 +26,7 @@ export default function ClusterView({ clusters }: Props) {
               <li key={c.statement_id} className="consensus-item consensus-agree">
                 <span className="consensus-text">{c.text}</span>
                 <span className="consensus-rate">
-                  {Math.round(c.agree_rate * 100)}% agree ({c.vote_count} votes)
+                  {Math.round(c.agree_rate * 100)}% agree ({c.vote_count} vote{c.vote_count !== 1 ? "s" : ""})
                 </span>
               </li>
             ))}

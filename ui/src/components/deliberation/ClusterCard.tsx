@@ -16,8 +16,8 @@ export default function ClusterCard({ groupId, size, statements }: Props) {
   return (
     <div className="cluster-card">
       <div className="cluster-card-header">
-        <span className="cluster-name">Group {groupId}</span>
-        <span className="cluster-size">{size} participants</span>
+        <span className="cluster-name">Group {groupId + 1}</span>
+        <span className="cluster-size">{size} participant{size !== 1 ? "s" : ""}</span>
       </div>
       <ul className="cluster-statements">
         {statements.map((s, i) => (
