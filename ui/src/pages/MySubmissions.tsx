@@ -192,7 +192,7 @@ export default function MySubmissions() {
             {/* Current content */}
             <div className="submission-detail-section">
               <h2>Your submission</h2>
-              <p>{(proc?.description as string) || "No description"}</p>
+              <p style={{ whiteSpace: "pre-wrap" }}>{(proc?.description as string) || "No description"}</p>
             </div>
 
             {/* Review thread */}

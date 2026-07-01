@@ -160,6 +160,16 @@ export function createPolisAdapter(config: PolisAdapterConfig): PolisAdapter {
       actorXid: string,
     ): Promise<Statement | null> {
       try {
+        // Ensure the participant exists in Polis before requesting statements.
+        // Without this, new users who haven't voted/commented get no results.
+        await apiFetch("/api/v3/participationInit", {
+          method: "POST",
+          body: JSON.stringify({
+            conversation_id: conversationId,
+            xid: actorXid,
+          }),
+        }).catch(() => {});
+
         const result = await apiFetch<PolisNextCommentResponse>(
           `/api/v3/nextComment?conversation_id=${enc(conversationId)}&xid=${enc(actorXid)}`,
         );
