@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { useAuth } from "../../context/AuthContext";
 import type { DeliberationReadModel, ClusterState, VoteDirection } from "../../services/api";
 import {
   getDeliberation,
@@ -19,8 +20,10 @@ interface Props {
 type Tab = "participate" | "clusters";
 
 export default function DeliberationPanel({ processId }: Props) {
+  const { user } = useAuth();
   const [process, setProcess] = useState<DeliberationReadModel | null>(null);
   const [clusters, setClusters] = useState<ClusterState | null>(null);
+  const [hasSubmitted, setHasSubmitted] = useState(false);
   const [currentStatement, setCurrentStatement] = useState<{
     id: number;
     text: string;
@@ -34,12 +37,13 @@ export default function DeliberationPanel({ processId }: Props) {
 
   const loadProcess = useCallback(async () => {
     try {
-      const p = await getDeliberation(processId);
+      const p = await getDeliberation(processId, user?.id);
       setProcess(p);
+      setHasSubmitted(!!p.has_submitted);
     } catch (err: any) {
       setError(err.message);
     }
-  }, [processId]);
+  }, [processId, user?.id]);
 
   const loadNextStatement = useCallback(async () => {
     try {
@@ -78,6 +82,7 @@ export default function DeliberationPanel({ processId }: Props) {
 
   async function handleSubmitStatement(text: string) {
     await deliberationSubmitStatement(processId, text);
+    setHasSubmitted(true);
   }
 
   if (loading) {
@@ -145,7 +150,15 @@ export default function DeliberationPanel({ processId }: Props) {
             </div>
           )}
 
-          <StatementSubmission onSubmit={handleSubmitStatement} />
+          {hasSubmitted ? (
+            <div className="statement-submission statement-submission--done">
+              <p className="statement-submission-done-msg">
+                You've already added your perspective to this conversation. Keep voting on other statements to help the community find common ground.
+              </p>
+            </div>
+          ) : (
+            <StatementSubmission onSubmit={handleSubmitStatement} />
+          )}
         </div>
       )}
 

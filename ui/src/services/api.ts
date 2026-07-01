@@ -1397,6 +1397,7 @@ export interface DeliberationReadModel {
   summary: DeliberationSummaryData | null;
   summary_status: string;
   continued_from_response_id: string | null;
+  has_submitted?: boolean;
 }
 
 export interface DeliberationSummaryData {
@@ -1433,8 +1434,9 @@ export function listDeliberations(): Promise<DeliberationSummary[]> {
   return request("GET", "/deliberations");
 }
 
-export function getDeliberation(processId: string): Promise<DeliberationReadModel> {
-  return request("GET", `/deliberations/${processId}`);
+export function getDeliberation(processId: string, actor?: string): Promise<DeliberationReadModel> {
+  const qs = actor ? `?actor=${encodeURIComponent(actor)}` : "";
+  return request("GET", `/deliberations/${processId}${qs}`);
 }
 
 export function getDeliberationClusters(processId: string): Promise<ClusterState> {

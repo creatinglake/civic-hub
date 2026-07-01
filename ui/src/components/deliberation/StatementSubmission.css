@@ -72,3 +72,15 @@
   color: #16a34a;
   margin: 0;
 }
+
+.statement-submission--done {
+  text-align: center;
+  padding: 1.5rem 1.25rem;
+}
+
+.statement-submission-done-msg {
+  font-size: 0.9rem;
+  color: #555;
+  margin: 0;
+  line-height: 1.5;
+}

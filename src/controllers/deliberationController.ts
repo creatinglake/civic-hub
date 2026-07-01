@@ -1,6 +1,7 @@
 import type { Request, Response } from "express";
 import { getAuthUser } from "../middleware/auth.js";
 import { getPolisAdapter } from "../processes/deliberationBoot.js";
+import { getDb } from "../db/client.js";
 import * as processService from "../services/processService.js";
 import type { PolisDeliberationState } from "../shared/polis_deliberation/types.js";
 import type { VoteDirection } from "../shared/polis_deliberation/adapter/types.js";
@@ -73,17 +74,35 @@ export async function submitStatement(req: Request, res: Response): Promise<void
       return;
     }
 
+    const { data: existing } = await getDb()
+      .from("deliberation_submissions")
+      .select("user_id")
+      .eq("process_id", processId)
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    if (existing) {
+      res.status(409).json({ error: "You have already submitted a statement in this conversation" });
+      return;
+    }
+
     const conversationId = await getConversationId(processId);
 
     // Seed conversations use mock data
     if (isSeedConversation(conversationId)) {
       const stmt = addMockStatement(conversationId, text.trim());
+      await getDb()
+        .from("deliberation_submissions")
+        .upsert({ process_id: processId, user_id: user.id });
       res.status(201).json(stmt ?? { id: 0, text: text.trim() });
       return;
     }
 
     const adapter = getPolisAdapter();
     const result = await adapter.submitStatement(conversationId, user.id, text.trim());
+    await getDb()
+      .from("deliberation_submissions")
+      .upsert({ process_id: processId, user_id: user.id });
     res.status(201).json(result);
   } catch (err: any) {
     handleError(res, err);
@@ -261,7 +280,20 @@ export async function getDeliberation(req: Request, res: Response): Promise<void
       return;
     }
     const actor = req.query.actor as string | undefined;
-    res.json(handler.getReadModel(process, actor));
+    const readModel = handler.getReadModel(process, actor);
+
+    let has_submitted = false;
+    if (actor) {
+      const { data } = await getDb()
+        .from("deliberation_submissions")
+        .select("user_id")
+        .eq("process_id", processId)
+        .eq("user_id", actor)
+        .maybeSingle();
+      has_submitted = !!data;
+    }
+
+    res.json({ ...readModel, has_submitted });
   } catch (err: any) {
     handleError(res, err);
   }

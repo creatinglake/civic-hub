@@ -1665,6 +1665,8 @@
   padding: 2rem;
   max-width: 520px;
   width: 100%;
+  max-height: calc(100vh - 2rem);
+  overflow-y: auto;
   position: relative;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
   animation: intro-fade-in 0.2s ease-out;

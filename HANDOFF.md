@@ -6,7 +6,7 @@ Updated after every Claude Code session. Records what was built, what's incomple
 
 ## Pre-test-user verification pass + prod clean-slate — 2026-06-30 (PM)
 
-**Status:** Big verification + fix session. Code changes are **UNCOMMITTED** on `main` (working tree). Prod **data** cleanup already ran (see below); prod **code** still needs to deploy. Backend `tsc --noEmit` + frontend `tsc -b` both clean.
+**Status:** Big verification + fix session. **COMMITTED + DEPLOYED to `main` (through commit `7720ea9`)** — Vercel auto-deploy triggered 2026-07-01; full prod build (`npm run build` frontend + backend) verified locally before push, so no silent Vercel failure. Prod **data** cleanup also ran (see below). Backend `tsc` + frontend `tsc -b`/`vite build` all clean.
 
 ### 1. Creation-review flow — VERIFIED end-to-end in the browser (was never browser-tested)
 Drove it as resident + admin against dev, watching real events: submit → `pending_review` → MySubmissions → admin queue/detail → **request-changes** (note shown to creator) → **revise & resubmit** → **approve → posts LIVE** (project went `active`, in public list; creator emailed "now live") → **decline** (archived). All five tested branches emit the right events. Withdraw not click-verified (button observed; unit-tested in `review-transitions.test.ts`).
