@@ -1,0 +1,90 @@
+.wc-teaser {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 7px 16px;
+  background: var(--pill-vote-bg, #e3eaf6);
+  color: var(--pill-vote-fg, #1e3a5f);
+  font-size: 13px;
+  line-height: 1.2;
+  text-decoration: none;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  transition: background 0.15s ease;
+}
+
+.wc-teaser:hover {
+  background: #d6e0f2;
+}
+
+.wc-teaser-icon {
+  font-size: 13px;
+  opacity: 0.8;
+}
+
+.wc-teaser-label {
+  font-weight: 600;
+}
+
+.wc-teaser-sep {
+  opacity: 0.45;
+}
+
+/* Fixed-width-ish slot so rotating words don't jiggle the layout. */
+.wc-teaser-rotator {
+  display: inline-flex;
+  min-width: 7ch;
+  justify-content: flex-start;
+}
+
+.wc-teaser-word {
+  font-weight: 600;
+  font-style: italic;
+  animation: wc-word-in 0.45s ease;
+}
+
+.wc-teaser-empty {
+  opacity: 0.85;
+}
+
+.wc-teaser-cta {
+  font-weight: 700;
+  transition: transform 0.15s ease;
+}
+
+.wc-teaser:hover .wc-teaser-cta {
+  transform: translateX(2px);
+}
+
+@keyframes wc-word-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wc-teaser-word {
+    animation: none;
+  }
+}
+
+/* Mobile: keep the label for clarity, just tighten spacing and cap the
+   rotating word so a long entry can't push the row out of bounds. */
+@media (max-width: 560px) {
+  .wc-teaser {
+    gap: 6px;
+    padding: 7px 12px;
+  }
+  .wc-teaser-rotator {
+    min-width: 0;
+    max-width: 40vw;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+}

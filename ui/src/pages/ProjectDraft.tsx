@@ -39,6 +39,7 @@ export default function ProjectDraft() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [reviewNotice, setReviewNotice] = useState<string | null>(null);
   const [showMobileAssistant, setShowMobileAssistant] = useState(false);
   const [phase, setPhase] = useState<"brainstorm" | "free_form" | "review">("brainstorm");
   const [showConfirm, setShowConfirm] = useState(false);
@@ -131,9 +132,11 @@ export default function ProjectDraft() {
     if (!draft) return;
     setLoading(true);
     setError(null);
+    setReviewNotice(null);
     try {
       const result = await reviewProjectDraft(draft.id);
       setDraft(result.draft);
+      setReviewNotice(result.review_unavailable ? result.response.message : null);
       setMessages((prev) => {
         const cleaned = prev.map((msg) =>
           msg.suggestions ? { ...msg, role: msg.role, content: msg.content } : msg,
@@ -152,6 +155,7 @@ export default function ProjectDraft() {
       });
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Unknown error";
+      setError(friendlyError(msg));
       setMessages((prev) => [
         ...prev,
         { role: "assistant", content: friendlyError(msg) },
@@ -279,6 +283,7 @@ export default function ProjectDraft() {
         )}
 
         {error && <p className="form-error">{error}</p>}
+        {reviewNotice && <p className="form-hint">{reviewNotice}</p>}
 
         <div className="path-choice">
           <button
@@ -345,6 +350,7 @@ export default function ProjectDraft() {
               <h1 className="propose-draft-title">Start a project</h1>
             </div>
             {error && <p className="form-error" style={{ padding: "0 var(--space-lg)" }}>{error}</p>}
+            {reviewNotice && <p className="form-hint" style={{ padding: "0 var(--space-lg)" }}>{reviewNotice}</p>}
             <ProjectDraftingForm
               draft={draft}
               onFieldChange={handleFieldChange}
@@ -368,6 +374,7 @@ export default function ProjectDraft() {
               </Link>
               <h1>Start a project</h1>
               {error && <p className="form-error">{error}</p>}
+        {reviewNotice && <p className="form-hint">{reviewNotice}</p>}
               <ProjectDraftingForm
                 draft={draft}
                 onFieldChange={handleFieldChange}

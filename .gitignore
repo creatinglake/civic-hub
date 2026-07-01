@@ -22,3 +22,6 @@ ui/README.md
 ui/src/assets/
 .vercel
 .env*
+
+# Local DB backups — may contain prod data/PII, never commit
+backups/

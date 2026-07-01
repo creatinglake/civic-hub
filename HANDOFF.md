@@ -4,6 +4,56 @@ Updated after every Claude Code session. Records what was built, what's incomple
 
 ---
 
+## Pre-test-user verification pass + prod clean-slate — 2026-06-30 (PM)
+
+**Status:** Big verification + fix session. Code changes are **UNCOMMITTED** on `main` (working tree). Prod **data** cleanup already ran (see below); prod **code** still needs to deploy. Backend `tsc --noEmit` + frontend `tsc -b` both clean.
+
+### 1. Creation-review flow — VERIFIED end-to-end in the browser (was never browser-tested)
+Drove it as resident + admin against dev, watching real events: submit → `pending_review` → MySubmissions → admin queue/detail → **request-changes** (note shown to creator) → **revise & resubmit** → **approve → posts LIVE** (project went `active`, in public list; creator emailed "now live") → **decline** (archived). All five tested branches emit the right events. Withdraw not click-verified (button observed; unit-tested in `review-transitions.test.ts`).
+
+### 2. BLOCKER found + fixed — AI pre-check was a silent single-point-of-failure
+Every resident submission (project/vote/proposal) was hard-gated behind an AI "Review draft" Code-of-Conduct check. On failure (no key / timeout / quota) the old code **500'd into a hidden chat panel** → Submit disabled forever, no visible error → resident silently trapped.
+**Fix (Adam chose fail-open):** the 3 review handlers now degrade gracefully — on any review-service error they save a clean empty result, let the submission through to human admin review (the real gate per Decision #7), and return `review_unavailable: true`. The 3 draft pages surface a visible `form-hint` notice ("The automated check couldn't run just now… your submission will go straight to human review"). Verified in-browser (dev has no `ANTHROPIC_API_KEY`, so this path is exercised every time). Files: `src/modules/civic.proposal_assistant/index.ts` (shared `AUTOMATED_REVIEW_UNAVAILABLE_NOTICE`), `src/controllers/{project,vote,proposal}DraftController.ts`, `ui/src/services/api.ts`, `ui/src/pages/{ProjectDraft,ProposeDraft,ProposeDraftVote}.tsx`.
+
+### 3. PROD clean-slate (Adam-directed) — DONE
+Selective, type-scoped (announcements + meeting summaries are ALSO `processes` — a blanket wipe would destroy them). Scripts: `scripts/exportProdProcesses.ts` (read-only backup), `scripts/cleanupProdProcesses.ts` (dry-run by default, `--apply` to write; self-backs-up first).
+- **Archived 16 test processes** (4 conversations, 5 proposals, 5 votes, 2 vote_results) → hidden from public + admin queue.
+- **Deleted 92 test events** (302→210) — archiving alone does NOT clean the feed (the feed renders raw events without status-filtering; see Open issue below), so the events were removed to clear them.
+- **Word cloud "What do you love about Floyd?" kept ACTIVE, 33 submissions deleted** → starts blank for testers.
+- **Preserved untouched:** 29 announcements + 48 meeting summaries.
+- Backups in `backups/` (`prod-processes-*.json/.md`, `cleanup-backup-PROD-*.json`) — everything recoverable.
+
+### 4. Conversation auto-start on approval — DONE (code), PROD-VERIFY PENDING
+`approveReview()` now auto-starts approved conversations: best-effort `executeAction("start")` creates the Polis room (passing `state.seed_statements` through `createDeliberation`, which should also fix the seed-statements-not-reaching-Polis bug) and goes `active`. On failure (dev has no `POLIS_AUTH_TOKEN`, or transient Polis outage) it logs and LEAVES the conversation in `draft` — never rolls back the approval. **Note:** the public "Start" button was removed earlier, so auto-start is now the primary path; if it fails in prod the admin recovery is the still-existing `POST /:id/start` endpoint (no UI button). File: `src/modules/civic.review/service.ts`.
+
+### 5. Word-cloud teaser — DONE + verified
+New `ui/src/components/WordcloudTeaser.tsx` (+ `.css`): slim on-brand bar under the nav — "✦ Community word cloud · *[rotating word]* →" linking to the cloud, with a "be the first to add a word" invite when blank. Verified desktop + mobile (rotates real words, links, no overflow). Reads `hub.onboarding_wordcloud_id`; hides if unset. Rendered after `<Nav/>` in `App.tsx` (both shells).
+
+### 6. Onboarding word-cloud step — enabled via config
+The post-signup redirect to `/wordcloud/:id?onboarding=1` was already built but disabled (empty `VITE_HUB_ONBOARDING_WORDCLOUD_ID`). Adam set it in Vercel (prod + dev). Locally injected via `.claude/launch.json` (dev id `proc-wordcloud-test`) since `.env` writes are blocked — consider moving to `ui/.env`. **Prod needs a redeploy** (build-time Vite var). Dev id = `proc-wordcloud-test`, prod id = `proc_wordcloud_floyd_001`.
+
+### 7. Onboarding copy review — DELIVERED, awaiting Adam's calls
+- First-visit popup (`VITE_HUB_INTRO_BODY`) undersells — proposed a stronger version (env change, Adam to set).
+- `welcome.md` describes the OLD proposal→threshold→vote mechanic (pre the proposal/proposed-vote split) — offered to reconcile; awaiting yes/no.
+- Residency + legal in one checkbox — flagged for the pro-bono legal review.
+
+### Findings / env notes
+- **Email:** prod Resend works (Adam gets feedback at adam@civic.social). DEV Resend key is **test-mode** — only mails creatinglake@gmail.com (verified-domain restriction); not a prod problem. Feedback top-bar button: Adam confirms it's placed + works → no change.
+- **`CIVIC_ADMIN_EMAILS`** already `adam@civic.social` in prod (was fine all along; only local dev `.env` showed creatinglake).
+- **Session persistence on refresh:** PASS (earlier "logout" was a stale `civic_hub_token` legacy key + HMR churn, not a bug).
+- Dev env gaps that limit local testing: no `ANTHROPIC_API_KEY`, no `POLIS_AUTH_TOKEN`, no `RESEND_FROM`.
+
+### Open issues / deferred
+- **`GET /debug/seed` (Workstream G)** — blocked by the SAME `review_turns` append-only trigger as the prod delete (not just the wordcloud FK). Can't be fixed via the REST clear functions; needs a trigger migration (a change to audit-log immutability) or a different reset approach. The selective cleanup script is the working alternative. Recommend post-launch.
+- **Feed doesn't status-filter** — `GET /events` (and the UI feed) render events regardless of the process's current status, so an archived process can still surface (empty/fallback) feed posts. The prod cleanup worked around this by deleting events. A principled fix (feed excludes non-public-process events) is worth doing so future archives/soft-removes are clean without deleting events.
+- **Auto-start prod verification** — needs a real conversation approved in prod (Polis).
+- **Full smoke test** — auth/onboarding/session/picker/creation-review verified; feed/digest/vote/project/nav/error-states/admin sections still to do.
+
+### Uncommitted files this session
+`src/modules/civic.proposal_assistant/index.ts`, `src/controllers/{project,vote,proposal}DraftController.ts`, `src/modules/civic.review/service.ts`, `ui/src/services/api.ts`, `ui/src/pages/{ProjectDraft,ProposeDraft,ProposeDraftVote}.tsx`, `ui/src/App.tsx`, `ui/src/components/WordcloudTeaser.tsx` + `.css`, `.claude/launch.json`, `scripts/exportProdProcesses.ts`, `scripts/cleanupProdProcesses.ts`, `backups/`.
+
+---
+
 ## Phase 5 — Test the spine (logic-level) — 2026-06-30
 
 **Status:** **MERGED to `main` and DEPLOYED (commit `3df3571`).** Behavior-preserving refactor + new tests. Backend `tsc --noEmit` + frontend `tsc -b` clean; `vitest run tests/unit/` = **101 passed** (+15).

@@ -5,6 +5,7 @@ import hub from "./config/hub";
 import Nav from "./components/Nav";
 import BetaLanding from "./pages/BetaLanding";
 import HubBanner from "./components/HubBanner";
+import WordcloudTeaser from "./components/WordcloudTeaser";
 import FeedVotesTabs from "./components/FeedVotesTabs";
 import Home from "./pages/Home";
 import Votes from "./pages/Votes";
@@ -72,6 +73,7 @@ function AppContent() {
     return (
       <div className="app">
         <Nav />
+        <WordcloudTeaser />
         <main className="page-shell">
           <Routes>
             <Route path="/welcome" element={<Welcome />} />
@@ -93,6 +95,7 @@ function AppContent() {
       {showIntro && <IntroPopup onDismiss={() => setShowIntro(false)} />}
 
       <Nav />
+      <WordcloudTeaser />
       <BannerSlot />
       <FeedVotesTabs />
 

@@ -358,6 +358,8 @@ export interface AssistantResponse {
 export interface DraftAssistantResult {
   response: AssistantResponse;
   draft: ProposalDraft;
+  /** True when the automated pre-check could not run and was skipped (fail-open). */
+  review_unavailable?: boolean;
 }
 
 export function createDraft(category?: DraftCategory): Promise<ProposalDraft> {
@@ -435,6 +437,8 @@ export interface VoteDraft {
 export interface VoteDraftAssistantResult {
   response: AssistantResponse;
   draft: VoteDraft;
+  /** True when the automated pre-check could not run and was skipped (fail-open). */
+  review_unavailable?: boolean;
 }
 
 export function createVoteDraft(): Promise<VoteDraft> {
@@ -574,6 +578,8 @@ export interface ProjectDraft {
 export interface ProjectDraftAssistantResult {
   response: AssistantResponse;
   draft: ProjectDraft;
+  /** True when the automated pre-check could not run and was skipped (fail-open). */
+  review_unavailable?: boolean;
 }
 
 export function createProjectDraft(): Promise<ProjectDraft> {

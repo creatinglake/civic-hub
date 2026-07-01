@@ -59,6 +59,7 @@ export default function ProposeDraft() {
   const [showConfirm, setShowConfirm] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [reviewFailed, setReviewFailed] = useState(false);
+  const [reviewNotice, setReviewNotice] = useState<string | null>(null);
 
   const isMobile = useIsMobile();
 
@@ -150,9 +151,11 @@ export default function ProposeDraft() {
     setLoading(true);
     setError(null);
     setReviewFailed(false);
+    setReviewNotice(null);
     try {
       const result = await reviewDraft(draft.id);
       setDraft(result.draft);
+      setReviewNotice(result.review_unavailable ? result.response.message : null);
       setMessages((prev) => {
         const cleaned = prev.map((msg) =>
           msg.suggestions ? { ...msg, role: msg.role, content: msg.content } : msg,
@@ -295,6 +298,7 @@ export default function ProposeDraft() {
         )}
 
         {error && <p className="form-error">{error}</p>}
+        {reviewNotice && <p className="form-hint">{reviewNotice}</p>}
 
         <div className="path-choice">
           <button
@@ -385,6 +389,7 @@ export default function ProposeDraft() {
               </Link>
               <h1>Propose something</h1>
               {error && <p className="form-error">{error}</p>}
+        {reviewNotice && <p className="form-hint">{reviewNotice}</p>}
               <DraftingForm
                 draft={draft}
                 onFieldChange={handleFieldChange}

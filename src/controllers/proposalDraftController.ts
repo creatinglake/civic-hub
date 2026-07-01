@@ -13,6 +13,7 @@ import {
 } from "../modules/civic.proposal_drafts/index.js";
 import {
   callAssistant,
+  AUTOMATED_REVIEW_UNAVAILABLE_NOTICE,
   type HubConfig,
   type DraftState,
   type Phase,
@@ -258,14 +259,33 @@ export async function handleReviewDraft(
       "Please review my current draft against the Code of Conduct and Proposal Best Practices. " +
       "Return your feedback as structured suggestions.";
 
-    const response = await callAssistant({
-      phase: "review",
-      category: category as Category,
-      draft_state: draftState(draft),
-      conversation_history: draft.conversation_history,
-      user_message: reviewMessage,
-      hub_config: hubConfig,
-    });
+    let response;
+    try {
+      response = await callAssistant({
+        phase: "review",
+        category: category as Category,
+        draft_state: draftState(draft),
+        conversation_history: draft.conversation_history,
+        user_message: reviewMessage,
+        hub_config: hubConfig,
+      });
+    } catch (reviewErr) {
+      // Fail open: the automated pre-check couldn't run. Record a clean
+      // (empty) review result so the draft is no longer "modified since
+      // review", and let it through to human admin review (the real gate).
+      console.error(
+        "[proposal-review] automated check unavailable, failing open to human review:",
+        reviewErr instanceof Error ? reviewErr.message : reviewErr,
+      );
+      await saveReviewResult(id, []);
+      const degraded = await getDraft(id);
+      res.json({
+        response: { message: AUTOMATED_REVIEW_UNAVAILABLE_NOTICE, suggestions: [] },
+        draft: degraded,
+        review_unavailable: true,
+      });
+      return;
+    }
 
     await appendConversation(id, reviewMessage, response.message);
     await saveReviewResult(id, response.suggestions);

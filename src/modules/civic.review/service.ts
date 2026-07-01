@@ -393,6 +393,29 @@ export async function approveReview(
     throw workErr;
   }
 
+  // Conversations: auto-start on approval. The approval is already committed
+  // above (the process is at "draft"); starting creates the live Polis
+  // conversation — passing through any seed statements — and flips it to
+  // "active" so participants can join immediately, with no manual admin
+  // "Start" step. BEST-EFFORT: if Polis is unreachable (e.g. POLIS_AUTH_TOKEN
+  // unset in dev, or a transient outage) we log and LEAVE the conversation in
+  // "draft" so an admin can Start it manually later — we never fail or roll
+  // back the approval over a Polis hiccup (mirrors the close-action guard).
+  if (proc.type === "civic.polis_deliberation") {
+    try {
+      await executeAction(review.process_id, {
+        type: "start",
+        actor: review.creator_id,
+        payload: {},
+      });
+    } catch (startErr) {
+      console.error(
+        `[review] auto-start of conversation ${review.process_id} failed — left in "draft" for a manual Start:`,
+        startErr instanceof Error ? startErr.message : startErr,
+      );
+    }
+  }
+
   // Notify creator
   try {
     await notifyCreatorApproved({
