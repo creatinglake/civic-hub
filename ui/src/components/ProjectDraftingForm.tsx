@@ -144,7 +144,7 @@ export default function ProjectDraftingForm({
             defaultValue={draft.sources}
             onChange={handleChange("sources")}
             placeholder={PLACEHOLDERS.sources}
-            rows={2}
+            rows={4}
             disabled={disabled}
           />
           <p className="form-hint">Add relevant links, one per line.</p>
