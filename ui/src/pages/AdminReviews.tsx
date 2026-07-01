@@ -221,7 +221,7 @@ export default function AdminReviews() {
               {/* Process content preview */}
               <div className="review-process-preview">
                 <h3>Process content</h3>
-                <p>{(proc?.description as string) || "No description"}</p>
+                <p style={{ whiteSpace: "pre-wrap" }}>{(proc?.description as string) || "No description"}</p>
                 {!!proc?.content && (
                   <details>
                     <summary>Structured content</summary>

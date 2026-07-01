@@ -739,6 +739,7 @@
 .process-description {
   color: var(--muted-text);
   margin: 0 0 1rem;
+  white-space: pre-wrap;
 }
 
 .process-meta {

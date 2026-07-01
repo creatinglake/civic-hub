@@ -144,7 +144,7 @@ export default function AdminProposals() {
         {selectedProposal.description && (
           <div className="admin-detail-section">
             <h3>Description</h3>
-            <p>{selectedProposal.description}</p>
+            <p style={{ whiteSpace: "pre-wrap" }}>{selectedProposal.description}</p>
           </div>
         )}
 
