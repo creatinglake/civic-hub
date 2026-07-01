@@ -10,6 +10,15 @@
   width: calc(100% - var(--space-xl) * 2);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-popover);
+  /* Explicitly center in the viewport. A modal <dialog> is meant to
+     self-center via `margin: auto`, but a global reset defeats it and
+     drops it top-left — so we position it directly, matching the
+     centered AuthModal (.intro-overlay/.intro-modal). */
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  margin: 0;
 }
 
 .intro-popup::backdrop {
