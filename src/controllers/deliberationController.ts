@@ -124,17 +124,7 @@ export async function getNextStatement(req: Request, res: Response): Promise<voi
     }
 
     const adapter = getPolisAdapter();
-    let statement = await adapter.getNextStatement(conversationId, user.id);
-
-    // Fallback: if nextComment returned nothing (new participant not yet
-    // registered with Polis), serve the first approved statement directly.
-    if (!statement) {
-      const all = await adapter.getStatements(conversationId);
-      if (all.length > 0) {
-        statement = all[0];
-      }
-    }
-
+    const statement = await adapter.getNextStatement(conversationId, user.id);
     res.json({ statement });
   } catch (err: any) {
     handleError(res, err);
