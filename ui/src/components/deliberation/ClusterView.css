@@ -68,6 +68,17 @@
   white-space: nowrap;
 }
 
+.cluster-view-pending {
+  text-align: center;
+  padding: 2rem 1rem;
+  color: #888;
+  font-size: 0.9rem;
+}
+
+.cluster-view-pending p {
+  margin: 0;
+}
+
 .cluster-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));

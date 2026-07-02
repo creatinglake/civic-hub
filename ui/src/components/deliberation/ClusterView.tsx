@@ -6,7 +6,25 @@ interface Props {
   clusters: ClusterState;
 }
 
+const MIN_PARTICIPANTS_FOR_GROUPS = 5;
+
 export default function ClusterView({ clusters }: Props) {
+  if (clusters.participant_count < MIN_PARTICIPANTS_FOR_GROUPS) {
+    return (
+      <div className="cluster-view">
+        <div className="cluster-view-header">
+          <h4 className="cluster-view-title">Opinion Groups</h4>
+          <span className="cluster-view-meta">
+            {clusters.participant_count} participant{clusters.participant_count !== 1 ? "s" : ""} so far
+          </span>
+        </div>
+        <div className="cluster-view-pending">
+          <p>Opinion groups need at least {MIN_PARTICIPANTS_FOR_GROUPS} participants to form. Keep sharing this conversation!</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="cluster-view">
       <div className="cluster-view-header">

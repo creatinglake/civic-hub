@@ -74,7 +74,8 @@
 }
 
 .deliberation-tab--active {
-  color: #1e3a5f;
+  color: #fff;
+  background: #1e3a5f;
   border-bottom-color: #1e3a5f;
 }
 
