@@ -79,6 +79,10 @@
   border-bottom-color: #1e3a5f;
 }
 
+.deliberation-tab--active:hover {
+  color: #fff;
+}
+
 .deliberation-participate {
   padding: 1.25rem;
   display: flex;
