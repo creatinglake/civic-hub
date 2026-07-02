@@ -57,6 +57,17 @@ export async function vote(req: Request, res: Response): Promise<void> {
 
     const adapter = getPolisAdapter();
     await adapter.recordVote(conversationId, user.id, statement_id, direction);
+
+    // Track vote locally so we can distinguish new participants from
+    // users who have voted on everything (Polis returns null for both).
+    try {
+      await getDb()
+        .from("deliberation_votes")
+        .upsert({ process_id: processId, user_id: user.id, statement_id });
+    } catch {
+      // Non-critical — don't fail the vote if local tracking fails
+    }
+
     res.json({ ok: true });
   } catch (err: any) {
     handleError(res, err);
@@ -124,7 +135,31 @@ export async function getNextStatement(req: Request, res: Response): Promise<voi
     }
 
     const adapter = getPolisAdapter();
-    const statement = await adapter.getNextStatement(conversationId, user.id);
+    let statement = await adapter.getNextStatement(conversationId, user.id);
+
+    // If Polis returned nothing, check whether this user has ever voted.
+    // New participants aren't registered with Polis yet, so nextComment
+    // returns null even though there ARE statements. For those users,
+    // fall back to serving unvoted statements from the full list.
+    if (!statement) {
+      const { data: votes } = await getDb()
+        .from("deliberation_votes")
+        .select("statement_id")
+        .eq("process_id", processId)
+        .eq("user_id", user.id);
+
+      const votedIds = new Set((votes ?? []).map((v: { statement_id: number }) => v.statement_id));
+
+      // If zero votes, definitely a new participant. If some votes,
+      // check for unvoted statements in case Polis lost track.
+      const allStatements = await adapter.getStatements(conversationId);
+      const unvoted = allStatements.filter((s) => !votedIds.has(s.id));
+
+      if (unvoted.length > 0) {
+        statement = unvoted[0];
+      }
+    }
+
     res.json({ statement });
   } catch (err: any) {
     handleError(res, err);
