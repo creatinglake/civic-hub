@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import hub from "../config/hub";
 import "./WelcomeBanner.css";
 
-const STORAGE_KEY = "welcome-banner-dismissed-v1";
+const STORAGE_KEY = "welcome-banner-dismissed-v2";
 
 function isDismissed(): boolean {
   try {
@@ -36,11 +36,13 @@ export default function WelcomeBanner() {
       <div className="welcome-banner-inner">
         <div className="welcome-banner-content">
           <h2 className="welcome-banner-title">
-            New to the {hub.name}?
+            Welcome — the {hub.name} is a community pilot
           </h2>
           <p className="welcome-banner-body">
-            Learn what this site is, how it works, and how you can
-            participate in {hub.jurisdiction} civic life.
+            A new space to follow county government, raise the issues that
+            matter, and decide together. It's early and still evolving — use the
+            feedback button at the top anytime to report a bug, suggest a
+            feature, or share anything else. We're building this with you.
           </p>
           <div className="welcome-banner-actions">
             <Link to="/welcome" className="welcome-banner-button">
