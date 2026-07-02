@@ -6,6 +6,18 @@
   width: calc(100% - var(--space-xl) * 2);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-popover);
+  /* A modal <dialog> should self-center via `margin: auto`, but a global
+     reset defeats it and drops it top-left. Position it directly: centered
+     horizontally, anchored near the top (upper-center) so the header stays
+     put and the taller content grows downward. max-height + scroll keeps it
+     fully on-screen on short/mobile viewports. */
+  position: fixed;
+  top: 5vh;
+  left: 50%;
+  transform: translateX(-50%);
+  margin: 0;
+  max-height: 90vh;
+  overflow-y: auto;
 }
 
 .picker::backdrop {
