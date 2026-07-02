@@ -6,7 +6,7 @@ Updated after every Claude Code session. Records what was built, what's incomple
 
 ## Onboarding copy, review polish, prod legacy cleanup + digest fix — 2026-07-01/02
 
-Continuation of the pre-test-user pass (below), plus a parallel Polis session (next entry). Shipped to prod across several pushes; local main == origin/main.
+Continuation of the pre-test-user pass (below), plus a parallel Polis session (next entry). Shipped to prod across several pushes (latest `08ba02d`); local main == origin/main.
 
 ### Onboarding copy — reviewed screen-by-screen with Adam and shipped (commit `7720ea9`)
 Worked through all 5 onboarding screens in `Onboarding-Copy.md`:
@@ -18,10 +18,15 @@ Worked through all 5 onboarding screens in `Onboarding-Copy.md`:
 ### Intro popup centering (commit `e888396`, deployed)
 The first-visit `<dialog>` lost its default centering and rendered top-left while the residency modal was centered. Positioned it explicitly (`position:fixed` + `translate(-50%,-50%)`) so the whole onboarding flow sits centered on desktop; still centered on mobile.
 
+### Process picker centering + pilot-reminder welcome banner (commits `ed3d3f7`, `08ba02d`, deployed)
+- **Process picker** (`ProcessPicker.tsx` / `.css`): same top-left `<dialog>` bug as the intro popup. Fixed to **upper-center** — `position:fixed; top:5vh; left:50%; transform:translateX(-50%)` + `max-height:90vh; overflow-y:auto`, so the taller picker keeps its header visible and scrolls on short/mobile viewports (mobile was already fine).
+- **Pilot reminder → merged into the existing welcome banner** (`WelcomeBanner.tsx`), per Adam — no new UI, nothing added to onboarding. Reframed "New to the {hub.name}?" into "**Welcome — the {hub.name} is a community pilot** … use the feedback button at the top anytime to report a bug, suggest a feature, or share anything else. We're building this with you." Points at the persistent header feedback button; dismiss key bumped `v1`→`v2` so anyone who dismissed the old banner sees this once.
+- **Decision (pilot feedback):** rejected random/timed pop-ups (intrusive + off-brand for a calm civic tool). Recommended surfaces = this dismissible banner + the always-on header feedback button, with an optional future **post-action contextual nudge** (after submit/vote/finish) and/or **occasional banner re-surface** if a recurring reminder is wanted. Feedback form should carry a distinct "feature suggestion" category.
+
 ### Prod legacy-tables cleanup — the child-table gap
 The earlier prod clean-slate archived `processes` rows + deleted events, but the **Proposals/Projects tabs read their own `proposals`/`projects` tables directly** (decoupled from the process/event cleanup), so test content lingered there. `scripts/cleanupProdLegacyTables.ts` backed up + **deleted all 4 proposals + the skate-park project** (Adam wants everything recreated via the new flow). Skate-park copy saved to `backups/saved-project-copy-*.md` + repo `Skate-Park-Project-Copy.md`. Both tables verify empty.
 
-### Daily-digest email layout (this session's uncommitted → committed here)
+### Daily-digest email layout (commit `2a72eed`, deployed)
 Mobile digest was cramped: each row put the category pill in a right-aligned `nowrap` column, squeezing the title. Moved the pill to a small label **above** the title so the title spans full width (verified at 375px — a 6-line title now wraps to 2). `src/modules/civic.digest/service.ts` (`renderSectionHtml`). Per-item pills KEPT — they encode item state (new / results / closed / update), not just category, so collapsing to one section pill would mislabel mixed sections.
 
 ### Notes / open decisions this stretch
