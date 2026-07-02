@@ -4,6 +4,45 @@ Updated after every Claude Code session. Records what was built, what's incomple
 
 ---
 
+## Onboarding copy, review polish, prod legacy cleanup + digest fix — 2026-07-01/02
+
+Continuation of the pre-test-user pass (below), plus a parallel Polis session (next entry). Shipped to prod across several pushes; local main == origin/main.
+
+### Onboarding copy — reviewed screen-by-screen with Adam and shipped (commit `7720ea9`)
+Worked through all 5 onboarding screens in `Onboarding-Copy.md`:
+- **Intro popup body** (`VITE_HUB_INTRO_BODY`): "This is where Floyd County residents keep up with county government, raise topics that matter, help make sense of issues together, and have conversations to see where our community stands." (hub.ts default updated; Adam updated ui/.env — no Vercel override, so ui/.env covers prod).
+- **Residency intro** (`VITE_HUB_RESIDENCY_INTRO`): "To participate in the Floyd Civic Hub, please confirm your residency and review the policies below."
+- **Word-cloud onboarding banner** (WordCloud.tsx): "One quick thing before you dive in" + reworded body.
+- Screens 2/3 (email/code), residency heading, and the combined residency+legal checkbox left as-is (checkbox flagged for the legal review).
+
+### Intro popup centering (commit `e888396`, deployed)
+The first-visit `<dialog>` lost its default centering and rendered top-left while the residency modal was centered. Positioned it explicitly (`position:fixed` + `translate(-50%,-50%)`) so the whole onboarding flow sits centered on desktop; still centered on mobile.
+
+### Prod legacy-tables cleanup — the child-table gap
+The earlier prod clean-slate archived `processes` rows + deleted events, but the **Proposals/Projects tabs read their own `proposals`/`projects` tables directly** (decoupled from the process/event cleanup), so test content lingered there. `scripts/cleanupProdLegacyTables.ts` backed up + **deleted all 4 proposals + the skate-park project** (Adam wants everything recreated via the new flow). Skate-park copy saved to `backups/saved-project-copy-*.md` + repo `Skate-Park-Project-Copy.md`. Both tables verify empty.
+
+### Daily-digest email layout (this session's uncommitted → committed here)
+Mobile digest was cramped: each row put the category pill in a right-aligned `nowrap` column, squeezing the title. Moved the pill to a small label **above** the title so the title spans full width (verified at 375px — a 6-line title now wraps to 2). `src/modules/civic.digest/service.ts` (`renderSectionHtml`). Per-item pills KEPT — they encode item state (new / results / closed / update), not just category, so collapsing to one section pill would mislabel mixed sections.
+
+### Notes / open decisions this stretch
+- **"Closing soon" is NOT built** (a documented stretch feature). New processes show in the feed on open + close only. Confirmed it's fully backward-compatible to add later — it keys off the deadline already stored on each process, so content loaded now is covered when it ships (best paired with the already-backlogged close cron for proactive/email delivery).
+- **Admin auto-approve** (admin-created processes skip creation-review via `submitAsCreator`) — left as-is per Adam (a no-op for a solo admin/reviewer; resident submissions still go through review).
+- **Vote approval email is inaccurate (flagged, not fixed):** `notifyCreatorApproved` says a vote is "now live!" but an approved vote enters the "proposed" endorsement phase, not live. On-site messaging is correct (VotePanel "Needs N more endorsements to proceed to an official vote"; Votes "Proposed Votes" section); only the email misleads. Small fix available.
+- **Prod state:** feed/Activity empty · Proposals/Projects tabs empty · word cloud active+blank · BoS announcements (29) + meeting summaries (48) intact.
+
+---
+
+## Parallel Polis + UI-polish session (Adam) — 2026-07-01/02
+
+Adam ran a separate session on the same repo (Polis conversation behavior + UI polish). Reconstructed from commits `3285326`..`07a6f35` — already committed, pushed, and deployed:
+- **Polis participant / statement serving:** register new participants before fetching statements (`ddc8ce7`); a fallback for new participants who get no statements (`51f8763`), later reverted + replaced with debug logging (`f72e66c`); track votes locally + serve unvoted statements as fallback (`5e02934`); one statement per user per deliberation + scrollable confirmation modal (`3285326`).
+- **Opinion groups:** 1-indexed group names + correct pluralization (`a1105b0`); hide opinion groups below 5 participants (`7d3c553`).
+- **UI polish:** preserve line breaks in process descriptions across all views (`3b19da1`); project sources textarea 2→4 rows (`ee78b82`); drafting-form scroll fix / `min-height:0` on flex container (`1f849f4`); active-tab hover styling (`7d3c553` / `591ba80` / `07a6f35`).
+
+*(Summarized from commit messages — Adam to correct/expand; the underlying Polis "seed statements at creation don't reach Polis" bug from the 06-27 entry may or may not be resolved by these — verify.)*
+
+---
+
 ## Pre-test-user verification pass + prod clean-slate — 2026-06-30 (PM)
 
 **Status:** Big verification + fix session. **COMMITTED + DEPLOYED to `main` (through commit `7720ea9`)** — Vercel auto-deploy triggered 2026-07-01; full prod build (`npm run build` frontend + backend) verified locally before push, so no silent Vercel failure. Prod **data** cleanup also ran (see below). Backend `tsc` + frontend `tsc -b`/`vite build` all clean.

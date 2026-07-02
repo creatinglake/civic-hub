@@ -360,11 +360,9 @@ function renderSectionHtml(label: string, items: DigestItem[]): string {
               <tr>
                 ${thumbCell}
                 <td valign="top" style="padding:0 12px 0 0;">
-                  <span style="font-family:${FONT_HEADING};color:#1a1a1a;font-weight:600;font-size:18px;line-height:1.25;display:inline-block;">${escapeHtml(item.title)}</span>
+                  <span style="display:inline-block;background:${bg};color:${fg};font-family:${FONT_BODY};font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;padding:3px 10px;border-radius:9999px;margin:0 0 8px;">${escapeHtml(item.pill_label)}</span>
+                  <div style="font-family:${FONT_HEADING};color:#1a1a1a;font-weight:600;font-size:18px;line-height:1.25;">${escapeHtml(item.title)}</div>
                   ${summaryBlock}
-                </td>
-                <td valign="top" align="right" style="white-space:nowrap;padding:0 8px 0 0;">
-                  <span style="display:inline-block;background:${bg};color:${fg};font-family:${FONT_BODY};font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;padding:3px 10px;border-radius:9999px;">${escapeHtml(item.pill_label)}</span>
                 </td>
                 <td valign="top" align="right" width="16" style="white-space:nowrap;font-family:${FONT_BODY};font-size:18px;line-height:1.25;color:#9ca3af;">&rsaquo;</td>
               </tr>
