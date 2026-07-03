@@ -10,6 +10,7 @@
 //
 // GUARDRAIL: This module MUST NOT import from civic.vote or civic.proposals.
 
+import { randomInt } from "node:crypto";
 import { getDb } from "../../db/client.js";
 import { generateId } from "../../utils/id.js";
 import { sendEmail } from "../../utils/email.js";
@@ -22,11 +23,18 @@ export type { User, PendingVerification, Session } from "./models.js";
 
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 const OTP_TTL_MS = 10 * 60 * 1000; // 10 minutes
+// Brute-force defenses (audit P1 — account takeover). Cap wrong guesses per
+// code, and throttle how often a fresh code can be requested so an attacker
+// can't reset the cap by re-requesting.
+const MAX_VERIFY_ATTEMPTS = 5;
+const REQUEST_THROTTLE_MS = 30 * 1000; // 30s between code requests per email
 
 // --- OTP / token generation ---
 
 function generateOTP(): string {
-  return Math.floor(100000 + Math.random() * 900000).toString();
+  // Cryptographically secure — Math.random() is predictable and unfit for a
+  // security credential.
+  return randomInt(100000, 1000000).toString();
 }
 
 function generateToken(): string {
@@ -135,6 +143,21 @@ export async function requestVerification(
     }
   }
 
+  // Throttle: reject a fresh code if one was requested for this email very
+  // recently. Without this an attacker could reset the wrong-guess cap by
+  // simply re-requesting a new code each time.
+  const { data: recent } = await getDb()
+    .from("pending_verifications")
+    .select("created_at")
+    .eq("email", normalizedEmail)
+    .maybeSingle();
+  if (
+    recent?.created_at &&
+    Date.now() - new Date(recent.created_at).getTime() < REQUEST_THROTTLE_MS
+  ) {
+    throw new Error("Please wait a moment before requesting another code.");
+  }
+
   const code = generateOTP();
   const now = new Date();
   const expires = new Date(now.getTime() + OTP_TTL_MS);
@@ -147,6 +170,7 @@ export async function requestVerification(
         code,
         expires_at: expires.toISOString(),
         created_at: now.toISOString(),
+        attempts: 0, // fresh code, reset the wrong-guess counter
       },
       { onConflict: "email" },
     );
@@ -248,6 +272,21 @@ export async function verifyCode(
       throw new Error("Verification code expired. Request a new code.");
     }
     if (pending.code !== code) {
+      // Count the wrong guess; after MAX_VERIFY_ATTEMPTS, burn the code so the
+      // attacker must request a new one (which is throttled). This is the core
+      // anti-brute-force defense.
+      const attempts = (pending.attempts ?? 0) + 1;
+      if (attempts >= MAX_VERIFY_ATTEMPTS) {
+        await db
+          .from("pending_verifications")
+          .delete()
+          .eq("email", normalizedEmail);
+        throw new Error("Too many incorrect attempts. Request a new code.");
+      }
+      await db
+        .from("pending_verifications")
+        .update({ attempts })
+        .eq("email", normalizedEmail);
       throw new Error("Invalid verification code");
     }
     await db
