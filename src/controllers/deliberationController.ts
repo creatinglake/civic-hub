@@ -215,7 +215,7 @@ export async function handleCreateDeliberation(req: Request, res: Response): Pro
         title: title || topic,
         description: description || framing,
         creator_id: user.id,
-        creator_name: user.display_name || user.email.split("@")[0],
+        creator_name: user.full_name || user.display_name || user.email.split("@")[0],
         creator_email: user.email,
         state: statePayload,
       },

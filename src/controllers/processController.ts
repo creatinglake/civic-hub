@@ -8,7 +8,28 @@ import {
   listProcessSummaries,
   getProcessState,
 } from "../services/processService.js";
-import { getAuthUser } from "../middleware/auth.js";
+import { getAuthUser, isAdminEmail } from "../middleware/auth.js";
+import { getUserFromToken } from "../modules/civic.auth/index.js";
+import { isPubliclyFetchable } from "../services/processLifecycle.js";
+
+/**
+ * Best-effort caller identification on public read paths: resolve the
+ * Bearer token to a user id when present, undefined otherwise. Never
+ * rejects — the read model is public; the token only unlocks the
+ * caller's OWN per-actor fields (has_voted, your_current_vote).
+ */
+async function resolveCallerId(req: Request): Promise<string | undefined> {
+  const auth = req.headers.authorization;
+  if (!auth || !auth.startsWith("Bearer ")) return undefined;
+  const token = auth.slice(7);
+  if (!token) return undefined;
+  try {
+    const user = await getUserFromToken(token);
+    return user?.id;
+  } catch {
+    return undefined;
+  }
+}
 
 export async function handleCreateProcess(
   req: Request,
@@ -49,17 +70,39 @@ export async function handleGetProcess(
 ): Promise<void> {
   const id = req.params.id as string;
   try {
-    const process = await getProcess(id);
-    if (!process) {
+    // Never serve the raw DB record: it exposes internal fields the
+    // public must not see (unpublished vote_results admin notes and
+    // recipient emails, moderation reasons, the identified supporters
+    // map, pending_review/draft content). Serve the same read-model
+    // projection as /state — getProcessState also owns the
+    // isPubliclyFetchable gate, so non-public processes 404 here too.
+    const actor = await resolveCallerId(req);
+    const state = await getProcessState(id, actor);
+    if (!state) {
       res.status(404).json({ error: "Process not found" });
       return;
     }
-    res.json(process);
+    res.json(state);
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
     res.status(500).json({ error: message });
   }
 }
+
+/**
+ * Lifecycle-control actions — these move a process through its state
+ * machine (or publish from it) rather than participate in it. Open to
+ * admins only: without this gate any resident could close or activate
+ * anyone's vote, or process.propose their own pending_review vote to
+ * bypass admin review. Participation actions (process.vote, .support,
+ * .unsupport, .submit, proposal.support) stay resident-level.
+ */
+const ADMIN_ONLY_ACTIONS = new Set([
+  "process.activate",
+  "process.close",
+  "process.propose",
+  "process.snapshot",
+]);
 
 export async function handleProcessAction(
   req: Request,
@@ -76,6 +119,25 @@ export async function handleProcessAction(
   try {
     // Actor is the authenticated user — never taken from the request body.
     const user = getAuthUser(res);
+    const isAdmin = isAdminEmail(user.email);
+
+    if (ADMIN_ONLY_ACTIONS.has(type) && !isAdmin) {
+      res.status(403).json({ error: "Admin access required for this action" });
+      return;
+    }
+
+    // Non-public processes (pending_review, archived) accept no actions
+    // from non-admins. 404 (not 403) so the id's existence isn't leaked.
+    const target = await getProcess(id);
+    if (!target) {
+      res.status(404).json({ error: "Process not found" });
+      return;
+    }
+    if (!isPubliclyFetchable(target.status) && !isAdmin) {
+      res.status(404).json({ error: "Process not found" });
+      return;
+    }
+
     const { process, result } = await executeAction(id, {
       type,
       actor: user.id,
@@ -136,7 +198,11 @@ export async function handleGetProcessState(
   res: Response,
 ): Promise<void> {
   const id = req.params.id as string;
-  const actor = req.query.actor as string | undefined;
+  // The actor is resolved from the session token, NEVER from the query
+  // string. The old `?actor=<id>` form let any caller read another
+  // user's has_voted / your_current_vote by passing their user id.
+  // Anonymous callers still get the public read model (actor omitted).
+  const actor = await resolveCallerId(req);
   try {
     const state = await getProcessState(id, actor);
     if (!state) {

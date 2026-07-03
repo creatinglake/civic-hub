@@ -2,6 +2,7 @@ import { useState } from "react";
 import { submitInput } from "../services/api";
 import { useAuth } from "../context/AuthContext";
 import { useRequireAuth } from "../hooks/useRequireAuth";
+import { useCommentIdentityMode } from "../hooks/useCommentIdentityMode";
 import AuthModal from "./AuthModal";
 
 const COMMENT_MAX = 500;
@@ -15,16 +16,22 @@ export default function ProposalCommentForm({ proposalId, onCommentAdded }: Prop
   const { actorId } = useAuth();
   const { requireAuth, showAuthModal, closeAuthModal, handleAuthComplete } = useRequireAuth();
   const [body, setBody] = useState("");
+  const [anonymous, setAnonymous] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const identityMode = useCommentIdentityMode();
 
   async function doSubmit() {
     if (!actorId || body.trim().length === 0) return;
     setSubmitting(true);
     setError(null);
     try {
-      await submitInput(proposalId, actorId, body.trim());
+      await submitInput(
+        proposalId,
+        body.trim(),
+        identityMode === "anonymous_only" || anonymous,
+      );
       setBody("");
       setSuccess(true);
       onCommentAdded();
@@ -59,6 +66,17 @@ export default function ProposalCommentForm({ proposalId, onCommentAdded }: Prop
           maxLength={COMMENT_MAX}
           disabled={submitting}
         />
+        {identityMode === "anonymous_optional" && body.trim().length > 0 && (
+          <label className="auth-checkbox-label comment-anonymous-toggle">
+            <input
+              type="checkbox"
+              checked={anonymous}
+              onChange={(e) => setAnonymous(e.target.checked)}
+              disabled={submitting}
+            />
+            <span>Post my comment anonymously</span>
+          </label>
+        )}
         <div className="proposal-comment-form-footer">
           <span className="vote-comment-counter">
             {body.length} / {COMMENT_MAX}

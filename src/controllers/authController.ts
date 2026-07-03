@@ -14,6 +14,7 @@ import {
   affirmResidency,
   acceptLegalTerms,
   updateDisplayName,
+  updateFullName,
   deleteAccount,
   getUserFromToken,
   logout,
@@ -78,6 +79,11 @@ export async function handleVerify(
 /**
  * POST /auth/residency
  * Header: Authorization: Bearer <token>
+ * Body: { full_name?: string }
+ *
+ * The sign-up gate collects the resident's real name alongside the
+ * residency affirmation. full_name is required unless the account
+ * already has one (pre-policy accounts re-affirming for other reasons).
  */
 export async function handleAffirmResidency(
   req: Request,
@@ -95,8 +101,22 @@ export async function handleAffirmResidency(
     return;
   }
 
+  const { full_name } = (req.body ?? {}) as { full_name?: unknown };
+  if (
+    !user.full_name &&
+    (typeof full_name !== "string" || full_name.trim().length === 0)
+  ) {
+    res.status(400).json({ error: "full_name is required" });
+    return;
+  }
+
   try {
-    const updated = await affirmResidency(user.id);
+    const updated = await affirmResidency(
+      user.id,
+      typeof full_name === "string" && full_name.trim().length > 0
+        ? full_name
+        : undefined,
+    );
     res.json({ user: updated });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
@@ -177,7 +197,11 @@ export async function handleAcceptTos(
 /**
  * PATCH /auth/me
  * Header: Authorization: Bearer <token>
- * Body: { display_name: string | null }
+ * Body: { display_name?: string | null, full_name?: string }
+ *
+ * display_name — role-attribution label (nullable). full_name — the
+ * user's real name; used by the re-gate flow for accounts that pre-date
+ * the required-name policy. At least one field must be present.
  */
 export async function handleUpdateProfile(
   req: Request,
@@ -193,16 +217,35 @@ export async function handleUpdateProfile(
     res.status(401).json({ error: "Invalid or expired session" });
     return;
   }
-  const { display_name } = (req.body ?? {}) as { display_name?: unknown };
-  if (display_name !== null && typeof display_name !== "string") {
+  const { display_name, full_name } = (req.body ?? {}) as {
+    display_name?: unknown;
+    full_name?: unknown;
+  };
+  const hasDisplayName = display_name !== undefined;
+  const hasFullName = full_name !== undefined;
+  if (!hasDisplayName && !hasFullName) {
+    res.status(400).json({ error: "Nothing to update" });
+    return;
+  }
+  if (hasDisplayName && display_name !== null && typeof display_name !== "string") {
     res.status(400).json({ error: "display_name must be a string or null" });
     return;
   }
+  if (hasFullName && typeof full_name !== "string") {
+    res.status(400).json({ error: "full_name must be a string" });
+    return;
+  }
   try {
-    const updated = await updateDisplayName(
-      user.id,
-      typeof display_name === "string" ? display_name : null,
-    );
+    let updated = user;
+    if (hasFullName) {
+      updated = await updateFullName(user.id, full_name as string);
+    }
+    if (hasDisplayName) {
+      updated = await updateDisplayName(
+        user.id,
+        typeof display_name === "string" ? display_name : null,
+      );
+    }
     res.json({ user: updated });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";

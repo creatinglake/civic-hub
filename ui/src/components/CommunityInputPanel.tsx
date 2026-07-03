@@ -169,7 +169,15 @@ export default function CommunityInputPanel({ processId, config }: Props) {
               )}
 
               <span className="input-meta">
-                {input.author_id} &middot; {formatRelativeTime(input.submitted_at)}
+                {input.is_anonymous
+                  ? "Anonymous"
+                  : input.author_name || "Resident"}{" "}
+                {/* Moderation accountability: admins can see who posted
+                    an anonymous comment; residents never can. */}
+                {isAdmin && input.is_anonymous && input.author_id && (
+                  <span className="input-admin-meta"> ({input.author_id})</span>
+                )}
+                &middot; {formatRelativeTime(input.submitted_at)}
                 {isAdmin && !hidden && (
                   <>
                     {" · "}

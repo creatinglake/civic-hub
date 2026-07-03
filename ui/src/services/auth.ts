@@ -56,6 +56,13 @@ export interface AuthUser {
   tos_version_accepted: string | null;
   tos_accepted_at: string | null;
   display_name: string | null;
+  /**
+   * The user's real name — required for participation. null on
+   * accounts created before the required-name policy; those users are
+   * re-gated through the add-your-name step on their next sign-in or
+   * participation attempt.
+   */
+  full_name: string | null;
 }
 
 /**
@@ -100,8 +107,28 @@ export function verifyCode(
   return request("POST", "/auth/verify", { email, code });
 }
 
-export function affirmResidency(token: string): Promise<{ user: AuthUser }> {
-  return request("POST", "/auth/residency", undefined, token);
+export function affirmResidency(
+  token: string,
+  fullName?: string,
+): Promise<{ user: AuthUser }> {
+  return request(
+    "POST",
+    "/auth/residency",
+    fullName ? { full_name: fullName } : undefined,
+    token,
+  );
+}
+
+/**
+ * Set the user's real name — the re-gate path for accounts that
+ * pre-date the required-name policy (already residents, just missing a
+ * name).
+ */
+export function updateFullName(
+  token: string,
+  fullName: string,
+): Promise<{ user: AuthUser }> {
+  return request("PATCH", "/auth/me", { full_name: fullName }, token);
 }
 
 /**

@@ -4,6 +4,53 @@ Updated after every Claude Code session. Records what was built, what's incomple
 
 ---
 
+## Identity & anonymity: ballot secrecy, required real names, opt-in anonymous comments — 2026-07-03
+
+Full identity/anonymity pass for the Aug 11 launch. Backend `tsc` clean, UI `npm run build` (tsc -b) clean. **NOT yet committed, and the three new migrations are NOT yet applied to any database** — apply to dev first (see below).
+
+### 1. Ballot secrecy — closed three user↔ballot leaks
+- `state.votes` (per-user ballot map in `processes.state`) is GONE. `VoteProcessState` now keeps only an anonymous `total_votes` counter; ballots live solely in the `civic.receipts` tables. Tallies compute from `vote_records` (`getBallotChoicesForProcess`), the voter's own current choice resolves via `active_vote_keys` (`getActiveChoice`) and is null after close — true paper-ballot semantics.
+- `civic.process.vote_submitted` events no longer carry the ballot (`data.vote = { changed }`) and are emitted `meta.visibility: "restricted"`. Previously the public `/events` feed exposed actor + choice in real time.
+- `GET /process/:id/state` derives the actor from the Bearer token (`resolveCallerId`), never from `?actor=` — the old form let anyone read anyone's vote. UI `getProcessState()` no longer sends an actor param.
+- `VotingMethod` gained `parseReceipt(choice)`; `computeTally` now takes `Ballot[]` instead of a user-keyed map. `ProcessHandler.getReadModel` may now return a Promise (vote handler is async; service awaits either form).
+- Migration `20260703000000_ballot_secrecy.sql`: strips `votes` from existing state (sets `total_votes`), DELETEs historical `vote_submitted` events (events are UPDATE-blocked by trigger; privacy purge via delete).
+- Edge case handled: a voter with `vote_participation` but no `active_vote_keys` row (pre-receipts legacy) gets "already voted" instead of being double-counted.
+
+### 2. Required real names
+- `users.full_name` (migration `20260703000100_full_name.sql`), on `User`/`AuthUser` models. Distinct from `display_name` (Board-role attribution) — both kept.
+- Sign-up gate (AuthModal step 3) now collects Full name alongside residency + ToS; `POST /auth/residency` accepts/requires `full_name`; `PATCH /auth/me` accepts `full_name` (validated 2–100 chars in `normalizeFullName`).
+- **Existing accounts:** no purge. `canParticipate` (UI) and `requireResident` (server, `code: "name_required"`) now require a name, so name-less accounts are re-gated: next participation attempt opens AuthModal's "Add your name" variant (name field only, no ToS re-accept). Email/account untouched.
+- `creator_name` fallbacks in vote/project/proposal/deliberation draft controllers now prefer `full_name` (was leaking email prefixes).
+
+### 3. Comments: real name by default, opt-in anonymous
+- `community_inputs.is_anonymous` + `author_name` (snapshot at post time) — migration `20260703000200_comment_identity.sql`. `author_id` still stored always (moderation accountability); **redacted from all non-admin API responses** (was previously shown raw in the UI!).
+- Composers (VotePanel comment box, ProposalCommentForm) show a "Post my comment anonymously" checkbox when the hub policy allows. `submitInput` API no longer takes an author param (server uses the session).
+- CommunityInputPanel renders `author_name` / "Anonymous" / "Resident" (legacy rows); admins additionally see the author id on anonymous comments.
+- `comment_added` events: `actor: "anonymous"` for anonymous comments (public event log must not leak the id); `data.comment` carries `author_name`/`is_anonymous`.
+
+### 4. Admin identity setting (stretch goal — shipped)
+- `hub_settings.comment_identity_mode`: `real_name` | `anonymous_optional` (default) | `anonymous_only`. Getter/setter in hubSettings.ts; enforced server-side in `handleSubmitInput` (overrides client flag both directions).
+- Admin → Settings gains an "Identity & anonymity" section (dropdown + save). Votes/process-creation described there as fixed (structural, not settings).
+- Public `GET /process/input/identity-mode` lets composers render the right toggle; UI hook `useCommentIdentityMode` (fails safe to default; server re-enforces anyway).
+
+### To deploy (in order)
+1. Apply the three migrations to **dev** Supabase (`urfmvqhzmamigssqwsya`), verify, then prod (`nfhyypwoporfggqcerli`): `20260703000000_ballot_secrecy.sql`, `20260703000100_full_name.sql`, `20260703000200_comment_identity.sql`. Until applied: comment posting and name-saving will 500 (missing columns); votes/tallies still work.
+2. Deploy code. Order doesn't matter much (old code + new columns is safe; new code + old columns breaks the two paths above), so migrate first.
+
+### 5. Audit fast-follows (same session)
+- `GET /process/:id` no longer serves the raw DB record (it exposed unpublished vote_results admin_notes + delivered_to recipient emails, moderation reasons, the identified supporters map, and pending_review/draft content). It now returns the same read-model projection as `/state`, inheriting the `isPubliclyFetchable` 404 gate. No UI caller used the raw form.
+- `POST /process/:id/action`: lifecycle-control actions (`process.activate`, `.close`, `.propose`, `.snapshot`) are now admin-only (`ADMIN_ONLY_ACTIONS` in processController) — previously any resident could close/activate any process or propose their own pending_review vote past review. Participation actions (`process.vote`, `.support`, `.unsupport`, `.submit`, `proposal.support`) stay resident-level. Actions on non-public-status processes 404 for non-admins (no id-existence leak). Auto-close (`system:auto-close`) and threshold auto-activation are internal dispatch/module paths — unaffected. Verified live: projection shape + 401 on unauth action.
+- Known cosmetic quirk: votes closed BEFORE the receipts module existed recompute their tally from (empty) vote_records → zeros. Demo data only; finalized votes use the `result` snapshot and are unaffected.
+
+### Open questions / follow-ups
+- Process detail page still shows raw `created_by` user id ("Created by user_xxx") — should show the creator's real name (or nothing) now that names exist. Small UI+read-model change.
+- Still open from the broader audit (cheap, non-blocking): OTP hardening, RLS on 5 tables, minimal CI, `.temp/linked-project.json` pointing at prod, HUB_ID constant, review-email escaping, SSRF.
+- Settings page has no "edit my name" field yet (PATCH /auth/me full_name exists; UI not wired).
+- `GET /events` still exposes user ids as `actor` on non-vote public events (comment_added named comments, proposals, endorsements). IDs are opaque but linkable across events — consider actor display-name enrichment or hashing later.
+- Vote-results comment seeding (`spawnVoteResultsFromClosedVote` → `getInputsByProcess`) copies comment bodies only — unaffected by anonymity.
+
+---
+
 ## Onboarding copy, review polish, prod legacy cleanup + digest fix — 2026-07-01/02
 
 Continuation of the pre-test-user pass (below), plus a parallel Polis session (next entry). Shipped to prod across several pushes (latest `08ba02d`); local main == origin/main.

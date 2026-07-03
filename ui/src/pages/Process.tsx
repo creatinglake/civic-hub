@@ -52,7 +52,7 @@ export default function Process() {
   const fetchState = useCallback(async (retries = 2) => {
     if (!id) return;
     try {
-      const state = await getProcessState(id, currentActor);
+      const state = await getProcessState(id);
       setProcess(state);
       setError(null);
     } catch (err) {
@@ -65,7 +65,10 @@ export default function Process() {
     } finally {
       setLoading(false);
     }
-  }, [id, currentActor]);
+    // actorId isn't read here directly, but a sign-in/out changes the
+    // Bearer token request() sends — refetch so has_voted /
+    // your_current_vote reflect the new session.
+  }, [id, actorId]);
 
   useEffect(() => {
     fetchState();

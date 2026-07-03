@@ -25,6 +25,9 @@ import {
 import {
   recordOrUpdateVote,
   clearActiveVoteKeysForProcess,
+  getActiveChoice,
+  getBallotChoicesForProcess,
+  hasUserVoted,
 } from "../modules/civic.receipts/index.js";
 import type { VoteResultsProcessState } from "../modules/civic.vote_results/index.js";
 import { emitVoteResultsAggregationCompleted } from "../modules/civic.vote_results/events.js";
@@ -199,7 +202,27 @@ const voteProcess: ProcessHandler = {
         const ballotInput = methodKey === "approval"
           ? action.payload.selections
           : action.payload.option;
-        const outcome = await submitVote(state, action.actor, ballotInput, ctx);
+
+        // Ballot secrecy: the module never stores ballots in state, so
+        // the previous choice comes from the receipts bridge. A voter
+        // with participation but no active key voted before the bridge
+        // existed (or the vote closed under them) — refuse the change
+        // up front rather than double-counting them as a first vote.
+        const previousSerialized = await getActiveChoice(action.actor, process.id);
+        if (
+          previousSerialized === null &&
+          (await hasUserVoted(action.actor, process.id))
+        ) {
+          throw new Error("You have already voted on this process");
+        }
+
+        const outcome = await submitVote(
+          state,
+          action.actor,
+          ballotInput,
+          previousSerialized,
+          ctx,
+        );
         syncStatus(process, outcome.state);
 
         // Same-ballot re-submit short-circuits in the lifecycle module —
@@ -224,7 +247,12 @@ const voteProcess: ProcessHandler = {
         break;
       }
       case "process.close": {
-        const outcome = await closeVote(state, action.actor, ctx);
+        const methodKey = state.method ?? DEFAULT_METHOD;
+        const method = getVotingMethod(methodKey);
+        const ballots = (await getBallotChoicesForProcess(process.id)).map(
+          (c) => method.parseReceipt(c),
+        );
+        const outcome = await closeVote(state, action.actor, ballots, ctx);
         syncStatus(process, outcome.state);
         result = outcome.result;
 
@@ -262,15 +290,45 @@ const voteProcess: ProcessHandler = {
     return result;
   },
 
-  getReadModel(process: Process, actor?: string): Record<string, unknown> {
+  async getReadModel(process: Process, actor?: string): Promise<Record<string, unknown>> {
     const state = getState(process);
+    const methodKey = state.method ?? DEFAULT_METHOD;
+    const method = getVotingMethod(methodKey);
+
+    // Actor-specific bits come from the receipts tables, never from state.
+    const hasVoted = actor
+      ? await hasUserVoted(actor, process.id)
+      : null;
+    const yourSerialized =
+      actor && state.status === "active"
+        ? await getActiveChoice(actor, process.id)
+        : null;
+
+    // Ballots are only needed when results are visible AND no finalized
+    // snapshot exists (finalized votes read state.result instead).
+    const resultsVisible =
+      state.status === "closed" ||
+      state.status === "finalized" ||
+      hasVoted === true;
+    const ballots =
+      resultsVisible && !state.result
+        ? (await getBallotChoicesForProcess(process.id)).map((c) =>
+            method.parseReceipt(c),
+          )
+        : null;
+
     const model = getReadModel(state, {
       id: process.id,
       title: process.title,
       description: process.description,
       createdAt: process.createdAt,
       createdBy: process.createdBy,
-    }, actor);
+    }, actor, {
+      has_voted: hasVoted,
+      your_current_vote:
+        yourSerialized !== null ? method.parseReceipt(yourSerialized) : null,
+      ballots,
+    });
 
     // Include structured content and jurisdiction if present
     model.jurisdiction = process.jurisdiction;

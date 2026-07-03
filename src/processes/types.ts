@@ -24,8 +24,16 @@ export interface ProcessHandler {
     action: ProcessAction,
   ): Promise<Record<string, unknown>>;
 
-  /** Produce a UI-friendly read model. Actor is optional (for visibility rules). */
-  getReadModel(process: Process, actor?: string): Record<string, unknown>;
+  /**
+   * Produce a UI-friendly read model. Actor is optional (for visibility
+   * rules). May be async — handlers that resolve per-actor data from
+   * storage (e.g. civic.vote reading the receipts tables) return a
+   * Promise; the service layer awaits either form.
+   */
+  getReadModel(
+    process: Process,
+    actor?: string,
+  ): Record<string, unknown> | Promise<Record<string, unknown>>;
 
   /** Produce a summary for list views */
   getSummary(process: Process): Record<string, unknown>;

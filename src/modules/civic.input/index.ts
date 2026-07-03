@@ -27,6 +27,8 @@ interface InputRow {
   id: string;
   process_id: string;
   author_id: string | null;
+  author_name: string | null;
+  is_anonymous: boolean | null;
   body: string;
   submitted_at: string;
   phase: string | null;
@@ -56,6 +58,8 @@ function rowToInput(row: InputRow): CommunityInput {
     id: row.id,
     process_id: row.process_id,
     author_id: row.author_id ?? "",
+    author_name: row.author_name ?? null,
+    is_anonymous: row.is_anonymous ?? false,
     body: row.body,
     submitted_at: row.submitted_at,
     phase: (row.phase as CommentPhase) ?? null,
@@ -80,6 +84,12 @@ export async function submitInput(
   body: string,
   ctx: InputContext,
   phase?: CommentPhase,
+  identity?: {
+    /** Display-level anonymity — author_id is still stored for moderation. */
+    is_anonymous?: boolean;
+    /** Real-name snapshot at post time; ignored when is_anonymous. */
+    author_name?: string | null;
+  },
 ): Promise<CommunityInput> {
   if (!body || body.trim().length === 0) {
     throw new Error("Input body cannot be empty");
@@ -87,10 +97,19 @@ export async function submitInput(
 
   const id = generateId("input");
   const trimmed = body.trim();
+  const isAnonymous = identity?.is_anonymous === true;
+  const authorName = isAnonymous ? null : identity?.author_name ?? null;
 
   const { data, error } = await getDb()
     .from("community_inputs")
-    .insert({ id, process_id, author_id, body: trimmed })
+    .insert({
+      id,
+      process_id,
+      author_id,
+      body: trimmed,
+      is_anonymous: isAnonymous,
+      author_name: authorName,
+    })
     .select()
     .single();
 
@@ -111,10 +130,12 @@ export async function submitInput(
 
   // Emit the participation event. The preview is truncated so events stay
   // cheap to index and distribute; consumers that want the full body read
-  // /process/:id/input.
+  // /process/:id/input. Anonymous comments emit actor "anonymous" — the
+  // event log is public and permanent, so the author id must not appear
+  // on it (the community_inputs row keeps it for moderation).
   await ctx.emit({
     event_type: "civic.process.comment_added",
-    actor: author_id,
+    actor: isAnonymous ? "anonymous" : author_id,
     process_id,
     hub_id: ctx.hub_id,
     jurisdiction: ctx.jurisdiction,
@@ -122,6 +143,8 @@ export async function submitInput(
       comment: {
         id: input.id,
         body_preview: trimmed.slice(0, BODY_PREVIEW_LEN),
+        author_name: authorName,
+        is_anonymous: isAnonymous,
       },
     },
   });

@@ -35,6 +35,14 @@ export interface User {
   tos_version_accepted: string | null;
   tos_accepted_at: string | null;
   display_name: string | null;
+  /**
+   * The user's real name, required for participation (votes, comments,
+   * endorsements, process creation). Collected at the sign-up gate;
+   * existing accounts are re-gated on their next participation attempt.
+   * Distinct from display_name, which is the role-attribution label for
+   * Board/committee accounts on announcements.
+   */
+  full_name: string | null;
 }
 
 /** Pending verification — an OTP code sent to an email */

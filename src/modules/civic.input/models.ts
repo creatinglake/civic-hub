@@ -8,7 +8,20 @@ export type CommentPhase = "proposal" | "vote";
 export interface CommunityInput {
   id: string;
   process_id: string;
+  /**
+   * Always stored for moderation accountability. Public read models
+   * redact this field for non-admin callers — residents identify each
+   * other by author_name, never by id.
+   */
   author_id: string;
+  /**
+   * Snapshot of the author's real name at post time. null for
+   * anonymous comments and for legacy rows that pre-date the
+   * required-name policy.
+   */
+  author_name: string | null;
+  /** Resident chose to post anonymously (display-level only). */
+  is_anonymous: boolean;
   body: string;
   submitted_at: string; // ISO 8601
   phase: CommentPhase | null;

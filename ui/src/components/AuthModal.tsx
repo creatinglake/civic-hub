@@ -4,6 +4,7 @@ import {
   requestCode,
   verifyCode,
   affirmResidency,
+  updateFullName,
   acceptTos,
   type AuthRole,
   type AuthUser,
@@ -35,12 +36,17 @@ interface Props {
 export default function AuthModal({ onComplete, onDismiss }: Props) {
   const { user, token, login, updateUser } = useAuth();
   const [step, setStep] = useState<Step>(() => {
-    if (user && user.email_verified && !user.is_resident) return "residency";
-    if (user && user.email_verified && user.is_resident) return "residency"; // will auto-complete
+    // Any verified user lands on the gate step — it renders only the
+    // pieces they're missing (residency checkbox and/or name field),
+    // and auto-completes when nothing is missing.
+    if (user && user.email_verified) return "residency";
     return "email";
   });
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
+  // Required-name policy: collected at the gate for new users, and for
+  // returning accounts that pre-date the policy (re-gate).
+  const [fullName, setFullName] = useState("");
   // Slice 13.10 — verifyCode result is held here UNTIL the residency
   // gate passes. We do not call login() at the verify step anymore so
   // dismissing the modal at the gate leaves no session behind.
@@ -55,9 +61,9 @@ export default function AuthModal({ onComplete, onDismiss }: Props) {
   const [error, setError] = useState<string | null>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
 
-  // If user is already fully authenticated + resident, just complete
+  // If user is already fully authenticated + resident + named, just complete
   useEffect(() => {
-    if (user && user.email_verified && user.is_resident) {
+    if (user && user.email_verified && user.is_resident && user.full_name) {
       onComplete();
     }
   }, [user, onComplete]);
@@ -109,17 +115,18 @@ export default function AuthModal({ onComplete, onDismiss }: Props) {
     try {
       const result = await verifyCode(email.trim(), code.trim());
 
-      if (result.user.is_resident) {
-        // Returning resident — fully signed up before. login() now,
-        // complete. The app-root ReAcceptModal catches them if their
-        // legal-version is stale.
+      if (result.user.is_resident && result.user.full_name) {
+        // Returning resident with a name on file — fully signed up
+        // before. login() now, complete. The app-root ReAcceptModal
+        // catches them if their legal-version is stale.
         login(result.token, result.user, result.role, result.author_label);
         onComplete();
       } else {
-        // New user — hold the credentials in local state and route
-        // to the combined residency + legal gate. login() will only
-        // fire if/when they pass the gate; closing the modal here
-        // leaves no session behind.
+        // New user, or a returning account missing the (now required)
+        // real name — hold the credentials in local state and route to
+        // the gate, which renders only the missing pieces. login()
+        // fires once the gate passes; closing the modal here leaves no
+        // session behind.
         setPendingAuth({
           token: result.token,
           user: result.user,
@@ -135,11 +142,21 @@ export default function AuthModal({ onComplete, onDismiss }: Props) {
     }
   }
 
+  // The gate renders only what the (pending or current) user is
+  // missing: the residency+legal checkbox, the real-name field, or both.
+  const gateUser = pendingAuth?.user ?? user;
+  const needsResidency = !gateUser?.is_resident;
+  const needsName = !gateUser?.full_name;
+
   async function handleResidency(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
 
-    if (!gateChecked) {
+    if (needsName && fullName.trim().length < 2) {
+      setError("Please enter your full name.");
+      return;
+    }
+    if (needsResidency && !gateChecked) {
       setError(
         "Please confirm your residency and acceptance of the policies to continue.",
       );
@@ -147,12 +164,14 @@ export default function AuthModal({ onComplete, onDismiss }: Props) {
     }
 
     // Two paths into the residency step:
-    //   1. Brand-new sign-up — pendingAuth holds the verified-but-not-
-    //      yet-logged-in credentials from handleVerifyCode. login()
-    //      will fire only after the gate passes.
+    //   1. Brand-new sign-up (or returning account missing the required
+    //      name) — pendingAuth holds the verified-but-not-yet-logged-in
+    //      credentials from handleVerifyCode. login() will fire only
+    //      after the gate passes.
     //   2. Returning user already logged in (re-opened the modal
-    //      because is_resident is still false) — useAuth's token
-    //      applies. updateUser() refreshes the cached state.
+    //      because is_resident or full_name is still missing) —
+    //      useAuth's token applies. updateUser() refreshes the cached
+    //      state.
     const tokenToUse = pendingAuth?.token ?? token ?? null;
     if (!tokenToUse) {
       setError("Session expired. Please start over.");
@@ -161,32 +180,47 @@ export default function AuthModal({ onComplete, onDismiss }: Props) {
 
     setLoading(true);
     try {
-      // Combined gate: affirm residency + record legal-doc acceptance.
-      // Both calls happen here so a network blip on either surfaces an
-      // error the user can retry on this same step rather than getting
-      // half-completed sign-ups. acceptTos failure is non-fatal — the
-      // re-acceptance modal will catch them on next page load.
-      const residencyResult = await affirmResidency(tokenToUse);
-      let nextUser = residencyResult.user;
-      try {
-        const accepted = await acceptTos(tokenToUse, CURRENT_LEGAL_VERSION);
-        nextUser = accepted.user;
-      } catch (acceptErr) {
-        console.warn(
-          "[auth] accept-tos failed during sign-up; re-acceptance modal will retry.",
-          acceptErr,
+      let nextUser: AuthUser;
+      if (needsResidency) {
+        // Combined gate: affirm residency (+ name) + record legal-doc
+        // acceptance. Both calls happen here so a network blip on
+        // either surfaces an error the user can retry on this same
+        // step rather than getting half-completed sign-ups. acceptTos
+        // failure is non-fatal — the re-acceptance modal will catch
+        // them on next page load.
+        const residencyResult = await affirmResidency(
+          tokenToUse,
+          needsName ? fullName.trim() : undefined,
         );
+        nextUser = residencyResult.user;
+        try {
+          const accepted = await acceptTos(tokenToUse, CURRENT_LEGAL_VERSION);
+          nextUser = accepted.user;
+        } catch (acceptErr) {
+          console.warn(
+            "[auth] accept-tos failed during sign-up; re-acceptance modal will retry.",
+            acceptErr,
+          );
+        }
+      } else {
+        // Already a resident — this is the required-name re-gate for an
+        // account that pre-dates the policy. No ToS re-acceptance here
+        // (the ReAcceptModal owns legal-version staleness).
+        const updated = await updateFullName(tokenToUse, fullName.trim());
+        nextUser = updated.user;
       }
       // Only NOW does the session actually start — login() fires with
-      // the residency-affirmed user. If the user had closed the modal
-      // before reaching this point, no login() ever happened.
+      // the gate-passed user. If the user had closed the modal before
+      // reaching this point, no login() ever happened.
       if (pendingAuth) {
         login(tokenToUse, nextUser, pendingAuth.role, pendingAuth.author_label);
         // First-time signup — route to the onboarding word cloud if configured.
-        const wcId = hub.onboarding_wordcloud_id;
-        if (wcId) {
-          window.location.href = `/wordcloud/${wcId}?onboarding=1`;
-          return;
+        if (needsResidency) {
+          const wcId = hub.onboarding_wordcloud_id;
+          if (wcId) {
+            window.location.href = `/wordcloud/${wcId}?onboarding=1`;
+            return;
+          }
         }
       } else {
         updateUser(nextUser);
@@ -309,44 +343,81 @@ export default function AuthModal({ onComplete, onDismiss }: Props) {
             this step automatically per handleVerifyCode). */}
         {step === "residency" && (
           <form onSubmit={handleResidency}>
-            <h2 className="auth-title">One last thing</h2>
-            <p className="auth-description">{hub.residency_intro}</p>
+            <h2 className="auth-title">
+              {needsResidency ? "One last thing" : "Add your name"}
+            </h2>
+            <p className="auth-description">
+              {needsResidency
+                ? hub.residency_intro
+                : "Residents now participate under their real name. Your name appears on comments you post (unless you choose to comment anonymously) — votes are always anonymous."}
+            </p>
 
-            <label className="auth-checkbox-label auth-legal-checkbox">
-              <input
-                type="checkbox"
-                checked={gateChecked}
-                onChange={(e) => setGateChecked(e.target.checked)}
-                disabled={loading}
-              />
-              <span>
-                I confirm that I am a resident of {hub.jurisdiction}, and
-                I have read and agree to the{" "}
-                <a href="/terms" target="_blank" rel="noopener noreferrer">
-                  Terms of Service
-                </a>
-                ,{" "}
-                <a href="/privacy" target="_blank" rel="noopener noreferrer">
-                  Privacy Policy
-                </a>
-                , and{" "}
-                <a
-                  href="/code-of-conduct"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  Code of Conduct
-                </a>
-                .
-              </span>
-            </label>
+            {needsName && (
+              <div className="form-field">
+                <label htmlFor="auth-full-name" className="form-label">
+                  Full name
+                </label>
+                <input
+                  id="auth-full-name"
+                  type="text"
+                  className="form-input"
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  placeholder="Jane Doe"
+                  maxLength={100}
+                  autoComplete="name"
+                  autoFocus={!needsResidency}
+                  disabled={loading}
+                />
+                {needsResidency && (
+                  <p className="auth-hint">
+                    Shown on comments you post — votes are always anonymous.
+                  </p>
+                )}
+              </div>
+            )}
+
+            {needsResidency && (
+              <label className="auth-checkbox-label auth-legal-checkbox">
+                <input
+                  type="checkbox"
+                  checked={gateChecked}
+                  onChange={(e) => setGateChecked(e.target.checked)}
+                  disabled={loading}
+                />
+                <span>
+                  I confirm that I am a resident of {hub.jurisdiction}, and
+                  I have read and agree to the{" "}
+                  <a href="/terms" target="_blank" rel="noopener noreferrer">
+                    Terms of Service
+                  </a>
+                  ,{" "}
+                  <a href="/privacy" target="_blank" rel="noopener noreferrer">
+                    Privacy Policy
+                  </a>
+                  , and{" "}
+                  <a
+                    href="/code-of-conduct"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    Code of Conduct
+                  </a>
+                  .
+                </span>
+              </label>
+            )}
 
             {error && <p className="form-error">{error}</p>}
 
             <button
               type="submit"
               className="auth-continue-button"
-              disabled={loading || !gateChecked}
+              disabled={
+                loading ||
+                (needsResidency && !gateChecked) ||
+                (needsName && fullName.trim().length < 2)
+              }
             >
               {loading ? "Confirming..." : "Continue"}
             </button>

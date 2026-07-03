@@ -320,7 +320,7 @@ export async function handleSubmitProjectDraft(
         title: draft.title.trim(),
         description: draft.description.trim(),
         creator_id: user.id,
-        creator_name: user.display_name || user.email.split("@")[0],
+        creator_name: user.full_name || user.display_name || user.email.split("@")[0],
         creator_email: user.email,
         content: {
           sources,

@@ -30,8 +30,11 @@ export interface VoteProcessState {
   method: string; // "yes_no_unsure" | "approval" (extensible)
   status: VoteStatus;
   options: string[];
-  votes: Record<string, string | string[]>; // actor → ballot (string for yes_no_unsure, string[] for approval)
-  supporters: Record<string, boolean>; // actor → supported
+  // Ballot secrecy: individual ballots are NEVER stored in process state.
+  // They live in the civic.receipts tables (vote_records, keyed by random
+  // receipt_id with no user link). State keeps only the anonymous count.
+  total_votes: number;
+  supporters: Record<string, boolean>; // actor → supported (endorsements are not secret)
   support_count: number;
   config: {
     support_threshold: number;
@@ -60,6 +63,12 @@ export interface EmitEventFn {
     data: Record<string, unknown>;
     /** Phase 3 — canonical process type, stamped into data.process.type. */
     processType?: string;
+    /**
+     * Ballot secrecy — vote_submitted events are emitted with restricted
+     * visibility so the public /events feed never links an actor to a
+     * ballot. Defaults to "public" when omitted.
+     */
+    visibility?: "public" | "restricted";
   }): Promise<unknown>;
 }
 

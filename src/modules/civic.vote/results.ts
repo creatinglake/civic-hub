@@ -8,10 +8,10 @@ import type { VoteResult } from "./models.js";
 import { getVotingMethod, DEFAULT_METHOD, type Ballot } from "./methods.js";
 
 export function computeTally(
-  votes: Record<string, string | string[]>,
+  ballots: Ballot[],
   options: string[],
   method?: string,
 ): VoteResult {
   const m = getVotingMethod(method ?? DEFAULT_METHOD);
-  return m.computeTally(votes as Record<string, Ballot>, options);
+  return m.computeTally(ballots, options);
 }

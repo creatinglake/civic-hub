@@ -114,7 +114,7 @@ export function createVoteState(
     method: methodKey,
     status: "draft",
     options,
-    votes: {},
+    total_votes: 0,
     supporters: {},
     support_count: 0,
     config: {
@@ -273,11 +273,17 @@ export async function activate(
 /**
  * Submit a vote during the active period.
  * Delegates ballot validation to the voting method.
+ *
+ * Ballot secrecy: this function never stores the ballot in state — the
+ * host hub persists it via civic.receipts. `previousSerialized` is the
+ * user's current receipt choice (from active_vote_keys) or null for a
+ * first-time vote; the host looks it up so this module stays pure.
  */
 export async function submitVote(
   state: VoteProcessState,
   actor: string,
   ballotInput: unknown,
+  previousSerialized: string | null,
   ctx: ProcessContext
 ): Promise<ActionOutcome> {
   if (!isVotingOpen(state.status)) {
@@ -300,18 +306,21 @@ export async function submitVote(
 
   const ballot = method.validateBallot(ballotInput, state.options);
 
-  const previousBallot = state.votes[actor] ?? null;
+  const previousBallot =
+    previousSerialized !== null ? method.parseReceipt(previousSerialized) : null;
 
   // No-op: re-submitting the same choice is treated as a confirmation,
   // not a state change. Skip the event so the audit log doesn't fill
   // with redundant entries when residents click their current option.
-  if (previousBallot !== null && method.isSameBallot(previousBallot as Ballot, ballot)) {
+  if (previousBallot !== null && method.isSameBallot(previousBallot, ballot)) {
     return { state, result: { ballot, previous_ballot: previousBallot, unchanged: true } };
   }
 
-  state.votes[actor] = ballot;
+  if (previousBallot === null) {
+    state.total_votes += 1;
+  }
 
-  await emitVoteSubmitted(ctx, actor, method.serializeForReceipt(ballot), previousBallot !== null ? method.serializeForReceipt(previousBallot as Ballot) : null);
+  await emitVoteSubmitted(ctx, actor, previousBallot !== null);
 
   return { state, result: { ballot, previous_ballot: previousBallot } };
 }
@@ -328,14 +337,15 @@ export async function submitVote(
 export async function closeVote(
   state: VoteProcessState,
   actor: string,
+  ballots: Ballot[],
   ctx: ProcessContext
 ): Promise<ActionOutcome> {
   assertTransition(state.status, "closed", state.config.activation_mode);
 
   state.status = "closed";
   const methodKey = resolveMethod(state);
-  const result = computeTally(state.votes, state.options, methodKey);
-  const participantCount = Object.keys(state.votes).length;
+  const result = computeTally(ballots, state.options, methodKey);
+  const participantCount = ballots.length;
 
   await emitEnded(ctx, actor, result);
   await emitAggregationCompleted(ctx, actor, result, participantCount, methodKey);
@@ -357,12 +367,13 @@ export async function closeVote(
 export async function finalizeVote(
   state: VoteProcessState,
   actor: string,
+  ballots: Ballot[],
   ctx: ProcessContext
 ): Promise<ActionOutcome> {
   assertTransition(state.status, "finalized", state.config.activation_mode);
 
   const methodKey = resolveMethod(state);
-  const result = computeTally(state.votes, state.options, methodKey);
+  const result = computeTally(ballots, state.options, methodKey);
   state.status = "finalized";
   state.result = result;
 
@@ -380,16 +391,34 @@ export async function finalizeVote(
 
 // --- Read models ---
 
+/**
+ * Actor-specific vote info, resolved by the host hub from the
+ * civic.receipts tables (this module never touches storage):
+ *   has_voted          — vote_participation lookup (null when no actor)
+ *   your_current_vote  — active_vote_keys → vote_records, only while the
+ *                        vote is open; null after close (paper-ballot model)
+ *   ballots            — all anonymized ballots, needed only when results
+ *                        are visible and no finalized result snapshot exists
+ */
+export interface VoteReadContext {
+  has_voted: boolean | null;
+  your_current_vote: Ballot | null;
+  ballots: Ballot[] | null;
+}
+
 export function getReadModel(
   state: VoteProcessState,
   processMeta: { id: string; title: string; description: string; createdAt: string; createdBy: string },
-  actor?: string
+  actor: string | undefined,
+  view: VoteReadContext
 ): Record<string, unknown> {
   const methodKey = resolveMethod(state);
-  const tally = computeTally(state.votes, state.options, methodKey);
-  const hasVoted = actor ? actor in state.votes : null;
+  const tally =
+    state.result ??
+    (view.ballots ? computeTally(view.ballots, state.options, methodKey) : null);
+  const hasVoted = view.has_voted;
   const hasSupported = actor ? actor in state.supporters : null;
-  const yourCurrentVote = actor ? state.votes[actor] ?? null : null;
+  const yourCurrentVote = view.your_current_vote;
 
   // Results visible after voting, when closed, or when finalized
   const showResults =
@@ -405,8 +434,8 @@ export function getReadModel(
     description: processMeta.description,
     status: state.status,
     options: state.options,
-    tally: showResults ? tally.tally : null,
-    total_votes: showResults ? tally.total_votes : null,
+    tally: showResults && tally ? tally.tally : null,
+    total_votes: showResults ? tally?.total_votes ?? state.total_votes : null,
     has_voted: hasVoted,
     your_current_vote: yourCurrentVote,
     has_supported: hasSupported,
@@ -432,7 +461,7 @@ export function getSummary(
     method: resolveMethod(state),
     title: processMeta.title,
     status: processMeta.status,
-    total_votes: Object.keys(state.votes).length,
+    total_votes: state.total_votes ?? 0,
     support_count: state.support_count,
     support_threshold: state.config.support_threshold,
     closes_at: state.voting_closes_at,

@@ -11,6 +11,7 @@ import {
   adminPatchSettings,
   type AnnouncementAuthor,
   type WaitlistEntry,
+  type CommentIdentityMode,
 } from "../services/api";
 import AdminTabs from "../components/AdminTabs";
 import "./AdminSettings.css";
@@ -43,6 +44,12 @@ export default function AdminSettings() {
   const [waitlist, setWaitlist] = useState<WaitlistEntry[]>([]);
   const [copiedWaitlist, setCopiedWaitlist] = useState(false);
 
+  // --- Comment identity ---
+  const [identityMode, setIdentityMode] =
+    useState<CommentIdentityMode>("anonymous_optional");
+  const [savingIdentityMode, setSavingIdentityMode] = useState(false);
+  const [identityModeMessage, setIdentityModeMessage] = useState<string | null>(null);
+
   useEffect(() => {
     adminGetSettings()
       .then((s) => {
@@ -51,6 +58,7 @@ export default function AdminSettings() {
         setThreshold(s.support_threshold);
         setAllowlistText(s.beta_allowlist.join(", "));
         setWaitlist(s.waitlist);
+        setIdentityMode(s.comment_identity_mode);
         setLoaded(true);
       })
       .catch((err: Error) => {
@@ -131,6 +139,22 @@ export default function AdminSettings() {
       );
     } finally {
       setSavingAllowlist(false);
+    }
+  }
+
+  async function saveIdentityMode() {
+    setSavingIdentityMode(true);
+    setIdentityModeMessage(null);
+    try {
+      const saved = await adminPatchSettings({ comment_identity_mode: identityMode });
+      setIdentityMode(saved.comment_identity_mode);
+      setIdentityModeMessage("Saved. Applies to new comments immediately.");
+    } catch (err) {
+      setIdentityModeMessage(
+        err instanceof Error ? err.message : "Failed to save comment identity mode",
+      );
+    } finally {
+      setSavingIdentityMode(false);
     }
   }
 
@@ -321,6 +345,55 @@ export default function AdminSettings() {
             </button>
             {thresholdMessage && (
               <span className="admin-settings-message">{thresholdMessage}</span>
+            )}
+          </div>
+        </section>
+
+        {/* --- Identity & anonymity --- */}
+        <section className="admin-settings-panel">
+          <h3>Identity &amp; anonymity</h3>
+          <p className="form-hint">
+            Votes are always anonymous (ballot secrecy) and creating a
+            process always carries the creator's real name — those are
+            fixed. This setting controls how residents appear on
+            community comments.
+          </p>
+          <label className="form-label" htmlFor="comment-identity-mode">
+            Comment identity
+          </label>
+          <select
+            id="comment-identity-mode"
+            className="form-input"
+            value={identityMode}
+            onChange={(e) => setIdentityMode(e.target.value as CommentIdentityMode)}
+            disabled={!loaded || savingIdentityMode}
+            style={{ maxWidth: "360px" }}
+          >
+            <option value="real_name">
+              Real name required — no anonymous comments
+            </option>
+            <option value="anonymous_optional">
+              Real name by default — residents may opt into anonymity
+            </option>
+            <option value="anonymous_only">
+              Anonymous only — no names shown on comments
+            </option>
+          </select>
+          <p className="form-hint">
+            Anonymity is display-level: the author is always recorded
+            internally for Code of Conduct moderation.
+          </p>
+          <div className="admin-settings-actions">
+            <button
+              type="button"
+              className="admin-convert-button"
+              onClick={saveIdentityMode}
+              disabled={!loaded || savingIdentityMode}
+            >
+              {savingIdentityMode ? "Saving…" : "Save comment identity"}
+            </button>
+            {identityModeMessage && (
+              <span className="admin-settings-message">{identityModeMessage}</span>
             )}
           </div>
         </section>

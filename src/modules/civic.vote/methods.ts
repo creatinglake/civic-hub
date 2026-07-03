@@ -38,9 +38,12 @@ export interface VotingMethod {
   /** Deserialize a receipt choice back to displayable form */
   deserializeReceipt(choice: string): string;
 
-  /** Compute tally from all stored ballots */
+  /** Parse a receipt's TEXT choice column back into a Ballot */
+  parseReceipt(choice: string): Ballot;
+
+  /** Compute tally from anonymized ballots (order-free, no voter linkage) */
   computeTally(
-    votes: Record<string, Ballot>,
+    ballots: Ballot[],
     options: string[],
   ): VoteResult;
 
@@ -79,23 +82,27 @@ const yesNoUnsure: VotingMethod = {
     return choice;
   },
 
+  parseReceipt(choice: string): Ballot {
+    return choice;
+  },
+
   computeTally(
-    votes: Record<string, Ballot>,
+    ballots: Ballot[],
     options: string[],
   ): VoteResult {
     const tally: Record<string, number> = {};
     for (const option of options) {
       tally[option] = 0;
     }
-    for (const vote of Object.values(votes)) {
-      const option = vote as string;
+    for (const ballot of ballots) {
+      const option = ballot as string;
       if (tally[option] !== undefined) {
         tally[option]++;
       }
     }
     return {
       tally,
-      total_votes: Object.keys(votes).length,
+      total_votes: ballots.length,
       computed_at: new Date().toISOString(),
     };
   },
@@ -162,16 +169,29 @@ const approval: VotingMethod = {
     return choice;
   },
 
+  parseReceipt(choice: string): Ballot {
+    try {
+      const parsed = JSON.parse(choice);
+      if (Array.isArray(parsed)) {
+        return parsed.filter((s): s is string => typeof s === "string");
+      }
+    } catch {
+      // fall through
+    }
+    // Malformed row — count nothing rather than guessing.
+    return [];
+  },
+
   computeTally(
-    votes: Record<string, Ballot>,
+    ballots: Ballot[],
     options: string[],
   ): VoteResult {
     const tally: Record<string, number> = {};
     for (const option of options) {
       tally[option] = 0;
     }
-    for (const selections of Object.values(votes)) {
-      for (const option of selections as string[]) {
+    for (const ballot of ballots) {
+      for (const option of ballot as string[]) {
         if (tally[option] !== undefined) {
           tally[option]++;
         }
@@ -179,7 +199,7 @@ const approval: VotingMethod = {
     }
     return {
       tally,
-      total_votes: Object.keys(votes).length,
+      total_votes: ballots.length,
       computed_at: new Date().toISOString(),
     };
   },

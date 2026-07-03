@@ -16,6 +16,7 @@ import { Request, Response } from "express";
 import {
   type AnnouncementAuthor,
   type WaitlistEntry,
+  type CommentIdentityMode,
   getAnnouncementAuthors,
   getVoteResultsRecipients,
   setAnnouncementAuthors,
@@ -25,6 +26,8 @@ import {
   getWaitlist,
   getSupportThreshold,
   setSupportThreshold,
+  getCommentIdentityMode,
+  setCommentIdentityMode,
 } from "../services/hubSettings.js";
 import { getAuthUser } from "../middleware/auth.js";
 
@@ -34,6 +37,7 @@ interface SettingsResponse {
   beta_allowlist: string[];
   waitlist: WaitlistEntry[];
   support_threshold: number;
+  comment_identity_mode: CommentIdentityMode;
 }
 
 async function loadSettings(): Promise<SettingsResponse> {
@@ -43,6 +47,7 @@ async function loadSettings(): Promise<SettingsResponse> {
     beta_allowlist: await getBetaAllowlist(),
     waitlist: await getWaitlist(),
     support_threshold: await getSupportThreshold(),
+    comment_identity_mode: await getCommentIdentityMode(),
   };
 }
 
@@ -69,6 +74,7 @@ export async function handlePatchSettings(
       announcement_authors?: unknown;
       beta_allowlist?: unknown;
       support_threshold?: unknown;
+      comment_identity_mode?: unknown;
     };
 
     if (body.brief_recipient_emails !== undefined) {
@@ -125,6 +131,18 @@ export async function handlePatchSettings(
         return;
       }
       await setSupportThreshold(n, actor);
+    }
+
+    if (body.comment_identity_mode !== undefined) {
+      if (typeof body.comment_identity_mode !== "string") {
+        res.status(400).json({
+          error:
+            "comment_identity_mode must be one of: real_name, anonymous_optional, anonymous_only.",
+        });
+        return;
+      }
+      // setCommentIdentityMode validates the value and throws on junk.
+      await setCommentIdentityMode(body.comment_identity_mode, actor);
     }
 
     res.json(await loadSettings());

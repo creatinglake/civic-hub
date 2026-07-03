@@ -12,6 +12,7 @@ import { getDb } from "../db/client.js";
 import { getAuthUser, isAdminEmail } from "../middleware/auth.js";
 import { emitEvent } from "../events/eventEmitter.js";
 import { getUserFromToken } from "../modules/civic.auth/index.js";
+import { getCommentIdentityMode } from "../services/hubSettings.js";
 
 const HUB_ID = "civic-hub-local";
 
@@ -35,18 +36,22 @@ async function getSourceProposalId(processId: string): Promise<string | null> {
 }
 
 /**
- * Redact a hidden comment for non-admin viewers (Slice 11). The body
- * is replaced with an empty string and `moderation.reason` is dropped
- * — the reason is internal-audit only. Admins receive the row
- * unchanged.
+ * Redact a comment for non-admin viewers.
+ *   - author_id is ALWAYS stripped — residents identify each other by
+ *     author_name (or "Anonymous"), never by user id.
+ *   - Hidden comments (Slice 11) additionally lose their body, and
+ *     `moderation.reason` is dropped — the reason is internal-audit
+ *     only.
+ * Admins receive the row unchanged.
  */
 function redactForPublic(input: CommunityInput): CommunityInput {
-  if (!input.moderation?.hidden) return input;
+  const publicInput: CommunityInput = { ...input, author_id: "" };
+  if (!publicInput.moderation?.hidden) return publicInput;
   return {
-    ...input,
+    ...publicInput,
     body: "",
     moderation: {
-      ...input.moderation,
+      ...publicInput.moderation,
       reason: null,
     },
   };
@@ -72,7 +77,10 @@ export async function handleSubmitInput(
   res: Response,
 ): Promise<void> {
   const processId = req.params.id as string;
-  const { body } = req.body;
+  const { body, is_anonymous } = req.body as {
+    body?: unknown;
+    is_anonymous?: unknown;
+  };
 
   if (!body) {
     res.status(400).json({ error: "Missing required field: body" });
@@ -99,15 +107,48 @@ export async function handleSubmitInput(
     }
 
     const user = getAuthUser(res);
-    const input = await submitInput(processId, user.id, body, {
+
+    // Hub-wide identity policy for comments. The mode overrides the
+    // caller's flag in both directions so a stale client can't bypass
+    // the admin's setting.
+    const mode = await getCommentIdentityMode();
+    let isAnonymous = is_anonymous === true;
+    if (mode === "real_name") isAnonymous = false;
+    if (mode === "anonymous_only") isAnonymous = true;
+
+    const input = await submitInput(processId, user.id, String(body), {
       hub_id: hubId,
       jurisdiction,
       emit: emitEvent,
-    }, phase);
-    res.status(201).json(input);
+    }, phase, {
+      is_anonymous: isAnonymous,
+      // Real-name snapshot at post time (required-name policy makes
+      // full_name present for all participants; display_name covers
+      // legacy Board accounts).
+      author_name: user.full_name ?? user.display_name ?? null,
+    });
+    res.status(201).json(redactForPublic(input));
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
     res.status(400).json({ error: message });
+  }
+}
+
+/**
+ * GET /input/identity-mode — public. The comment composers read this
+ * to decide whether to render the "post anonymously" toggle (or force
+ * anonymity) per the admin-configured hub policy.
+ */
+export async function handleGetCommentIdentityMode(
+  _req: Request,
+  res: Response,
+): Promise<void> {
+  try {
+    const mode = await getCommentIdentityMode();
+    res.json({ mode });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Unknown error";
+    res.status(500).json({ error: message });
   }
 }
 

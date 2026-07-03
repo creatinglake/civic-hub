@@ -100,7 +100,10 @@ export async function requireAuth(
 }
 
 /**
- * Require a valid session AND a user who has affirmed residency.
+ * Require a valid session AND a user who has affirmed residency AND a
+ * real name on file (required-name policy — accounts that pre-date it
+ * are re-gated here; the UI catches the `name_required` code and opens
+ * the add-your-name step).
  * Use this for all civic-participation actions (vote, support, submit, etc.).
  */
 export async function requireResident(
@@ -117,6 +120,14 @@ export async function requireResident(
     if (!user.is_resident) {
       res.status(403).json({
         error: "Residency affirmation required to participate",
+        code: "residency_required",
+      });
+      return;
+    }
+    if (!user.full_name) {
+      res.status(403).json({
+        error: "Please add your name to participate",
+        code: "name_required",
       });
       return;
     }

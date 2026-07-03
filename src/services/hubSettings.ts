@@ -20,6 +20,7 @@ export const SETTING_KEYS = {
   ANNOUNCEMENT_AUTHORS: "announcement_authors",
   BETA_ALLOWLIST: "beta_allowlist",
   SUPPORT_THRESHOLD: "support_threshold",
+  COMMENT_IDENTITY_MODE: "comment_identity_mode",
 } as const;
 
 export type SettingKey = (typeof SETTING_KEYS)[keyof typeof SETTING_KEYS];
@@ -256,6 +257,53 @@ export async function lookupAuthorLabel(
     if (a.email.toLowerCase() === lower) return a.label;
   }
   return null;
+}
+
+// --- Comment identity mode ---
+
+/**
+ * Hub-wide identity policy for community comments:
+ *   real_name          — every comment carries the author's real name
+ *   anonymous_optional — real name by default, resident may opt into
+ *                        anonymity per comment (launch default)
+ *   anonymous_only     — all comments are anonymous
+ *
+ * Votes are always ballot-secret and process creation is always
+ * real-name — those are structural, not settings. This key only
+ * governs comments.
+ */
+export type CommentIdentityMode =
+  | "real_name"
+  | "anonymous_optional"
+  | "anonymous_only";
+
+export const COMMENT_IDENTITY_MODES: CommentIdentityMode[] = [
+  "real_name",
+  "anonymous_optional",
+  "anonymous_only",
+];
+
+const DEFAULT_COMMENT_IDENTITY_MODE: CommentIdentityMode = "anonymous_optional";
+
+export async function getCommentIdentityMode(): Promise<CommentIdentityMode> {
+  const stored = await getSetting(SETTING_KEYS.COMMENT_IDENTITY_MODE);
+  if (stored && (COMMENT_IDENTITY_MODES as string[]).includes(stored)) {
+    return stored as CommentIdentityMode;
+  }
+  return DEFAULT_COMMENT_IDENTITY_MODE;
+}
+
+export async function setCommentIdentityMode(
+  mode: string,
+  updatedBy: string | null,
+): Promise<CommentIdentityMode> {
+  if (!(COMMENT_IDENTITY_MODES as string[]).includes(mode)) {
+    throw new Error(
+      `Invalid comment identity mode "${mode}". Valid: ${COMMENT_IDENTITY_MODES.join(", ")}`,
+    );
+  }
+  await setSetting(SETTING_KEYS.COMMENT_IDENTITY_MODE, mode, updatedBy);
+  return mode as CommentIdentityMode;
 }
 
 // --- Support threshold ---

@@ -25,3 +25,4 @@ ui/src/assets/
 
 # Local DB backups — may contain prod data/PII, never commit
 backups/
+supabase/.temp/

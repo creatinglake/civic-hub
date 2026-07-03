@@ -58,7 +58,20 @@ function rowToUser(row: Record<string, unknown>): User {
       ? String(row.tos_accepted_at)
       : null,
     display_name: row.display_name ? String(row.display_name) : null,
+    full_name: row.full_name ? String(row.full_name) : null,
   };
+}
+
+/** Shared validation for real names — used by sign-up and profile update. */
+export function normalizeFullName(raw: unknown): string {
+  const value = typeof raw === "string" ? raw.trim().replace(/\s+/g, " ") : "";
+  if (value.length < 2) {
+    throw new Error("Please enter your full name");
+  }
+  if (value.length > 100) {
+    throw new Error("Name must be 100 characters or fewer");
+  }
+  return value;
 }
 
 // --- Auth flow ---
@@ -311,13 +324,21 @@ export async function verifyCode(
 }
 
 /**
- * Step 3: Affirm residency.
+ * Step 3: Affirm residency (and record the user's real name when the
+ * sign-up gate supplies one — the gate collects both in one step).
  * Must be called after authentication.
  */
-export async function affirmResidency(userId: string): Promise<User> {
+export async function affirmResidency(
+  userId: string,
+  fullName?: string,
+): Promise<User> {
+  const patch: Record<string, unknown> = { is_resident: true };
+  if (fullName !== undefined) {
+    patch.full_name = normalizeFullName(fullName);
+  }
   const { data, error } = await getDb()
     .from("users")
-    .update({ is_resident: true })
+    .update(patch)
     .eq("id", userId)
     .select()
     .maybeSingle();
@@ -326,6 +347,27 @@ export async function affirmResidency(userId: string): Promise<User> {
   if (!data) throw new Error("User not found");
 
   console.log(`[auth] User ${userId} affirmed residency`);
+  return rowToUser(data);
+}
+
+/**
+ * Set the user's real name. Used by the re-gate flow for accounts that
+ * pre-date the required-name policy (already residents, just missing a
+ * name) and by profile settings.
+ */
+export async function updateFullName(
+  userId: string,
+  fullName: string,
+): Promise<User> {
+  const value = normalizeFullName(fullName);
+  const { data, error } = await getDb()
+    .from("users")
+    .update({ full_name: value })
+    .eq("id", userId)
+    .select()
+    .maybeSingle();
+  if (error) throw new Error(`Auth: ${error.message}`);
+  if (!data) throw new Error("User not found");
   return rowToUser(data);
 }
 

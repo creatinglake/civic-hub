@@ -382,7 +382,7 @@ export async function handleSubmitDraft(
           title: draft.title.trim(),
           description: fullDescription || "",
           creator_id: user.id,
-          creator_name: user.display_name || user.email.split("@")[0],
+          creator_name: user.full_name || user.display_name || user.email.split("@")[0],
           creator_email: user.email,
           content: {
             optional_links: optionalLinks,

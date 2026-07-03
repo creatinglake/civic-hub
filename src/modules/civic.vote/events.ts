@@ -81,11 +81,18 @@ export async function emitStarted(
   });
 }
 
+/**
+ * Ballot secrecy: this event intentionally carries NO ballot content.
+ * The event log persists forever, so including the choice here would
+ * permanently link actor ↔ ballot and defeat the civic.receipts
+ * paper-ballot model. Visibility is restricted so the public /events
+ * feed doesn't even reveal who participated; the anonymized record
+ * lives in vote_records (GET /votes/:id/log).
+ */
 export async function emitVoteSubmitted(
   ctx: EventContext,
   actor: string,
-  ballot: string,
-  previous_ballot: string | null,
+  changed: boolean,
 ): Promise<void> {
   await ctx.emit({
     event_type: "civic.process.vote_submitted",
@@ -94,8 +101,9 @@ export async function emitVoteSubmitted(
     hub_id: ctx.hub_id,
     jurisdiction: ctx.jurisdiction,
     processType: "civic.vote",
+    visibility: "restricted",
     data: {
-      vote: { option: ballot, previous_vote: previous_ballot },
+      vote: { changed },
     },
   });
 }

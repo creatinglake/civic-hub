@@ -115,7 +115,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [token]);
 
   const actorId = user?.id ?? null;
-  const canParticipate = !!user && user.email_verified && user.is_resident;
+  // Participation requires a real name on file (required-name policy).
+  // Accounts that pre-date it fail this check, which routes them into
+  // the AuthModal's add-your-name step via useRequireAuth.
+  const canParticipate =
+    !!user && user.email_verified && user.is_resident && !!user.full_name;
   const isAdmin = role === "admin";
   const canPostAnnouncements = role === "admin" || role === "author";
 

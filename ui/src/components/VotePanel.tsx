@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import type { VoteState } from "../services/api";
 import { submitVote, submitApprovalVote, supportVote, unsupportVote, submitInput } from "../services/api";
 import { useRequireAuth } from "../hooks/useRequireAuth";
+import { useCommentIdentityMode } from "../hooks/useCommentIdentityMode";
 import AuthModal from "./AuthModal";
 
 const COMMENT_MAX = 500;
@@ -20,8 +21,10 @@ export default function VotePanel({ process, actor, onVoted }: Props) {
   const [voteWasUpdated, setVoteWasUpdated] = useState(false);
   const [receiptId, setReceiptId] = useState<string | null>(null);
   const [comment, setComment] = useState("");
+  const [commentAnonymous, setCommentAnonymous] = useState(false);
   const [commentSubmitted, setCommentSubmitted] = useState(false);
   const [commentWarning, setCommentWarning] = useState<string | null>(null);
+  const commentIdentityMode = useCommentIdentityMode();
   const [approvalSelections, setApprovalSelections] = useState<Set<string>>(new Set());
   const { requireAuth, showAuthModal, closeAuthModal, handleAuthComplete } = useRequireAuth();
 
@@ -83,7 +86,11 @@ export default function VotePanel({ process, actor, onVoted }: Props) {
     const trimmed = comment.trim();
     if (trimmed.length > 0) {
       try {
-        await submitInput(process.id, actor, trimmed);
+        await submitInput(
+          process.id,
+          trimmed,
+          commentIdentityMode === "anonymous_only" || commentAnonymous,
+        );
         setCommentSubmitted(true);
         setComment("");
       } catch (commentErr) {
@@ -243,6 +250,17 @@ export default function VotePanel({ process, actor, onVoted }: Props) {
               <span className="vote-comment-counter">
                 {comment.length} / {COMMENT_MAX}
               </span>
+              {commentIdentityMode === "anonymous_optional" && comment.trim().length > 0 && (
+                <label className="auth-checkbox-label comment-anonymous-toggle">
+                  <input
+                    type="checkbox"
+                    checked={commentAnonymous}
+                    onChange={(e) => setCommentAnonymous(e.target.checked)}
+                    disabled={loading}
+                  />
+                  <span>Post my comment anonymously</span>
+                </label>
+              )}
             </div>
           )}
 

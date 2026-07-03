@@ -180,9 +180,11 @@ export function listProcesses(): Promise<ProcessSummary[]> {
   return request("GET", "/process");
 }
 
-export function getProcessState(id: string, actor?: string): Promise<ProcessState> {
-  const params = actor ? `?actor=${encodeURIComponent(actor)}` : "";
-  return request("GET", `/process/${id}/state${params}`);
+export function getProcessState(id: string): Promise<ProcessState> {
+  // The caller's identity rides on the Bearer token (request() attaches
+  // it) — the server resolves per-actor fields (has_voted,
+  // your_current_vote) from the session, never from a query param.
+  return request("GET", `/process/${id}/state`);
 }
 
 // --- Actions (internal control surface) ---
@@ -641,11 +643,30 @@ export function archiveProposal(proposalId: string): Promise<{ message: string }
 export interface CommunityInput {
   id: string;
   process_id: string;
+  /** Empty string for non-admin callers — the server redacts it. */
   author_id: string;
+  /** Real-name snapshot at post time; null for anonymous / legacy rows. */
+  author_name: string | null;
+  is_anonymous: boolean;
   body: string;
   submitted_at: string;
   phase: "proposal" | "vote" | null;
   moderation: CommentModerationView | null;
+}
+
+/**
+ * Hub-wide identity policy for comments (admin-configurable):
+ *   real_name          — no anonymity toggle; comments carry the name
+ *   anonymous_optional — toggle shown, real name is the default
+ *   anonymous_only     — every comment is anonymous
+ */
+export type CommentIdentityMode =
+  | "real_name"
+  | "anonymous_optional"
+  | "anonymous_only";
+
+export function getCommentIdentityMode(): Promise<{ mode: CommentIdentityMode }> {
+  return request("GET", "/process/input/identity-mode");
 }
 
 export interface CommentModerationView {
@@ -660,10 +681,16 @@ export function getInputs(processId: string): Promise<CommunityInput[]> {
   return request("GET", `/process/${processId}/input`);
 }
 
-export function submitInput(processId: string, authorId: string, body: string): Promise<CommunityInput> {
+export function submitInput(
+  processId: string,
+  body: string,
+  isAnonymous = false,
+): Promise<CommunityInput> {
+  // The author is the authenticated session user — the server ignores
+  // any caller-supplied identity.
   return request("POST", `/process/${processId}/input`, {
-    author_id: authorId,
     body,
+    is_anonymous: isAnonymous,
   });
 }
 
@@ -1110,6 +1137,7 @@ export interface AdminSettings {
   beta_allowlist: string[];
   waitlist: WaitlistEntry[];
   support_threshold: number;
+  comment_identity_mode: CommentIdentityMode;
 }
 
 export function adminGetSettings(): Promise<AdminSettings> {

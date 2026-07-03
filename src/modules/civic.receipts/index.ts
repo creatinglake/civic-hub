@@ -140,6 +140,52 @@ export async function recordOrUpdateVote(
 }
 
 /**
+ * Look up the caller's CURRENT ballot choice via the transient
+ * active_vote_keys bridge. Only meaningful while the vote is open —
+ * after closeVote the keys are gone and this returns null, which is
+ * exactly the paper-ballot semantics (nobody, including the voter,
+ * can look a cast ballot back up by identity once the box closes).
+ */
+export async function getActiveChoice(
+  userId: string,
+  processId: string,
+): Promise<string | null> {
+  const db = getDb();
+  const { data: keyRow, error: keyErr } = await db
+    .from("active_vote_keys")
+    .select("receipt_id")
+    .eq("user_id", userId)
+    .eq("process_id", processId)
+    .maybeSingle();
+  if (keyErr) throw new Error(`Receipts: ${keyErr.message}`);
+  if (!keyRow) return null;
+
+  const { data: record, error: recErr } = await db
+    .from("vote_records")
+    .select("choice")
+    .eq("receipt_id", keyRow.receipt_id)
+    .maybeSingle();
+  if (recErr) throw new Error(`Receipts: ${recErr.message}`);
+  return record ? String(record.choice) : null;
+}
+
+/**
+ * All anonymized ballot choices for a process — the tally source.
+ * vote_records carries no user linkage, so this is safe to read on
+ * any results path.
+ */
+export async function getBallotChoicesForProcess(
+  processId: string,
+): Promise<string[]> {
+  const { data, error } = await getDb()
+    .from("vote_records")
+    .select("choice")
+    .eq("process_id", processId);
+  if (error) throw new Error(`Receipts: ${error.message}`);
+  return (data ?? []).map((r) => String(r.choice));
+}
+
+/**
  * Drop every active_vote_key row for a process. Called by the vote
  * lifecycle on closeVote so the post-close snapshot retains no
  * user_id ↔ receipt_id linkage.

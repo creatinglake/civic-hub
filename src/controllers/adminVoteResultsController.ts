@@ -35,8 +35,11 @@ import {
 } from "../modules/civic.vote_results/index.js";
 import {
   finalizeVote,
+  getVotingMethod,
+  DEFAULT_METHOD,
   type VoteProcessState,
 } from "../modules/civic.vote/index.js";
+import { getBallotChoicesForProcess } from "../modules/civic.receipts/index.js";
 import {
   getAllProcesses,
   getProcess,
@@ -306,7 +309,14 @@ export async function handleApproveVoteResults(
         jurisdiction: voteRecord.jurisdiction,
         emit: emitEvent,
       };
-      await finalizeVote(voteState(voteRecord), byActor, voteCtx);
+      // Ballots come from the anonymized receipts table — the vote's
+      // state carries no individual ballots (ballot secrecy).
+      const vState = voteState(voteRecord);
+      const method = getVotingMethod(vState.method ?? DEFAULT_METHOD);
+      const ballots = (await getBallotChoicesForProcess(voteRecord.id)).map(
+        (c) => method.parseReceipt(c),
+      );
+      await finalizeVote(vState, byActor, ballots, voteCtx);
       voteRecord.status = voteState(voteRecord).status;
       await saveProcessState(voteRecord);
     };
