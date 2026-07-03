@@ -286,4 +286,26 @@ app.get("/health", async (_req, res) => {
 // Auto-seed is triggered by the `ensureSeeded` middleware on first request,
 // and is gated behind CIVIC_ALLOW_SEED so it never runs in production.
 
+// Terminal error handler — MUST be the last app.use, after all routes. Catches
+// synchronous throws in middleware and anything a handler passes to next(err),
+// logs it (the observability gap: no Sentry yet), and always returns a clean
+// 500 without leaking internals. Controllers already try/catch their own async
+// errors; this is the safety net for the rest so an error can't hang a request.
+app.use(
+  (
+    err: unknown,
+    _req: express.Request,
+    res: express.Response,
+    _next: express.NextFunction,
+  ) => {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error(
+      `[unhandled] ${message}`,
+      err instanceof Error ? err.stack : "",
+    );
+    if (res.headersSent) return;
+    res.status(500).json({ error: "Internal server error" });
+  },
+);
+
 export default app;

@@ -105,7 +105,14 @@ export async function requestVerification(
   // verifyCode() already accepts the bypass code without needing a
   // pending_verifications row (it short-circuits the existence
   // check), so skipping the insert here doesn't break the flow.
-  const demoBypass = process.env.CIVIC_DEMO_BYPASS_CODE?.trim();
+  // The demo bypass is inert in production: even if CIVIC_DEMO_BYPASS_CODE is
+  // accidentally set on a prod deployment, it resolves to undefined here, so
+  // the static code can never skip real OTP in prod. Fail-safe (inert), not
+  // fail-loud (refuse-to-boot) — a misconfig can't cause an outage.
+  const demoBypass =
+    process.env.NODE_ENV === "production"
+      ? undefined
+      : process.env.CIVIC_DEMO_BYPASS_CODE?.trim();
   if (demoBypass) {
     console.log(
       `[auth] Demo-mode signin requested for ${normalizedEmail} — bypass code active, skipping email.`,
@@ -213,10 +220,14 @@ export async function verifyCode(
 
   if (pendErr) throw new Error(`Auth: ${pendErr.message}`);
 
-  const demoBypass = process.env.CIVIC_DEMO_BYPASS_CODE;
+  // Inert in production (see requestCode): a prod deployment with the var set
+  // still cannot be bypassed, because this resolves to undefined there.
+  const demoBypass =
+    process.env.NODE_ENV === "production"
+      ? undefined
+      : process.env.CIVIC_DEMO_BYPASS_CODE;
   if (demoBypass && code === demoBypass) {
-    // Demo-mode bypass — only active when CIVIC_DEMO_BYPASS_CODE is set
-    // (e.g. in dev/preview). MUST NOT be set in production.
+    // Demo-mode bypass — only active outside production (dev/preview).
     if (pending) {
       await db
         .from("pending_verifications")
