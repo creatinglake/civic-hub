@@ -185,11 +185,20 @@ export async function handleGetInputs(
       .map((c) => c.author_id)
       .filter((id) => id.length > 0);
     const creatorMap = await resolveCreators(authorIds);
-    const withAdmin = inputs.map((c) => ({
-      ...c,
-      author_is_admin:
-        !c.is_anonymous && (creatorMap.get(c.author_id)?.is_admin ?? false),
-    }));
+    const withAdmin = inputs.map((c) => {
+      const resolved = c.is_anonymous ? undefined : creatorMap.get(c.author_id);
+      return {
+        ...c,
+        // Display name: the post-time snapshot wins (so later name edits don't
+        // rewrite history), but legacy comments predate the snapshot and stored
+        // null — fall back to the live-resolved name so they show the real
+        // person, not "Resident". Anonymous comments keep null ("Anonymous").
+        author_name: c.is_anonymous
+          ? c.author_name
+          : c.author_name ?? resolved?.name ?? null,
+        author_is_admin: !c.is_anonymous && (resolved?.is_admin ?? false),
+      };
+    });
 
     const isAdmin = await callerIsAdmin(req);
     res.json(isAdmin ? withAdmin : withAdmin.map(redactForPublic));
