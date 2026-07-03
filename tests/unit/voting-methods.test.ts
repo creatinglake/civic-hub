@@ -67,19 +67,17 @@ describe("yes_no_unsure method", () => {
 
   describe("computeTally", () => {
     it("counts votes correctly", () => {
-      const votes = {
-        user1: "yes",
-        user2: "no",
-        user3: "yes",
-        user4: "unsure",
-      };
-      const result = m.computeTally(votes, options);
+      // computeTally takes anonymized ballot values (no voter keys) — the
+      // ballot-secrecy refactor: tallies come from vote_records, not a
+      // per-user map.
+      const ballots = ["yes", "no", "yes", "unsure"];
+      const result = m.computeTally(ballots, options);
       expect(result.tally).toEqual({ yes: 2, no: 1, unsure: 1 });
       expect(result.total_votes).toBe(4);
     });
 
     it("handles empty votes", () => {
-      const result = m.computeTally({}, options);
+      const result = m.computeTally([], options);
       expect(result.tally).toEqual({ yes: 0, no: 0, unsure: 0 });
       expect(result.total_votes).toBe(0);
     });
@@ -87,13 +85,13 @@ describe("yes_no_unsure method", () => {
 
   describe("summarizeTally", () => {
     it("reports the leading option", () => {
-      const result = m.computeTally({ u1: "yes", u2: "yes", u3: "no" }, options);
+      const result = m.computeTally(["yes", "yes", "no"], options);
       expect(m.summarizeTally(result)).toContain("yes");
       expect(m.summarizeTally(result)).toContain("67%");
     });
 
     it("handles no votes", () => {
-      const result = m.computeTally({}, options);
+      const result = m.computeTally([], options);
       expect(m.summarizeTally(result)).toBe("No votes recorded.");
     });
   });
@@ -173,12 +171,12 @@ describe("approval method", () => {
 
   describe("computeTally", () => {
     it("counts approvals per option across voters", () => {
-      const votes = {
-        user1: ["sidewalks", "bike lanes"],
-        user2: ["sidewalks", "bus stops"],
-        user3: ["bike lanes", "bus stops", "street lights"],
-      };
-      const result = m.computeTally(votes, options);
+      const ballots = [
+        ["sidewalks", "bike lanes"],
+        ["sidewalks", "bus stops"],
+        ["bike lanes", "bus stops", "street lights"],
+      ];
+      const result = m.computeTally(ballots, options);
       expect(result.tally).toEqual({
         sidewalks: 2,
         "bike lanes": 2,
@@ -189,16 +187,16 @@ describe("approval method", () => {
     });
 
     it("total_votes is number of voters not sum of approvals", () => {
-      const votes = {
-        user1: ["sidewalks", "bike lanes", "bus stops", "street lights"],
-      };
-      const result = m.computeTally(votes, options);
+      const ballots = [
+        ["sidewalks", "bike lanes", "bus stops", "street lights"],
+      ];
+      const result = m.computeTally(ballots, options);
       expect(result.total_votes).toBe(1);
       expect(result.tally.sidewalks).toBe(1);
     });
 
     it("handles empty votes", () => {
-      const result = m.computeTally({}, options);
+      const result = m.computeTally([], options);
       expect(result.total_votes).toBe(0);
       for (const count of Object.values(result.tally)) {
         expect(count).toBe(0);
@@ -208,12 +206,12 @@ describe("approval method", () => {
 
   describe("summarizeTally", () => {
     it("reports the most-approved option", () => {
-      const votes = {
-        u1: ["sidewalks"],
-        u2: ["sidewalks", "bike lanes"],
-        u3: ["bike lanes"],
-      };
-      const result = m.computeTally(votes, options);
+      const ballots = [
+        ["sidewalks"],
+        ["sidewalks", "bike lanes"],
+        ["bike lanes"],
+      ];
+      const result = m.computeTally(ballots, options);
       const summary = m.summarizeTally(result);
       expect(summary).toContain("Most approved:");
       expect(summary).toContain("sidewalks");

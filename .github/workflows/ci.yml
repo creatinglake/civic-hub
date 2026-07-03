@@ -1,0 +1,39 @@
+name: CI
+
+# Typecheck + unit tests on every push and PR. This is the safety net the
+# repo lacked: pushing to main auto-deploys to Vercel, and the backend is
+# bundled by esbuild (no tsc) on deploy — so without this, a backend type
+# error ships to production silently. CI does not gate the Vercel deploy
+# (that's independent); it surfaces breakage fast.
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      # --- Backend: install, typecheck (tsc), run infra-free unit tests ---
+      - name: Backend install
+        run: npm ci
+      - name: Backend typecheck
+        run: npm run build
+      - name: Backend unit tests
+        # tests/unit only — tests/api and tests/e2e need a live Supabase/dev
+        # server and are not runnable in CI. `npm test` would run everything.
+        run: npx vitest run tests/unit
+
+      # --- UI: install, real typecheck + build (tsc -b && vite build) ---
+      - name: UI install
+        run: npm ci
+        working-directory: ui
+      - name: UI build
+        run: npm run build
+        working-directory: ui
