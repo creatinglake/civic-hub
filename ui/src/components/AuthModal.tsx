@@ -369,11 +369,10 @@ export default function AuthModal({ onComplete, onDismiss }: Props) {
                   autoFocus={!needsResidency}
                   disabled={loading}
                 />
-                {needsResidency && (
-                  <p className="auth-hint">
-                    Shown on comments you post — votes are always anonymous.
-                  </p>
-                )}
+                <p className="auth-hint">
+                  Please use your real name. It appears next to proposals,
+                  votes, and comments you create on the Floyd Civic Hub.
+                </p>
               </div>
             )}
 

@@ -75,6 +75,27 @@ export async function resolveAuthorship(
 /**
  * Require a valid session token. Attaches `res.locals.authUser`.
  */
+/**
+ * Best-effort caller identification for PUBLIC read paths. Resolves the Bearer
+ * token to a user id when present, undefined otherwise. Never rejects — the
+ * caller may legitimately be anonymous; a token only unlocks that caller's OWN
+ * per-actor fields (has_voted, your_current_vote, is_owner, your sentiment).
+ * The actor is NEVER taken from the query string (that let anyone read another
+ * user's per-actor state by passing their id).
+ */
+export async function resolveCallerId(
+  req: Request,
+): Promise<string | undefined> {
+  const token = extractToken(req);
+  if (!token) return undefined;
+  try {
+    const user = await getUserFromToken(token);
+    return user?.id;
+  } catch {
+    return undefined;
+  }
+}
+
 export async function requireAuth(
   req: Request,
   res: Response,

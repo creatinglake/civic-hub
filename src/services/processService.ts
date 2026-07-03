@@ -37,6 +37,11 @@ import {
   shouldEmitStatusUpdate,
   nonPublicStatusFilter,
 } from "./processLifecycle.js";
+import {
+  resolveCreators,
+  resolveCreator,
+  getCreator,
+} from "./creatorDisplay.js";
 
 const HUB_ID = "civic-hub-local";
 const DEFAULT_JURISDICTION = "local";
@@ -305,7 +310,7 @@ export async function listProcessSummaries(): Promise<Record<string, unknown>[]>
   const all = await getAllProcesses();
   // Lazily close any process whose deadline has elapsed before summarizing.
   const resolved = await Promise.all(all.map(autoCloseIfExpired));
-  return resolved.map((p) => {
+  const summaries = resolved.map((p) => {
     const handler = getProcessHandler(p.definition.type);
     if (handler) return handler.getSummary(p);
     return {
@@ -315,6 +320,31 @@ export async function listProcessSummaries(): Promise<Record<string, unknown>[]>
       status: p.status,
       created_at: p.createdAt,
       created_by: p.createdBy,
+    };
+  });
+
+  // Resolve every creator id in ONE query, then attach the human-facing
+  // attribution (name + admin flag) and redact the raw id from this
+  // public list. Summaries carry `created_by`; some types instead expose
+  // an author id — those are enriched inside their own read models.
+  const map = await resolveCreators(
+    summaries.map((s) =>
+      typeof (s as { created_by?: unknown }).created_by === "string"
+        ? ((s as { created_by: string }).created_by)
+        : "",
+    ),
+  );
+  return summaries.map((s) => {
+    const rawId =
+      typeof (s as { created_by?: unknown }).created_by === "string"
+        ? ((s as { created_by: string }).created_by)
+        : "";
+    const creator = getCreator(map, rawId);
+    return {
+      ...s,
+      creator_name: creator.name,
+      creator_is_admin: creator.is_admin,
+      created_by: "",
     };
   });
 }
@@ -340,15 +370,41 @@ export async function getProcessState(
   process = await autoCloseIfExpired(process);
 
   const handler = getProcessHandler(process.definition.type);
-  if (handler) return handler.getReadModel(process, actor);
+  const model = handler
+    ? await handler.getReadModel(process, actor)
+    : {
+        id: process.id,
+        type: process.definition.type,
+        title: process.title,
+        status: process.status,
+        created_at: process.createdAt,
+        created_by: process.createdBy,
+      };
 
+  // Attach human-facing creator attribution and redact the raw id from this
+  // public read model. Read models expose the creator id under `created_by`
+  // (vote, project, proposal, generic) — types that use a different field
+  // (announcement → author_id) enrich inside their own read model instead.
+  return enrichProcessCreator(model);
+}
+
+/**
+ * Attach `creator_name` + `creator_is_admin` to a process read model and
+ * redact the raw `created_by` id. Shared by the single-process read path.
+ * Idempotent-friendly: if the model has no `created_by`, resolves to the
+ * "Resident" fallback and leaves the (already absent) id blank.
+ */
+async function enrichProcessCreator(
+  model: Record<string, unknown>,
+): Promise<Record<string, unknown>> {
+  const rawId =
+    typeof model.created_by === "string" ? (model.created_by as string) : "";
+  const creator = await resolveCreator(rawId);
   return {
-    id: process.id,
-    type: process.definition.type,
-    title: process.title,
-    status: process.status,
-    created_at: process.createdAt,
-    created_by: process.createdBy,
+    ...model,
+    creator_name: creator.name,
+    creator_is_admin: creator.is_admin,
+    created_by: "",
   };
 }
 

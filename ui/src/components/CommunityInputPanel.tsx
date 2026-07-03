@@ -13,6 +13,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import type { CommunityInput, CommunityInputConfig } from "../services/api";
+import "./Creator.css";
 import {
   adminHideComment,
   adminRestoreComment,
@@ -172,6 +173,11 @@ export default function CommunityInputPanel({ processId, config }: Props) {
                 {input.is_anonymous
                   ? "Anonymous"
                   : input.author_name || "Resident"}{" "}
+                {/* Admin badge — only for non-anonymous admin authors.
+                    Anonymity is never pierced. */}
+                {!input.is_anonymous && input.author_is_admin && (
+                  <span className="creator-admin-badge">Admin</span>
+                )}{" "}
                 {/* Moderation accountability: admins can see who posted
                     an anonymous comment; residents never can. */}
                 {isAdmin && input.is_anonymous && input.author_id && (

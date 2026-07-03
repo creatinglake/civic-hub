@@ -7,6 +7,7 @@ import {
 } from "../services/api";
 import HubInfo from "../components/HubInfo";
 import ProcessPicker from "../components/ProcessPicker";
+import Creator from "../components/Creator";
 import "./Propose.css";
 
 /**
@@ -91,7 +92,11 @@ export default function Propose() {
                           </p>
                         )}
                         <div className="process-card-meta">
-                          <span>by {p.submitted_by}</span>
+                          <Creator
+                            name={p.creator_name}
+                            isAdmin={p.creator_is_admin}
+                            prefix="by"
+                          />
                           <span>{new Date(p.created_at).toLocaleDateString()}</span>
                         </div>
                       </div>
@@ -121,7 +126,11 @@ export default function Propose() {
                           </span>
                         </div>
                         <div className="process-card-meta">
-                          <span>by {p.submitted_by}</span>
+                          <Creator
+                            name={p.creator_name}
+                            isAdmin={p.creator_is_admin}
+                            prefix="by"
+                          />
                           <span>{new Date(p.created_at).toLocaleDateString()}</span>
                         </div>
                       </div>

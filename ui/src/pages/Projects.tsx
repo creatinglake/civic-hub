@@ -4,6 +4,7 @@ import { useAuth } from "../context/AuthContext";
 import { listProjects, type ProjectSummary } from "../services/api";
 import HubInfo from "../components/HubInfo";
 import ProcessPicker from "../components/ProcessPicker";
+import Creator from "../components/Creator";
 import "./Projects.css";
 
 export default function Projects() {
@@ -84,7 +85,11 @@ export default function Projects() {
                           </div>
                         )}
                         <div className="process-card-meta">
-                          <span>by {p.user_id}</span>
+                          <Creator
+                            name={p.creator_name}
+                            isAdmin={p.creator_is_admin}
+                            prefix="by"
+                          />
                           <span>{new Date(p.created_at).toLocaleDateString()}</span>
                         </div>
                       </div>
@@ -108,7 +113,11 @@ export default function Projects() {
                           <span className="status-badge status-archived">archived</span>
                         </div>
                         <div className="process-card-meta">
-                          <span>by {p.user_id}</span>
+                          <Creator
+                            name={p.creator_name}
+                            isAdmin={p.creator_is_admin}
+                            prefix="by"
+                          />
                           <span>{new Date(p.created_at).toLocaleDateString()}</span>
                         </div>
                       </div>

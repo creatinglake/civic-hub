@@ -7,6 +7,7 @@ import {
   type CivicProposalDetail,
 } from "../services/api";
 import AdminTabs from "../components/AdminTabs";
+import Creator from "../components/Creator";
 
 // A Proposal is an idea board (float an idea, gauge interest/discussion) — it
 // does NOT become a vote. This page lets admins review proposals and archive
@@ -107,7 +108,14 @@ export default function AdminProposals() {
                 </div>
                 <div className="admin-proposal-meta">
                   <span>{p.support_count} supporter{p.support_count !== 1 ? "s" : ""}</span>
-                  <span>by {p.submitted_by}</span>
+                  <Creator
+                    name={p.creator_name}
+                    isAdmin={p.creator_is_admin}
+                    prefix="by"
+                  />
+                  {p.submitted_by && (
+                    <span className="admin-id-secondary">{p.submitted_by}</span>
+                  )}
                   <span>{new Date(p.created_at).toLocaleDateString()}</span>
                 </div>
               </li>
@@ -136,7 +144,14 @@ export default function AdminProposals() {
         {error && <p className="form-error">{error}</p>}
 
         <div className="process-meta">
-          <span>Submitted by {selectedProposal.submitted_by}</span>
+          <Creator
+            name={selectedProposal.creator_name}
+            isAdmin={selectedProposal.creator_is_admin}
+            prefix="Submitted by"
+          />
+          {selectedProposal.submitted_by && (
+            <span className="admin-id-secondary">{selectedProposal.submitted_by}</span>
+          )}
           <span>{new Date(selectedProposal.created_at).toLocaleDateString()}</span>
           <span>{selectedProposal.support_count} supporters</span>
         </div>

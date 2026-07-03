@@ -13,6 +13,7 @@ import {
   getProposalSummary,
 } from "../modules/civic.proposals/index.js";
 import { getAuthUser } from "../middleware/auth.js";
+import { enrichCreator, enrichCreators } from "../services/creatorDisplay.js";
 
 /**
  * POST /proposals — submit a new proposal
@@ -61,7 +62,12 @@ export async function handleListProposals(
   try {
     const proposals = await listProposals(status as any);
     const summaries = proposals.map(getProposalSummary);
-    res.json(summaries);
+    // Resolve every submitter in one query; attach creator name + admin
+    // flag and redact the raw submitted_by id from this public list.
+    const enriched = await enrichCreators(summaries, {
+      rawIdField: "submitted_by",
+    });
+    res.json(enriched);
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
     res.status(500).json({ error: message });
@@ -84,7 +90,8 @@ export async function handleGetProposal(
       res.status(404).json({ error: "Proposal not found" });
       return;
     }
-    res.json(readModel);
+    // Attach creator name + admin flag; redact the raw submitted_by id.
+    res.json(await enrichCreator(readModel, { rawIdField: "submitted_by" }));
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
     res.status(500).json({ error: message });

@@ -5,6 +5,7 @@ import { useAuth } from "../context/AuthContext";
 import { useRequireAuth } from "../hooks/useRequireAuth";
 import AuthModal from "../components/AuthModal";
 import ShareButton from "../components/ShareButton";
+import Creator from "../components/Creator";
 import CommunityInputPanel from "../components/CommunityInputPanel";
 import ProposalCommentForm from "../components/ProposalCommentForm";
 
@@ -107,7 +108,11 @@ export default function ProposalDetail() {
       )}
 
       <div className="process-meta">
-        <span>Proposed by {proposal.submitted_by}</span>
+        <Creator
+          name={proposal.creator_name}
+          isAdmin={proposal.creator_is_admin}
+          prefix="Proposed by"
+        />
         <span>Submitted {formatDate(proposal.created_at)}</span>
         {proposal.closes_at && proposal.status === "submitted" && (
           <span>Open until {formatDate(proposal.closes_at)}</span>

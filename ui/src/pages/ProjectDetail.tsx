@@ -13,6 +13,7 @@ import {
 } from "../services/api";
 
 import ShareButton from "../components/ShareButton";
+import Creator from "../components/Creator";
 import "./ProjectDetail.css";
 
 export default function ProjectDetail() {
@@ -111,7 +112,9 @@ export default function ProjectDetail() {
   if (error) return <div className="section error">Error: {error}</div>;
   if (!project) return <div className="section">Project not found</div>;
 
-  const isCreator = user?.id === project.user_id;
+  // Ownership is decided server-side (is_owner) so the raw user_id is never
+  // sent to the client; fall back to the id compare only if is_owner is absent.
+  const isCreator = project.is_owner ?? (!!user?.id && user.id === project.user_id);
 
   return (
     <div className="page">
@@ -135,7 +138,11 @@ export default function ProjectDetail() {
       <div className="project-detail-header">
         <h1>{project.title}</h1>
         <div className="project-detail-meta">
-          <span>by {project.user_id}</span>
+          <Creator
+            name={project.creator_name}
+            isAdmin={project.creator_is_admin}
+            prefix="by"
+          />
           <span>&middot;</span>
           <span>{new Date(project.created_at).toLocaleDateString()}</span>
           <span className={`status-badge ${project.status === "active" ? "status-active" : "status-archived"}`}>
@@ -259,7 +266,7 @@ export default function ProjectDetail() {
             <div key={c.id} className="project-comment-item">
               <div className="project-comment-content">{c.content}</div>
               <div className="project-comment-meta">
-                <span>{c.user_id}</span>
+                <Creator name={c.creator_name} isAdmin={c.creator_is_admin} />
                 <span>
                   {new Date(c.created_at).toLocaleDateString(undefined, {
                     month: "short",

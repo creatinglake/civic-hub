@@ -22,6 +22,13 @@ export interface CommunityInput {
   author_name: string | null;
   /** Resident chose to post anonymously (display-level only). */
   is_anonymous: boolean;
+  /**
+   * Whether the (non-anonymous) author is a hub admin, resolved at read
+   * time from author_id via the central creator resolver. Always false
+   * for anonymous comments — anonymity is never pierced, even for admins.
+   * Attached by the read/list controller, not persisted.
+   */
+  author_is_admin?: boolean;
   body: string;
   submitted_at: string; // ISO 8601
   phase: CommentPhase | null;

@@ -13,6 +13,7 @@ import { getAuthUser, isAdminEmail } from "../middleware/auth.js";
 import { emitEvent } from "../events/eventEmitter.js";
 import { getUserFromToken } from "../modules/civic.auth/index.js";
 import { getCommentIdentityMode } from "../services/hubSettings.js";
+import { resolveCreators } from "../services/creatorDisplay.js";
 
 const HUB_ID = "civic-hub-local";
 
@@ -176,8 +177,22 @@ export async function handleGetInputs(
       }
     }
 
+    // Resolve author admin-status in ONE query, for non-anonymous comments
+    // only. Anonymity is never pierced — anonymous comments stay
+    // author_is_admin=false regardless of who posted them.
+    const authorIds = inputs
+      .filter((c) => !c.is_anonymous)
+      .map((c) => c.author_id)
+      .filter((id) => id.length > 0);
+    const creatorMap = await resolveCreators(authorIds);
+    const withAdmin = inputs.map((c) => ({
+      ...c,
+      author_is_admin:
+        !c.is_anonymous && (creatorMap.get(c.author_id)?.is_admin ?? false),
+    }));
+
     const isAdmin = await callerIsAdmin(req);
-    res.json(isAdmin ? inputs : inputs.map(redactForPublic));
+    res.json(isAdmin ? withAdmin : withAdmin.map(redactForPublic));
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
     res.status(500).json({ error: message });

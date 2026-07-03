@@ -26,6 +26,7 @@ import {
   saveProcessState,
 } from "../services/processService.js";
 import { getAuthUser, isAdminEmail } from "../middleware/auth.js";
+import { enrichCreator } from "../services/creatorDisplay.js";
 import { getUserFromToken, getUser } from "../modules/civic.auth/index.js";
 import { extractUrls } from "../modules/civic.link_preview/index.js";
 import { warmPreviewsInBackground } from "../services/linkPreviewCache.js";
@@ -153,7 +154,13 @@ export async function handleCreateAnnouncement(
     if (allUrls.length > 0) warmPreviewsInBackground(allUrls);
 
     res.status(201).json(
-      getPublicReadModel(state, { id: record.id, createdAt: record.createdAt }),
+      await enrichCreator(
+        getPublicReadModel(state, {
+          id: record.id,
+          createdAt: record.createdAt,
+        }),
+        { rawIdField: "author_id", keepRawId: true },
+      ),
     );
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
@@ -223,10 +230,13 @@ export async function handleUpdateAnnouncement(
       if (allUrls.length > 0) warmPreviewsInBackground(allUrls);
 
       res.json({
-        ...getPublicReadModel(outcome.state, {
-          id: record.id,
-          createdAt: record.createdAt,
-        }),
+        ...(await enrichCreator(
+          getPublicReadModel(outcome.state, {
+            id: record.id,
+            createdAt: record.createdAt,
+          }),
+          { rawIdField: "author_id", keepRawId: true },
+        )),
         edited_fields: outcome.result.edited_fields,
       });
     } catch (err) {
@@ -280,10 +290,17 @@ export async function handleGetAnnouncement(
     // image / links to a tombstone if the announcement was removed.
     const isAdmin = await callerIsAdmin(req);
     const meta = { id: record.id, createdAt: record.createdAt };
+    // Attach resolved author attribution (name + admin flag) from author_id.
+    // author_id is retained (not rendered anywhere) so the announcement page
+    // can still gate the owner's edit affordance (user.id === author_id).
+    const model = isAdmin
+      ? getAdminReadModel(getState(record), meta)
+      : getPublicReadModel(getState(record), meta);
     res.json(
-      isAdmin
-        ? getAdminReadModel(getState(record), meta)
-        : getPublicReadModel(getState(record), meta),
+      await enrichCreator(model, {
+        rawIdField: "author_id",
+        keepRawId: true,
+      }),
     );
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";

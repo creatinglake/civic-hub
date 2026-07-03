@@ -11,6 +11,7 @@ import { relativeTime, absoluteTime } from "../components/FeedPost";
 import PostFeaturedImage from "../components/PostFeaturedImage";
 import LinkPreviewCard from "../components/LinkPreviewCard";
 import ShareButton from "../components/ShareButton";
+import Creator from "../components/Creator";
 import "./Announcement.css";
 
 const URL_RE = /\bhttps?:\/\/\S+/gi;
@@ -83,9 +84,6 @@ export default function AnnouncementPage() {
   // normalize for display. Everything else renders verbatim.
   const roleLabel =
     announcement.author_role === "board" ? "Board member" : announcement.author_role;
-  const authorAttribution = announcement.author_display_name
-    ? `${announcement.author_display_name}, ${roleLabel}`
-    : roleLabel;
   const isAdminLabel = roleLabel === "Admin";
   const canEdit =
     isAdmin || (!!user?.id && user.id === announcement.author_id);
@@ -143,7 +141,11 @@ export default function AnnouncementPage() {
         </p>
         <h1>{announcement.title}</h1>
         <p className="announcement-meta">
-          Posted by {authorAttribution}{" "}
+          <Creator
+            name={announcement.creator_name}
+            isAdmin={announcement.creator_is_admin}
+            prefix="Posted by"
+          />{" "}
           <time
             dateTime={announcement.created_at}
             title={absoluteTime(announcement.created_at)}

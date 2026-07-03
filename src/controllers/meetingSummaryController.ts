@@ -48,6 +48,7 @@ import {
   saveProcessState,
 } from "../services/processService.js";
 import { getAuthUser } from "../middleware/auth.js";
+import { enrichCreator } from "../services/creatorDisplay.js";
 import { callClaude, DEFAULT_MODEL } from "../utils/anthropic.js";
 import { fetchHtml, fetchPdf } from "../utils/http.js";
 import { fetchYouTubeTranscript } from "../utils/youtube.js";
@@ -471,12 +472,15 @@ export async function handleAdminGetMeetingSummary(
       return;
     }
     res.json(
-      getAdminReadModel(summaryState(record), {
-        id: record.id,
-        title: record.title,
-        createdAt: record.createdAt,
-        createdBy: record.createdBy,
-      }),
+      await enrichCreator(
+        getAdminReadModel(summaryState(record), {
+          id: record.id,
+          title: record.title,
+          createdAt: record.createdAt,
+          createdBy: record.createdBy,
+        }),
+        { keepRawId: true },
+      ),
     );
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
@@ -533,12 +537,15 @@ export async function handlePatchMeetingSummary(
     await saveProcessState(record);
 
     res.json(
-      getAdminReadModel(state, {
-        id: record.id,
-        title: record.title,
-        createdAt: record.createdAt,
-        createdBy: record.createdBy,
-      }),
+      await enrichCreator(
+        getAdminReadModel(state, {
+          id: record.id,
+          title: record.title,
+          createdAt: record.createdAt,
+          createdBy: record.createdBy,
+        }),
+        { keepRawId: true },
+      ),
     );
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
@@ -583,12 +590,15 @@ export async function handleApproveMeetingSummary(
 
     res.json({
       message: "Meeting summary approved and published.",
-      meeting_summary: getAdminReadModel(state, {
-        id: record.id,
-        title: record.title,
-        createdAt: record.createdAt,
-        createdBy: record.createdBy,
-      }),
+      meeting_summary: await enrichCreator(
+        getAdminReadModel(state, {
+          id: record.id,
+          title: record.title,
+          createdAt: record.createdAt,
+          createdBy: record.createdBy,
+        }),
+        { keepRawId: true },
+      ),
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";

@@ -24,6 +24,7 @@
 
 import { Request, Response } from "express";
 import { emitEvent } from "../events/eventEmitter.js";
+import { enrichCreator } from "../services/creatorDisplay.js";
 import {
   approveVoteResults,
   editVoteResults,
@@ -145,12 +146,15 @@ export async function handleAdminGetVoteResults(
       res.status(404).json({ error: "Vote results not found" });
       return;
     }
-    const model = getAdminReadModel(voteResultsState(record), {
-      id: record.id,
-      title: record.title,
-      createdAt: record.createdAt,
-      createdBy: record.createdBy,
-    });
+    const model = await enrichCreator(
+      getAdminReadModel(voteResultsState(record), {
+        id: record.id,
+        title: record.title,
+        createdAt: record.createdAt,
+        createdBy: record.createdBy,
+      }),
+      { keepRawId: true },
+    );
     res.json(model);
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
@@ -220,12 +224,15 @@ export async function handlePatchVoteResults(
     const noteUrls = extractUrls(state.content.admin_notes);
     if (noteUrls.length > 0) warmPreviewsInBackground(noteUrls);
 
-    const model = getAdminReadModel(state, {
-      id: record.id,
-      title: record.title,
-      createdAt: record.createdAt,
-      createdBy: record.createdBy,
-    });
+    const model = await enrichCreator(
+      getAdminReadModel(state, {
+        id: record.id,
+        title: record.title,
+        createdAt: record.createdAt,
+        createdBy: record.createdBy,
+      }),
+      { keepRawId: true },
+    );
     res.json(model);
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
@@ -335,12 +342,15 @@ export async function handleApproveVoteResults(
     record.status = "finalized";
     await saveProcessState(record);
 
-    const model = getAdminReadModel(state, {
-      id: record.id,
-      title: record.title,
-      createdAt: record.createdAt,
-      createdBy: record.createdBy,
-    });
+    const model = await enrichCreator(
+      getAdminReadModel(state, {
+        id: record.id,
+        title: record.title,
+        createdAt: record.createdAt,
+        createdBy: record.createdBy,
+      }),
+      { keepRawId: true },
+    );
     res.json({
       message: "Vote results approved and published.",
       vote_results: model,

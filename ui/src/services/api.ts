@@ -90,7 +90,13 @@ interface ProcessSummaryBase {
   title: string;
   status: string;
   created_at: string;
+  // Raw id is redacted server-side on public responses (always ""). Use
+  // creator_name / creator_is_admin for attribution.
   created_by: string;
+  /** Resolved display name of the creator (full_name ?? display_name ?? "Resident"). */
+  creator_name: string;
+  /** Whether the creator is a hub admin (email in CIVIC_ADMIN_EMAILS). */
+  creator_is_admin: boolean;
 }
 
 /** Vote summary (from GET /process list) */
@@ -154,6 +160,8 @@ export interface VoteState {
   result: { tally: Record<string, number>; total_votes: number; computed_at: string } | null;
   created_at: string;
   created_by: string;
+  creator_name: string;
+  creator_is_admin: boolean;
   jurisdiction?: string;
   content?: ProcessContent;
 }
@@ -172,6 +180,8 @@ export interface ProposalState {
   promoted_vote_id: string | null;
   created_at: string;
   created_by: string;
+  creator_name: string;
+  creator_is_admin: boolean;
 }
 
 export type ProcessState = VoteState | ProposalState;
@@ -251,7 +261,10 @@ export interface CivicProposalSummary {
   id: string;
   title: string;
   description: string;
+  // Raw id is redacted ("") on public responses; use creator_name.
   submitted_by: string;
+  creator_name: string;
+  creator_is_admin: boolean;
   status: CivicProposalStatus;
   support_count: number;
   support_threshold: number;
@@ -268,6 +281,8 @@ export interface CivicProposalDetail {
   description: string;
   optional_links: string[];
   submitted_by: string;
+  creator_name: string;
+  creator_is_admin: boolean;
   status: CivicProposalStatus;
   support_count: number;
   support_threshold: number;
@@ -488,7 +503,11 @@ export interface ProjectSummary {
   id: string;
   title: string;
   description: string;
+  // Redacted ("") on the public LIST; retained on the DETAIL only for the
+  // owner edit-affordance check. Never render it — use creator_name.
   user_id: string;
+  creator_name: string;
+  creator_is_admin: boolean;
   status: ProjectStatus;
   support_count: number;
   oppose_count: number;
@@ -510,7 +529,10 @@ export interface ProjectUpdateEntry {
 export interface ProjectComment {
   id: string;
   project_id: string;
+  // Raw id is redacted ("") on public responses; use creator_name.
   user_id: string;
+  creator_name: string;
+  creator_is_admin: boolean;
   content: string;
   created_at: string;
 }
@@ -520,6 +542,9 @@ export interface ProjectDetail extends ProjectSummary {
   updates: ProjectUpdateEntry[];
   user_sentiment: SentimentValue | null;
   comment_count: number;
+  // Server-computed: is the authenticated caller the project owner? Replaces
+  // the client-side user_id compare so the raw id stays off the wire.
+  is_owner?: boolean;
 }
 
 export function listProjects(status?: ProjectStatus): Promise<ProjectSummary[]> {
@@ -647,6 +672,8 @@ export interface CommunityInput {
   author_id: string;
   /** Real-name snapshot at post time; null for anonymous / legacy rows. */
   author_name: string | null;
+  /** Whether the (non-anonymous) author is a hub admin. Always false for anonymous. */
+  author_is_admin?: boolean;
   is_anonymous: boolean;
   body: string;
   submitted_at: string;
@@ -914,7 +941,13 @@ export interface Announcement {
   links: AnnouncementLink[];
   image_url: string | null;
   image_alt: string | null;
+  // Retained only for the owner edit-affordance check (never rendered as a
+  // label). Use creator_name / creator_is_admin for attribution.
   author_id: string;
+  /** Resolved display name of the author (full_name ?? display_name ?? "Resident"). */
+  creator_name: string;
+  /** Whether the author is a hub admin. */
+  creator_is_admin: boolean;
   author_role: AnnouncementAuthorRole;
   author_display_name: string | null;
   created_at: string;

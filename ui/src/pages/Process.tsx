@@ -5,6 +5,7 @@ import { useAuth } from "../context/AuthContext";
 import { useRequireAuth } from "../hooks/useRequireAuth";
 import VotePanel from "../components/VotePanel";
 import ProposalPanel from "../components/ProposalPanel";
+import Creator from "../components/Creator";
 import IssueContent from "../components/IssueContent";
 import CommunityInputPanel from "../components/CommunityInputPanel";
 import ProposalCommentForm from "../components/ProposalCommentForm";
@@ -122,7 +123,11 @@ export default function Process() {
       <p className="process-description">{process.description}</p>
 
       <div className="process-meta">
-        <span>Created by {process.created_by}</span>
+        <Creator
+          name={process.creator_name}
+          isAdmin={process.creator_is_admin}
+          prefix="Created by"
+        />
         <span>Created {formatDate(process.created_at)}</span>
         {isVote && process.status === "active" && (process as VoteState).closes_at && (
           <span>Vote closes on {formatDate((process as VoteState).closes_at!)}</span>

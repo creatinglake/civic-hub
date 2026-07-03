@@ -14,6 +14,7 @@ import {
   getProposalSummary,
   archiveProposal,
 } from "../modules/civic.proposals/index.js";
+import { enrichCreator, enrichCreators } from "../services/creatorDisplay.js";
 
 /**
  * GET /admin/proposals — list proposals for admin review.
@@ -39,7 +40,13 @@ export async function handleAdminListProposals(
     }
 
     const summaries = proposals.map(getProposalSummary);
-    res.json(summaries);
+    // Admin list: attach creator name + admin flag, but KEEP the raw
+    // submitted_by id — admins need it to uniquely identify submitters.
+    const enriched = await enrichCreators(summaries, {
+      rawIdField: "submitted_by",
+      keepRawId: true,
+    });
+    res.json(enriched);
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
     res.status(500).json({ error: message });
@@ -60,7 +67,13 @@ export async function handleAdminGetProposal(
       res.status(404).json({ error: "Proposal not found" });
       return;
     }
-    res.json(readModel);
+    // Admin detail: attach creator name + admin flag, keep raw id.
+    res.json(
+      await enrichCreator(readModel, {
+        rawIdField: "submitted_by",
+        keepRawId: true,
+      }),
+    );
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
     res.status(500).json({ error: message });

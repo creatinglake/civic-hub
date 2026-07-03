@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 import { emitEvent } from "../events/eventEmitter.js";
-import { getAuthUser } from "../middleware/auth.js";
+import { getAuthUser, resolveCallerId } from "../middleware/auth.js";
 import {
   createProject,
   listProjects,
@@ -12,6 +12,7 @@ import {
   listProjectComments,
 } from "../modules/civic.projects/index.js";
 import type { SentimentValue } from "../modules/civic.projects/models.js";
+import { enrichCreator, enrichCreators } from "../services/creatorDisplay.js";
 
 export async function handleCreateProject(
   req: Request,
@@ -54,7 +55,10 @@ export async function handleListProjects(
   try {
     const projects = await listProjects(status as any);
     const summaries = projects.map(getProjectSummary);
-    res.json(summaries);
+    // Resolve every creator in one query; attach name + admin flag and
+    // redact the raw user_id from this public list.
+    const enriched = await enrichCreators(summaries, { rawIdField: "user_id" });
+    res.json(enriched);
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
     res.status(500).json({ error: message });
@@ -66,15 +70,24 @@ export async function handleGetProject(
   res: Response,
 ): Promise<void> {
   const id = req.params.id as string;
-  const actor = req.query.actor as string | undefined;
+  // Caller identity comes from the session token, never from ?actor= (which
+  // let anyone read another user's sentiment by passing their id). Anonymous
+  // callers get the public read model with no per-actor fields.
+  const callerId = await resolveCallerId(req);
 
   try {
-    const readModel = await getProjectReadModel(id, actor);
+    const readModel = await getProjectReadModel(id, callerId);
     if (!readModel) {
       res.status(404).json({ error: "Project not found" });
       return;
     }
-    res.json(readModel);
+    // Owner edit-affordance is a server-computed boolean, so the raw user_id
+    // never leaves the API. enrichCreator redacts user_id (keepRawId omitted).
+    const isOwner =
+      !!callerId && (readModel as { user_id?: string }).user_id === callerId;
+    const enriched = await enrichCreator(readModel, { rawIdField: "user_id" });
+    enriched.is_owner = isOwner;
+    res.json(enriched);
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
     res.status(500).json({ error: message });
@@ -183,7 +196,12 @@ export async function handleListComments(
 
   try {
     const comments = await listProjectComments(projectId);
-    res.json(comments);
+    // Attach creator name + admin flag (batched) and redact raw user_id.
+    const enriched = await enrichCreators(
+      comments as unknown as Record<string, unknown>[],
+      { rawIdField: "user_id" },
+    );
+    res.json(enriched);
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
     res.status(500).json({ error: message });
