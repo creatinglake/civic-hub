@@ -21,8 +21,13 @@ jobs:
           node-version: "24"
 
       # --- Backend: install, typecheck (tsc), run infra-free unit tests ---
+      # Use `npm install` (not `npm ci`): the dep tree includes optional,
+      # platform-specific WASM bindings (@rolldown/@emnapi) that resolve to
+      # different versions on Linux vs macOS, so a macOS-generated lockfile
+      # fails `npm ci`'s cross-platform strictness. `npm install` tolerates it
+      # and matches what Vercel runs on deploy.
       - name: Backend install
-        run: npm ci
+        run: npm install --include=dev
       - name: Backend typecheck
         run: npm run build
       - name: Backend unit tests
@@ -32,7 +37,7 @@ jobs:
 
       # --- UI: install, real typecheck + build (tsc -b && vite build) ---
       - name: UI install
-        run: npm ci
+        run: npm install --include=dev
         working-directory: ui
       - name: UI build
         run: npm run build
