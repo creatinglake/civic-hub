@@ -83,6 +83,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  // Global 401 handler: the API client dispatches "civic:auth-expired" when a
+  // request returns 401 (dead/expired session). Drop to logged-out state so
+  // the user is prompted to sign in again instead of every action failing
+  // silently with a stale token.
+  useEffect(() => {
+    const onExpired = () => {
+      clearToken();
+      setToken(null);
+      setUser(null);
+      setRole(null);
+      setAuthorLabel(null);
+    };
+    window.addEventListener("civic:auth-expired", onExpired);
+    return () => window.removeEventListener("civic:auth-expired", onExpired);
+  }, []);
+
   const login = useCallback(
     (
       newToken: string,

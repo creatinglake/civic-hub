@@ -38,6 +38,12 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
   });
 
   if (!res.ok) {
+    if (res.status === 401) {
+      // Session expired or invalid. Signal the app to drop to logged-out
+      // state (AuthProvider listens) instead of leaving the user "logged in"
+      // while every action fails with an opaque error.
+      window.dispatchEvent(new CustomEvent("civic:auth-expired"));
+    }
     const err = await res.json().catch(() => ({ error: res.statusText }));
     throw new Error(err.error ?? `Request failed: ${res.status}`);
   }

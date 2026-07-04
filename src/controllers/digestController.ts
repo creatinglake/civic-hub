@@ -39,6 +39,11 @@ import { baseUrl, uiBaseUrl } from "../utils/baseUrl.js";
 import { getAuthUser } from "../middleware/auth.js";
 
 const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
+// Slack subtracted from the next-due calculation so a daily cron firing at a
+// fixed wall-clock time isn't off-by-seconds against the prior send's
+// completion timestamp (which silently halved the send frequency). Comfortably
+// smaller than a day, so it can't cause a double-send within one cron cadence.
+const CADENCE_SLACK_MS = 6 * 60 * 60 * 1000; // 6 hours
 const HUB_NAME_FALLBACK = "Floyd Civic Hub";
 
 function hubName(): string {
@@ -232,10 +237,15 @@ export async function handleRunDigest(
       try {
         // Frequency-aware skip: if the user has a frequency > 1 day and
         // their last digest was sent less than frequency_days ago, skip.
+        // Subtract a slack window so a daily cron that fires at the same
+        // wall-clock time each day isn't judged "a few seconds early" against
+        // the previous send's *completion* timestamp — that off-by-seconds
+        // silently turned a daily digest into an every-other-day one.
         const freqDays = user.digest_frequency_days ?? 1;
         if (user.last_digest_sent_at) {
           const lastSent = new Date(user.last_digest_sent_at).getTime();
-          const nextDue = lastSent + freqDays * 24 * 60 * 60 * 1000;
+          const nextDue =
+            lastSent + freqDays * 24 * 60 * 60 * 1000 - CADENCE_SLACK_MS;
           if (now < nextDue) {
             skipped += 1;
             continue;
