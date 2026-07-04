@@ -19,7 +19,7 @@ export default function About() {
       <section className="about-section">
         <h2>What is the Floyd County Civic Hub?</h2>
         <p>
-          The Floyd County Civic Hub is a pilot project aimed at improving how
+          The Floyd County Civic Hub is a pilot program aimed at improving how
           our community understands and expresses public sentiment on local issues.
         </p>
         <p>
@@ -98,7 +98,7 @@ export default function About() {
 
       <section className="about-section">
         <h2>What comes next</h2>
-        <p>This is an early pilot.</p>
+        <p>This is an early pilot program.</p>
         <p>Future iterations may include:</p>
         <ul>
           <li>Additional civic processes</li>

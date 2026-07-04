@@ -36,7 +36,7 @@ export default function WelcomeBanner() {
       <div className="welcome-banner-inner">
         <div className="welcome-banner-content">
           <h2 className="welcome-banner-title">
-            Welcome — the {hub.name} is a community pilot
+            Welcome — the {hub.name} is a community pilot program
           </h2>
           <p className="welcome-banner-body">
             A new space to follow county government, raise the issues that
