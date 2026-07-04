@@ -64,8 +64,6 @@ export async function handleSubmitForReview(
     const content = body.content as Record<string, unknown> | undefined;
     const config = body.config as Record<string, unknown> | undefined;
     const state = body.state as Record<string, unknown> | undefined;
-    const creator_name = body.creator_name as string | undefined;
-    const creator_email = body.creator_email as string | undefined;
 
     if (!process_type || !title || !description) {
       res
@@ -74,12 +72,11 @@ export async function handleSubmitForReview(
       return;
     }
 
-    if (!creator_name || !creator_email) {
-      res
-        .status(400)
-        .json({ error: "creator_name and creator_email are required" });
-      return;
-    }
+    // Creator identity comes from the authenticated session, NEVER the request
+    // body. Taking creator_email from the body let a resident make the hub send
+    // review emails to an arbitrary address (an email-relay / phishing vector).
+    const creator_email = user.email;
+    const creator_name = user.full_name ?? user.display_name ?? user.email;
 
     const result = await submitForReview({
       process_type,

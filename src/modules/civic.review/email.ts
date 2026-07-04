@@ -2,6 +2,21 @@ import { sendEmail } from "../../utils/email.js";
 import { uiBaseUrl } from "../../utils/baseUrl.js";
 
 /**
+ * Escape user-controlled values before interpolating into email HTML. Without
+ * this, a resident could put markup (a phishing link, tracking pixel, or
+ * spoofed content) in a process title or a review note and have the hub send
+ * it as hub-branded HTML to the creator or admin.
+ */
+function esc(s: string): string {
+  return String(s)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+/**
  * Send via Resend (the same path used by the digest and OTP sign-in) and
  * surface failures loudly. The review module previously used the SMTP
  * mailer, whose env vars aren't set in prod — so every review email
@@ -46,8 +61,8 @@ export async function notifyCreatorSubmitted(input: {
     to: input.creator_email,
     subject: `Your ${typeLabel} "${input.title}" is in review`,
     html: `
-      <p>Hi ${input.creator_name},</p>
-      <p>Your ${typeLabel} <strong>"${input.title}"</strong> has been submitted and is now in review.</p>
+      <p>Hi ${esc(input.creator_name)},</p>
+      <p>Your ${typeLabel} <strong>"${esc(input.title)}"</strong> has been submitted and is now in review.</p>
       <p>The hub admin will review it shortly. You'll be notified when there's an update.</p>
       <p><a href="${url}">View your submission status</a></p>
     `,
@@ -70,8 +85,8 @@ export async function notifyAdminNewSubmission(input: {
     to: input.admin_email,
     subject: `New ${typeLabel} "${input.title}" submitted for review by ${input.creator_name}`,
     html: `
-      <p>${input.creator_name} submitted a new ${typeLabel} for review:</p>
-      <p><strong>"${input.title}"</strong></p>
+      <p>${esc(input.creator_name)} submitted a new ${typeLabel} for review:</p>
+      <p><strong>"${esc(input.title)}"</strong></p>
       <p><a href="${url}">Review it now</a></p>
     `,
     text: `${input.creator_name} submitted a new ${typeLabel} for review:\n\n"${input.title}"\n\nReview it: ${url}`,
@@ -94,9 +109,9 @@ export async function notifyCreatorChangesRequested(input: {
     to: input.creator_email,
     subject: `Changes requested on your ${typeLabel} "${input.title}"`,
     html: `
-      <p>Hi ${input.creator_name},</p>
-      <p>The admin has requested changes on your ${typeLabel} <strong>"${input.title}"</strong>:</p>
-      <blockquote style="border-left: 3px solid #ccc; padding-left: 12px; color: #555;">${input.note}</blockquote>
+      <p>Hi ${esc(input.creator_name)},</p>
+      <p>The admin has requested changes on your ${typeLabel} <strong>"${esc(input.title)}"</strong>:</p>
+      <blockquote style="border-left: 3px solid #ccc; padding-left: 12px; color: #555;">${esc(input.note)}</blockquote>
       <p><a href="${url}">View and revise your submission</a></p>
     `,
     text: `Hi ${input.creator_name},\n\nThe admin has requested changes on your ${typeLabel} "${input.title}":\n\n"${input.note}"\n\nView and revise: ${url}`,
@@ -126,8 +141,8 @@ export async function notifyCreatorApproved(input: {
     to: input.creator_email,
     subject: `Your ${typeLabel} "${input.title}" is now live!`,
     html: `
-      <p>Hi ${input.creator_name},</p>
-      <p>Your ${typeLabel} <strong>"${input.title}"</strong> has been approved and is now live on the hub.</p>
+      <p>Hi ${esc(input.creator_name)},</p>
+      <p>Your ${typeLabel} <strong>"${esc(input.title)}"</strong> has been approved and is now live on the hub.</p>
       <p><a href="${url}">View your ${typeLabel}</a></p>
     `,
     text: `Hi ${input.creator_name},\n\nYour ${typeLabel} "${input.title}" has been approved and is now live on the hub.\n\nView it: ${url}`,
@@ -150,9 +165,9 @@ export async function notifyCreatorDeclined(input: {
     to: input.creator_email,
     subject: `Your ${typeLabel} "${input.title}" was not approved`,
     html: `
-      <p>Hi ${input.creator_name},</p>
-      <p>Your ${typeLabel} <strong>"${input.title}"</strong> was not approved for the following reason:</p>
-      <blockquote style="border-left: 3px solid #ccc; padding-left: 12px; color: #555;">${input.reason}</blockquote>
+      <p>Hi ${esc(input.creator_name)},</p>
+      <p>Your ${typeLabel} <strong>"${esc(input.title)}"</strong> was not approved for the following reason:</p>
+      <blockquote style="border-left: 3px solid #ccc; padding-left: 12px; color: #555;">${esc(input.reason)}</blockquote>
       <p><a href="${url}">View details</a></p>
     `,
     text: `Hi ${input.creator_name},\n\nYour ${typeLabel} "${input.title}" was not approved.\n\nReason: ${input.reason}\n\nView details: ${url}`,
@@ -174,8 +189,8 @@ export async function notifyAdminResubmitted(input: {
     to: input.admin_email,
     subject: `${input.creator_name} revised their ${typeLabel} "${input.title}"`,
     html: `
-      <p>${input.creator_name} has revised and resubmitted their ${typeLabel}:</p>
-      <p><strong>"${input.title}"</strong></p>
+      <p>${esc(input.creator_name)} has revised and resubmitted their ${typeLabel}:</p>
+      <p><strong>"${esc(input.title)}"</strong></p>
       <p><a href="${url}">Review it now</a></p>
     `,
     text: `${input.creator_name} has revised and resubmitted their ${typeLabel}:\n\n"${input.title}"\n\nReview it: ${url}`,
@@ -194,8 +209,8 @@ export async function notifyAdminWithdrawn(input: {
     to: input.admin_email,
     subject: `${input.creator_name} withdrew their ${typeLabel} "${input.title}"`,
     html: `
-      <p>${input.creator_name} has withdrawn their ${typeLabel}:</p>
-      <p><strong>"${input.title}"</strong></p>
+      <p>${esc(input.creator_name)} has withdrawn their ${typeLabel}:</p>
+      <p><strong>"${esc(input.title)}"</strong></p>
       <p>No action needed — it has been removed from the review queue.</p>
     `,
     text: `${input.creator_name} has withdrawn their ${typeLabel}:\n\n"${input.title}"\n\nNo action needed — it has been removed from the review queue.`,
