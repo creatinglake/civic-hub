@@ -4,6 +4,91 @@ Updated after every Claude Code session. Records what was built, what's incomple
 
 ---
 
+## Launch-critical security hardening (audit §2 punch-list) — 2026-07-04
+
+Worked down the pre-Aug-11 launch-critical list from the code audit
+(`decisions/audit-2026-07-03-civic-hub-code.md` in the meta-repo). All items below
+are **committed and deployed to prod** (Vercel) unless noted, each dev-verified /
+prod-verified as called out. Deploys are per-commit; login-touching changes were
+verified on prod by Adam (dev uses the `000000` bypass, which short-circuits the
+real OTP path, so the real auth flow can only be tested on prod).
+
+### Shipped this session
+- **Ballot privacy + authz (P1 cluster)** — commit `0438e8b`. Closed all 4
+  user↔ballot leak vectors (see the 2026-07-03 entry below for detail);
+  `GET /process/:id` now returns the gated read-model projection (not raw state);
+  `POST /process/:id/action` admin-gates lifecycle actions (activate/close/
+  propose/snapshot) so a resident can't drive another process's lifecycle or
+  bypass the review queue. **Verified on prod** (cast a real vote, confirmed no
+  `vote_submitted` in the public `/events`, receipt anonymous, tally correct).
+- **Site-wide creator names + Admin badge** — commit `3fd889d` (+ `e151d76`
+  legacy-comment fix). Central `creatorDisplay.ts` resolver (batch ids →
+  `{name, is_admin}`, `full_name ?? display_name ?? "Resident"`, `select("*")` +
+  graceful-degrade so schema drift can't crash content). Raw `user_xxxx`
+  retired from all public surfaces; `<Creator>` component + "Admin" pill.
+  Project detail: `is_owner` computed server-side, replaces `?actor=`. **Verified
+  on prod.**
+- **CI** (#11) — `.github/workflows/ci.yml`, commits `e6b58e2` → `4dfe0bf`.
+  Backend `tsc` + infra-free `tests/unit` + real UI build on every push/PR.
+  Uses `npm install` (NOT `npm ci`): the dep tree has optional platform-specific
+  WASM bindings (`@rolldown`/`@emnapi`) that break `npm ci`'s cross-platform
+  lockfile strictness; `npm install` matches Vercel. **CI is green** (watched to
+  completion). First run also caught + fixed stale vote-tally unit tests (the
+  ballot refactor changed `computeTally(map)` → `computeTally(Ballot[])`).
+- **Prod boot guards + terminal error handler** (#13) — commit `7b3335a`. Demo
+  bypass (`CIVIC_DEMO_BYPASS_CODE`) is now **inert when `NODE_ENV=production`**
+  (fail-SAFE, not refuse-to-boot, so a misconfig can't cause an outage). Added a
+  last-resort Express error handler. Seed already prod-safe via host denylist.
+- **OTP hardening (P1 — account takeover)** (#5) — commits `9ec8e7c` (cap +
+  crypto RNG + 30s throttle) and `2ddcef5` (15-min lockout + Resend button).
+  `crypto.randomInt` for codes; 5 wrong guesses → email locked 15 min (verify +
+  request-code both refused with a "try again in ~N minutes" message); 30s
+  resend throttle; "Resend code" button added to the verify popup.
+  **Verified on prod** (login works; 15-min lockout confirmed). Migrations
+  `20260703010000_otp_attempts` + `20260704000000_otp_lockout` applied dev+prod.
+- **401 handling + digest cadence** (#15, #14) — commit `07576a4`. API client
+  dispatches `civic:auth-expired` on 401 → AuthProvider drops to logged-out.
+  Digest next-due check subtracts a 6h slack so a daily digest stops silently
+  degrading to every-other-day.
+- **Review-email escaping + creator-from-session** (#9) — commit `0671a82`.
+  `esc()` around all user content in review-email HTML; `handleSubmitForReview`
+  derives creator email/name from the session, not the request body (closed an
+  email-relay / phishing vector).
+- **Copy** — commit `536d3f1`. "pilot" → "pilot program" (welcome banner + About)
+  per resident feedback (misread as "plot").
+
+### Still open on the audit §2 punch-list (next session)
+- **SSRF in link-preview redirects** (#10) — code-only. Re-validate on every
+  redirect hop; block link-local/metadata (169.254.x) + RFC1918; check resolved
+  IPs. (News-sync fetcher is already safe — hard-restricted to floydcova.gov.)
+- **HUB_ID consolidation** (#16) — code-only. `"civic-hub-local"` hardcoded in
+  ~7 files → one env-backed `config/hub.ts` (default preserved so it can't break
+  provenance); also `CIVIC_JURISDICTION` is read only by the manifest while
+  emitters default to `"local"`.
+- **RLS on 5 tables** (#8) — needs a migration. `link_previews`,
+  `feedback_submissions`, `wordcloud_submissions`, `deliberation_submissions`,
+  `deliberation_votes` have no RLS (backstop gap; service-role bypasses it, so
+  not an active breach). ENABLE + FORCE for uniform default-deny.
+- **Concurrency atomic-claims** (#7) — the careful one; touches vote-writing.
+  Lazy-close and threshold-activation are check-then-act; add conditional
+  `UPDATE … WHERE status=…` returning affected rows so only the winner
+  emits/spawns. Do last, dev-first, with tests.
+- Smaller: dev `/debug/seed` wipe collides with append-only `review_turns` +
+  `wordcloud_submissions` FK (dev-only; unblock with
+  `TRUNCATE review_turns, process_reviews, wordcloud_submissions CASCADE`);
+  dev/prod schema-drift sync (dev was behind on `display_name` migration);
+  announcement GET still keeps `author_id` in public JSON for the edit-form owner
+  check (low concern — official posts; convert to `is_owner` like projects).
+
+### Related planning artifacts (this multi-session effort)
+- **Ecosystem architecture audit** (Step 1): `decisions/audit-2026-07-02-ecosystem-architecture.md` (meta-repo).
+- **civic-social-docs consolidation** (four-spec canon Space·Process·Activity·Identity):
+  PR #7 on `creatinglake/civic-social-docs`, branch `spec-consolidation-v0.2` — awaiting review.
+- **Civic Hub code audit** (Step 2): `decisions/audit-2026-07-03-civic-hub-code.md` (meta-repo) — the source of the §2 punch-list above.
+- Meta-repo `/specs/*` still needs deprecation-pointer stubs, and `specs/civic-activity.md` there is still untracked (`git add` it before it's lost).
+
+---
+
 ## Identity & anonymity: ballot secrecy, required real names, opt-in anonymous comments — 2026-07-03
 
 Full identity/anonymity pass for the Aug 11 launch. Backend `tsc` clean, UI `npm run build` (tsc -b) clean. **NOT yet committed, and the three new migrations are NOT yet applied to any database** — apply to dev first (see below).
