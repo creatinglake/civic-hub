@@ -59,6 +59,7 @@ export default function AuthModal({ onComplete, onDismiss }: Props) {
   const [gateChecked, setGateChecked] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
 
   // If user is already fully authenticated + resident + named, just complete
@@ -97,6 +98,23 @@ export default function AuthModal({ onComplete, onDismiss }: Props) {
       setStep("code");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to send code");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleResendCode() {
+    setError(null);
+    setNotice(null);
+    setLoading(true);
+    try {
+      await requestCode(email.trim());
+      setCode("");
+      setNotice("A new code has been sent to your email.");
+    } catch (err) {
+      // Backend enforces a 30s resend throttle and the lockout window; surface
+      // whatever message it returns ("Please wait…", "Too many attempts…").
+      setError(err instanceof Error ? err.message : "Failed to resend code");
     } finally {
       setLoading(false);
     }
@@ -318,6 +336,7 @@ export default function AuthModal({ onComplete, onDismiss }: Props) {
             </div>
 
             {error && <p className="form-error">{error}</p>}
+            {notice && <p className="auth-hint">{notice}</p>}
 
             <button
               type="submit"
@@ -330,7 +349,15 @@ export default function AuthModal({ onComplete, onDismiss }: Props) {
             <button
               type="button"
               className="auth-back-link"
-              onClick={() => { setStep("email"); setCode(""); setError(null); }}
+              onClick={handleResendCode}
+              disabled={loading}
+            >
+              Resend code
+            </button>
+            <button
+              type="button"
+              className="auth-back-link"
+              onClick={() => { setStep("email"); setCode(""); setError(null); setNotice(null); }}
               disabled={loading}
             >
               Use a different email

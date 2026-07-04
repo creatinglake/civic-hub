@@ -28,6 +28,11 @@ const OTP_TTL_MS = 10 * 60 * 1000; // 10 minutes
 // can't reset the cap by re-requesting.
 const MAX_VERIFY_ATTEMPTS = 5;
 const REQUEST_THROTTLE_MS = 30 * 1000; // 30s between code requests per email
+// After MAX_VERIFY_ATTEMPTS wrong guesses the email is locked for this long —
+// both verifying and requesting a new code are refused until it passes. Caps a
+// patient brute-force attacker at 5 guesses per lockout window (negligible),
+// while staying forgiving for a legit user who mistyped a few times.
+const LOCKOUT_MS = 15 * 60 * 1000; // 15 minutes
 
 // --- OTP / token generation ---
 
@@ -35,6 +40,15 @@ function generateOTP(): string {
   // Cryptographically secure — Math.random() is predictable and unfit for a
   // security credential.
   return randomInt(100000, 1000000).toString();
+}
+
+/** Human-friendly "try again in ~N minutes" message for a lockout. */
+function lockoutMessage(lockedUntilIso: string): string {
+  const mins = Math.max(
+    1,
+    Math.ceil((new Date(lockedUntilIso).getTime() - Date.now()) / 60000),
+  );
+  return `Too many incorrect attempts. Please try again in about ${mins} minute${mins === 1 ? "" : "s"}.`;
 }
 
 function generateToken(): string {
@@ -143,14 +157,19 @@ export async function requestVerification(
     }
   }
 
+  const { data: recent } = await getDb()
+    .from("pending_verifications")
+    .select("created_at, locked_until")
+    .eq("email", normalizedEmail)
+    .maybeSingle();
+  // Lockout: if this email is in its post-brute-force cooldown, refuse to issue
+  // a new code (otherwise the lockout is trivially escaped by re-requesting).
+  if (recent?.locked_until && Date.now() < new Date(recent.locked_until).getTime()) {
+    throw new Error(lockoutMessage(recent.locked_until));
+  }
   // Throttle: reject a fresh code if one was requested for this email very
   // recently. Without this an attacker could reset the wrong-guess cap by
   // simply re-requesting a new code each time.
-  const { data: recent } = await getDb()
-    .from("pending_verifications")
-    .select("created_at")
-    .eq("email", normalizedEmail)
-    .maybeSingle();
   if (
     recent?.created_at &&
     Date.now() - new Date(recent.created_at).getTime() < REQUEST_THROTTLE_MS
@@ -171,6 +190,7 @@ export async function requestVerification(
         expires_at: expires.toISOString(),
         created_at: now.toISOString(),
         attempts: 0, // fresh code, reset the wrong-guess counter
+        locked_until: null, // and clear any expired lockout
       },
       { onConflict: "email" },
     );
@@ -264,6 +284,14 @@ export async function verifyCode(
         "No pending verification for this email. Request a new code.",
       );
     }
+    // Lockout: if the email is in its post-brute-force cooldown, refuse to
+    // verify regardless of the code entered.
+    if (
+      pending.locked_until &&
+      new Date() < new Date(pending.locked_until)
+    ) {
+      throw new Error(lockoutMessage(pending.locked_until));
+    }
     if (new Date() > new Date(pending.expires_at)) {
       await db
         .from("pending_verifications")
@@ -272,16 +300,17 @@ export async function verifyCode(
       throw new Error("Verification code expired. Request a new code.");
     }
     if (pending.code !== code) {
-      // Count the wrong guess; after MAX_VERIFY_ATTEMPTS, burn the code so the
-      // attacker must request a new one (which is throttled). This is the core
-      // anti-brute-force defense.
+      // Count the wrong guess; after MAX_VERIFY_ATTEMPTS, lock the email for
+      // LOCKOUT_MS (both verify and request-code refuse until it passes). This
+      // is the core anti-brute-force defense.
       const attempts = (pending.attempts ?? 0) + 1;
       if (attempts >= MAX_VERIFY_ATTEMPTS) {
+        const lockedUntil = new Date(Date.now() + LOCKOUT_MS).toISOString();
         await db
           .from("pending_verifications")
-          .delete()
+          .update({ attempts, locked_until: lockedUntil })
           .eq("email", normalizedEmail);
-        throw new Error("Too many incorrect attempts. Request a new code.");
+        throw new Error(lockoutMessage(lockedUntil));
       }
       await db
         .from("pending_verifications")
