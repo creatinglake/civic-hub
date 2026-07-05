@@ -42,9 +42,8 @@ import {
   resolveCreator,
   getCreator,
 } from "./creatorDisplay.js";
+import { HUB_ID, DEFAULT_JURISDICTION } from "../config/hub.js";
 
-const HUB_ID = "civic-hub-local";
-const DEFAULT_JURISDICTION = "local";
 
 // --- Row <-> model mapping -------------------------------------------------
 

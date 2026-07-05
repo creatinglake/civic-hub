@@ -10,9 +10,8 @@ import type { Process } from "../models/process.js";
 import type { ProcessHandler } from "./types.js";
 import type { PolisHostInterface } from "../shared/polis_deliberation/hostInterface.js";
 import type { PolisAdapter } from "../shared/polis_deliberation/adapter/types.js";
+import { HUB_ID, DEFAULT_JURISDICTION } from "../config/hub.js";
 
-const HUB_ID = "civic-hub-local";
-const DEFAULT_JURISDICTION = "local";
 
 let _adapter: PolisAdapter | null = null;
 

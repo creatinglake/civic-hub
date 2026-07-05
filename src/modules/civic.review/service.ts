@@ -23,9 +23,8 @@ import { emitEvent } from "../../events/eventEmitter.js";
 import { executeAction } from "../../services/processService.js";
 import { createProject } from "../civic.projects/index.js";
 import { createProposal } from "../civic.proposals/index.js";
+import { HUB_ID, DEFAULT_JURISDICTION } from "../../config/hub.js";
 
-const HUB_ID = "civic-hub-local";
-const DEFAULT_JURISDICTION = "local";
 
 function getAdminEmails(): string[] {
   return (process.env.CIVIC_ADMIN_EMAILS ?? "")

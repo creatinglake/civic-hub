@@ -14,8 +14,8 @@ import { emitEvent } from "../events/eventEmitter.js";
 import { getUserFromToken } from "../modules/civic.auth/index.js";
 import { getCommentIdentityMode } from "../services/hubSettings.js";
 import { resolveCreators } from "../services/creatorDisplay.js";
+import { HUB_ID } from "../config/hub.js";
 
-const HUB_ID = "civic-hub-local";
 
 async function proposalExists(id: string): Promise<boolean> {
   const { data } = await getDb()

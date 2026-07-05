@@ -1,8 +1,8 @@
 import type { CreateEventInput } from "../../models/event.js";
+import { HUB_ID } from "../../config/hub.js";
 
 export type EmitEventFn = (input: CreateEventInput) => Promise<unknown>;
 
-const HUB_ID = "civic-hub-local";
 
 interface EventContext {
   project_id: string;

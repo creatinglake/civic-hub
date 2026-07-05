@@ -29,6 +29,7 @@ import {
   type DeliberationSeedScenario,
 } from "../debug/seedData.js";
 import { getDb } from "../db/client.js";
+import { HUB_ID } from "../config/hub.js";
 
 // Production Supabase hostnames that MUST NEVER be seeded against.
 // Add a new entry whenever a new production project is provisioned.
@@ -96,7 +97,7 @@ async function seedDeliberation(
     status,
     content: null,
     state: p.state as unknown as Record<string, unknown>,
-    hub_id: "civic-hub-local",
+    hub_id: HUB_ID,
     created_by: p.createdBy,
     source_proposal_id: null,
     starts_at: null,
@@ -115,7 +116,7 @@ async function seedDeliberation(
     event_type: "civic.process.created",
     actor: p.createdBy,
     process_id: p.id,
-    hub_id: "civic-hub-local",
+    hub_id: HUB_ID,
     jurisdiction: p.jurisdiction ?? "local",
     data: {
       process: {
