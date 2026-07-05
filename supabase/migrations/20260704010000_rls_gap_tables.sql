@@ -6,21 +6,26 @@
 -- PII: feedback_submissions (name/email), deliberation_votes (who voted on
 -- which statement).
 --
--- Apply via Supabase → SQL Editor (dev, then prod). Safe on a running system:
--- service-role access is unchanged; there is no client-side anon path to these
--- tables today.
-
-ALTER TABLE link_previews            ENABLE ROW LEVEL SECURITY;
-ALTER TABLE link_previews            FORCE  ROW LEVEL SECURITY;
-
-ALTER TABLE feedback_submissions     ENABLE ROW LEVEL SECURITY;
-ALTER TABLE feedback_submissions     FORCE  ROW LEVEL SECURITY;
-
-ALTER TABLE wordcloud_submissions    ENABLE ROW LEVEL SECURITY;
-ALTER TABLE wordcloud_submissions    FORCE  ROW LEVEL SECURITY;
-
-ALTER TABLE deliberation_submissions ENABLE ROW LEVEL SECURITY;
-ALTER TABLE deliberation_submissions FORCE  ROW LEVEL SECURITY;
-
-ALTER TABLE deliberation_votes       ENABLE ROW LEVEL SECURITY;
-ALTER TABLE deliberation_votes       FORCE  ROW LEVEL SECURITY;
+-- Guarded per-table so it runs cleanly on any environment even if some tables
+-- haven't been created yet (dev/prod migration drift). Apply via Supabase →
+-- SQL Editor (dev, then prod). Safe on a running system: service-role access is
+-- unchanged; there is no client-side anon path to these tables today.
+DO $$
+DECLARE t text;
+BEGIN
+  FOREACH t IN ARRAY ARRAY[
+    'link_previews','feedback_submissions','wordcloud_submissions',
+    'deliberation_submissions','deliberation_votes'
+  ] LOOP
+    IF EXISTS (
+      SELECT 1 FROM information_schema.tables
+      WHERE table_schema = 'public' AND table_name = t
+    ) THEN
+      EXECUTE format('ALTER TABLE public.%I ENABLE ROW LEVEL SECURITY', t);
+      EXECUTE format('ALTER TABLE public.%I FORCE  ROW LEVEL SECURITY', t);
+      RAISE NOTICE 'RLS enabled on %', t;
+    ELSE
+      RAISE NOTICE 'skipped (table missing): %', t;
+    END IF;
+  END LOOP;
+END $$;
