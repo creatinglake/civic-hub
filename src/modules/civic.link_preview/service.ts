@@ -41,10 +41,15 @@ export function validatePreviewUrl(input: string): { url: string } | { error: st
     host.endsWith(".local") ||
     /^10\./.test(host) ||
     /^192\.168\./.test(host) ||
-    /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(host)
+    /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(host) ||
+    /^169\.254\./.test(host) || // link-local / cloud metadata
+    /^100\.(6[4-9]|[7-9][0-9]|1[0-1][0-9]|12[0-7])\./.test(host) // CGNAT 100.64/10
   ) {
     return { error: "Internal hosts are not allowed." };
   }
+  // Note: this is only a fast string gate. The fetcher (linkPreviewFetcher.ts)
+  // runs the authoritative check — it resolves the host to its real IP and
+  // re-validates every redirect hop via assertPublicUrl().
   return { url: parsed.toString() };
 }
 

@@ -5,6 +5,7 @@
 // for relative-link resolution in the parser.
 
 import type { FetchHtmlFn } from "../modules/civic.link_preview/index.js";
+import { assertPublicUrl } from "../utils/ssrfGuard.js";
 
 export const fetchHtmlForPreview: FetchHtmlFn = async (url, opts) => {
   const controller = new AbortController();
@@ -13,6 +14,9 @@ export const fetchHtmlForPreview: FetchHtmlFn = async (url, opts) => {
   let current = url;
   let redirects = 0;
   try {
+    // SSRF guard on the initial URL: resolve the host and reject if it points
+    // at an internal address. Re-checked on every redirect hop below.
+    await assertPublicUrl(current);
     // Manual redirect loop — `redirect: "manual"` lets us surface the
     // hop count and stop early if the server is bouncing us in a loop.
     while (true) {
@@ -41,6 +45,9 @@ export const fetchHtmlForPreview: FetchHtmlFn = async (url, opts) => {
           throw new Error(`Exceeded ${opts.maxRedirects} redirects`);
         }
         const next = new URL(location, current).toString();
+        // Re-validate the redirect target — a public URL can 302 to an
+        // internal address; without this the guard on the initial URL is moot.
+        await assertPublicUrl(next);
         redirects += 1;
         current = next;
         continue;
