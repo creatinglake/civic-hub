@@ -57,23 +57,23 @@ real OTP path, so the real auth flow can only be tested on prod).
 - **Copy** — commit `536d3f1`. "pilot" → "pilot program" (welcome banner + About)
   per resident feedback (misread as "plot").
 
-### Still open on the audit §2 punch-list (next session)
-- **SSRF in link-preview redirects** (#10) — code-only. Re-validate on every
-  redirect hop; block link-local/metadata (169.254.x) + RFC1918; check resolved
-  IPs. (News-sync fetcher is already safe — hard-restricted to floydcova.gov.)
-- **HUB_ID consolidation** (#16) — code-only. `"civic-hub-local"` hardcoded in
-  ~7 files → one env-backed `config/hub.ts` (default preserved so it can't break
-  provenance); also `CIVIC_JURISDICTION` is read only by the manifest while
-  emitters default to `"local"`.
-- **RLS on 5 tables** (#8) — needs a migration. `link_previews`,
-  `feedback_submissions`, `wordcloud_submissions`, `deliberation_submissions`,
-  `deliberation_votes` have no RLS (backstop gap; service-role bypasses it, so
-  not an active breach). ENABLE + FORCE for uniform default-deny.
-- **Concurrency atomic-claims** (#7) — the careful one; touches vote-writing.
-  Lazy-close and threshold-activation are check-then-act; add conditional
-  `UPDATE … WHERE status=…` returning affected rows so only the winner
-  emits/spawns. Do last, dev-first, with tests.
-- Smaller: dev `/debug/seed` wipe collides with append-only `review_turns` +
+### Also shipped this session (was "still open") — audit §2 remainder
+- **SSRF** (#10) — commit `754783e`. New `utils/ssrfGuard.ts` resolves the host
+  to its real IP and rejects private/loopback/link-local/metadata ranges (v4+v6);
+  fetcher runs it on the initial URL and every redirect hop. Unit-tested.
+- **HUB_ID** (#16) — commit `88e53d7`. One `config/hub.ts` reads
+  `CIVIC_HUB_ID`/`CIVIC_JURISDICTION` with the same defaults (no behavior change
+  until the env is set). **To stamp Floyd's identity on new events, set
+  CIVIC_HUB_ID + CIVIC_JURISDICTION on the prod deployment.**
+- **RLS** (#8) — commit `ed38bed` (migration `20260704010000_rls_gap_tables.sql`).
+  **⚠ NOT yet applied to any DB** — apply the ENABLE+FORCE statements to dev then
+  prod via SQL editor (safe: service-role bypasses RLS, no client anon path).
+- **Concurrency** (#7) — commit `50570f8`. Proposal close is now a conditional
+  atomic claim (`.eq status 'submitted'`) — fully fixed. Vote close guards on an
+  existing vote_results record (kills duplicate spawn/board-emails; tally is
+  always correct from vote_records). Documented residual: vote support-threshold
+  double-activation (cosmetic duplicate 'started' events) — not addressed.
+- Smaller (still open): dev `/debug/seed` wipe collides with append-only `review_turns` +
   `wordcloud_submissions` FK (dev-only; unblock with
   `TRUNCATE review_turns, process_reviews, wordcloud_submissions CASCADE`);
   dev/prod schema-drift sync (dev was behind on `display_name` migration);
