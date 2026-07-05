@@ -17,7 +17,7 @@ const LINKS_MAX = 5;
 export default function PostAnnouncement() {
   const navigate = useNavigate();
   const { id: editId } = useParams<{ id?: string }>();
-  const { role, canPostAnnouncements, loading: authLoading, user } = useAuth();
+  const { role, canPostAnnouncements, loading: authLoading } = useAuth();
 
   const isEditMode = Boolean(editId);
 
@@ -29,7 +29,7 @@ export default function PostAnnouncement() {
   const [loadingExisting, setLoadingExisting] = useState(isEditMode);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [authorId, setAuthorId] = useState<string | null>(null);
+  const [isOwner, setIsOwner] = useState(false);
 
   // Load the existing announcement when editing.
   useEffect(() => {
@@ -42,7 +42,7 @@ export default function PostAnnouncement() {
         setLinks(a.links);
         setImageUrl(a.image_url);
         setImageAlt(a.image_alt);
-        setAuthorId(a.author_id);
+        setIsOwner(!!a.is_owner);
       })
       .catch((err: Error) => setError(err.message))
       .finally(() => setLoadingExisting(false));
@@ -83,7 +83,6 @@ export default function PostAnnouncement() {
       );
     }
     const isAdmin = role === "admin";
-    const isOwner = user?.id && authorId && user.id === authorId;
     if (!isAdmin && !isOwner) {
       return (
         <div className="page post-announcement-page">

@@ -168,7 +168,23 @@ export async function handleSeed(
     // Clear in dependency order: events first (they reference process IDs),
     // then processes + everything else.
     await clearEvents();
-    await clearProcesses();
+    try {
+      await clearProcesses();
+    } catch (err) {
+      // review_turns is append-only (a BEFORE DELETE trigger blocks row
+      // deletes), so the cascade processes → process_reviews → review_turns
+      // fails once any deliberation has been seeded; wordcloud_submissions
+      // holds an FK too. PostgREST can't issue TRUNCATE, so a dev reseed needs
+      // a one-time manual wipe. Surface that instead of a raw 500.
+      const msg = err instanceof Error ? err.message : String(err);
+      throw new Error(
+        `Could not clear processes (${msg}). review_turns is append-only and ` +
+          `wordcloud_submissions has an FK, so the JS client cannot cascade-` +
+          `delete them. In the Supabase SQL editor (DEV) run:  TRUNCATE ` +
+          `review_turns, process_reviews, wordcloud_submissions CASCADE;  then ` +
+          `re-hit /debug/seed.`,
+      );
+    }
     await clearInputs();
     await clearProposals();
     await clearAuth();

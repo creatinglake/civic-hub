@@ -26,7 +26,7 @@ const REASON_CHIPS = [
 
 export default function AnnouncementPage() {
   const { id } = useParams<{ id: string }>();
-  const { user, isAdmin } = useAuth();
+  const { isAdmin } = useAuth();
 
   const [announcement, setAnnouncement] = useState<Announcement | null>(null);
   const [loading, setLoading] = useState(true);
@@ -85,8 +85,7 @@ export default function AnnouncementPage() {
   const roleLabel =
     announcement.author_role === "board" ? "Board member" : announcement.author_role;
   const isAdminLabel = roleLabel === "Admin";
-  const canEdit =
-    isAdmin || (!!user?.id && user.id === announcement.author_id);
+  const canEdit = isAdmin || !!announcement.is_owner;
   const wasEdited = announcement.edit_count > 0;
   const isRemoved = !!announcement.moderation?.removed;
 

@@ -25,7 +25,11 @@ import {
   getProcess,
   saveProcessState,
 } from "../services/processService.js";
-import { getAuthUser, isAdminEmail } from "../middleware/auth.js";
+import {
+  getAuthUser,
+  isAdminEmail,
+  resolveCallerId,
+} from "../middleware/auth.js";
 import { enrichCreator } from "../services/creatorDisplay.js";
 import { getUserFromToken, getUser } from "../modules/civic.auth/index.js";
 import { extractUrls } from "../modules/civic.link_preview/index.js";
@@ -153,15 +157,15 @@ export async function handleCreateAnnouncement(
     );
     if (allUrls.length > 0) warmPreviewsInBackground(allUrls);
 
-    res.status(201).json(
-      await enrichCreator(
-        getPublicReadModel(state, {
-          id: record.id,
-          createdAt: record.createdAt,
-        }),
-        { rawIdField: "author_id", keepRawId: true },
-      ),
+    const created = await enrichCreator(
+      getPublicReadModel(state, {
+        id: record.id,
+        createdAt: record.createdAt,
+      }),
+      { rawIdField: "author_id" },
     );
+    created.is_owner = true; // the poster is, by definition, the author
+    res.status(201).json(created);
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
     res.status(400).json({ error: message });
@@ -229,16 +233,18 @@ export async function handleUpdateAnnouncement(
       );
       if (allUrls.length > 0) warmPreviewsInBackground(allUrls);
 
-      res.json({
-        ...(await enrichCreator(
-          getPublicReadModel(outcome.state, {
-            id: record.id,
-            createdAt: record.createdAt,
-          }),
-          { rawIdField: "author_id", keepRawId: true },
-        )),
-        edited_fields: outcome.result.edited_fields,
-      });
+      const callerId = await resolveCallerId(req);
+      const updated = await enrichCreator(
+        getPublicReadModel(outcome.state, {
+          id: record.id,
+          createdAt: record.createdAt,
+        }),
+        { rawIdField: "author_id" },
+      );
+      updated.is_owner =
+        !!callerId &&
+        (outcome.state as { author_id?: string }).author_id === callerId;
+      res.json({ ...updated, edited_fields: outcome.result.edited_fields });
     } catch (err) {
       const message = err instanceof Error ? err.message : "Unknown error";
       if (message.startsWith("Not authorized")) {
@@ -291,17 +297,16 @@ export async function handleGetAnnouncement(
     const isAdmin = await callerIsAdmin(req);
     const meta = { id: record.id, createdAt: record.createdAt };
     // Attach resolved author attribution (name + admin flag) from author_id.
-    // author_id is retained (not rendered anywhere) so the announcement page
-    // can still gate the owner's edit affordance (user.id === author_id).
     const model = isAdmin
       ? getAdminReadModel(getState(record), meta)
       : getPublicReadModel(getState(record), meta);
-    res.json(
-      await enrichCreator(model, {
-        rawIdField: "author_id",
-        keepRawId: true,
-      }),
-    );
+    // Owner edit-affordance is a server-computed boolean so the raw author_id
+    // never leaves the API (enrichCreator redacts it — keepRawId omitted).
+    const callerId = await resolveCallerId(req);
+    const enriched = await enrichCreator(model, { rawIdField: "author_id" });
+    enriched.is_owner =
+      !!callerId && (model as { author_id?: string }).author_id === callerId;
+    res.json(enriched);
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
     res.status(500).json({ error: message });

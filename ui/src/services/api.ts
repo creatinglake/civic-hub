@@ -947,9 +947,10 @@ export interface Announcement {
   links: AnnouncementLink[];
   image_url: string | null;
   image_alt: string | null;
-  // Retained only for the owner edit-affordance check (never rendered as a
-  // label). Use creator_name / creator_is_admin for attribution.
-  author_id: string;
+  // Server-computed: true when the authenticated caller is the author. Drives
+  // the edit affordance without exposing the raw author id. Use creator_name /
+  // creator_is_admin for attribution.
+  is_owner?: boolean;
   /** Resolved display name of the author (full_name ?? display_name ?? "Resident"). */
   creator_name: string;
   /** Whether the author is a hub admin. */
