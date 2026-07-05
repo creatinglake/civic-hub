@@ -33,6 +33,29 @@ import type { VoteResultsProcessState } from "../modules/civic.vote_results/inde
 import { emitVoteResultsAggregationCompleted } from "../modules/civic.vote_results/events.js";
 import { getInputsByProcess } from "../modules/civic.input/index.js";
 import { getProcessFactory, getProcessHandler, getActionDispatcher } from "./registry.js";
+import { getDb } from "../db/client.js";
+
+/**
+ * Return the id of an existing civic.vote_results record for this vote, if one
+ * was already spawned. Used to make the close idempotent: the lazy deadline
+ * close is triggered from read paths, so two near-simultaneous reads can both
+ * try to close the same vote. Without this guard that spawns two vote-results
+ * records (two admin queue entries, two board emails). Not a full mutual
+ * exclusion (a sub-100ms double-read can still race between this check and the
+ * spawn), but it collapses the common window; the tally itself is always
+ * correct because it is computed from the append-only vote_records table.
+ */
+async function findExistingVoteResultsId(
+  sourceVoteId: string,
+): Promise<string | null> {
+  const { data } = await getDb()
+    .from("processes")
+    .select("id")
+    .eq("type", "civic.vote_results")
+    .eq("state->>source_process_id", sourceVoteId)
+    .maybeSingle();
+  return data?.id ?? null;
+}
 import { isPastDeadline } from "../utils/deadline.js";
 
 // --- Helpers ---
@@ -247,6 +270,19 @@ const voteProcess: ProcessHandler = {
         break;
       }
       case "process.close": {
+        // Idempotency guard for the lazy-close race: if this vote already has a
+        // vote-results record, the close already ran — don't re-tally, re-emit,
+        // or spawn a duplicate. Just make sure the status reflects closed.
+        const existingResultsId = await findExistingVoteResultsId(process.id);
+        if (existingResultsId) {
+          if (state.status === "active") {
+            state.status = "closed";
+            syncStatus(process, state);
+          }
+          result = { already_closed: true, brief_process_id: existingResultsId };
+          break;
+        }
+
         const methodKey = state.method ?? DEFAULT_METHOD;
         const method = getVotingMethod(methodKey);
         const ballots = (await getBallotChoicesForProcess(process.id)).map(

@@ -343,11 +343,18 @@ export async function closeExpiredProposal(
   if (!isPastDeadline(proposal.closes_at)) return false;
 
   const now = new Date().toISOString();
-  const { error } = await getDb()
+  // Atomic claim: close only if still "submitted". Two concurrent lazy-close
+  // reads previously both passed the status check above and both updated +
+  // emitted, producing duplicate civic.proposal.closed events. The conditional
+  // update means only one wins the row; the loser gets an empty result.
+  const { data: claimed, error } = await getDb()
     .from("proposals")
     .update({ status: "closed" as ProposalStatus, updated_at: now })
-    .eq("id", proposalId);
+    .eq("id", proposalId)
+    .eq("status", "submitted")
+    .select("id");
   if (error) throw new Error(`Proposals: failed to close: ${error.message}`);
+  if (!claimed || claimed.length === 0) return false; // lost the race — no-op
 
   // Keep the canonical processes row in sync (source of truth for the unified
   // read layer). No-op for any legacy proposal without a processes row.
