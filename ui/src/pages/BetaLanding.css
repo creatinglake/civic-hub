@@ -70,6 +70,13 @@
   background: #14304f;
 }
 
+.beta-landing-feedback-note {
+  margin: var(--space-md) 0 0;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  line-height: var(--line-height-base);
+}
+
 /* Secondary CTA — drops the visitor into read-only preview. Outlined so it
    reads as the lower-emphasis option next to the solid "Sign in" button. */
 .beta-landing-browse {

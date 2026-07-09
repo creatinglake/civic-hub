@@ -48,6 +48,10 @@ export default function BetaLanding() {
               Browse the site &rarr;
             </button>
           </div>
+          <p className="beta-landing-feedback-note">
+            Have a look around and tell us what you think — use the{" "}
+            <strong>Feedback</strong> button at the top of any page.
+          </p>
         </div>
 
         <WaitlistForm
