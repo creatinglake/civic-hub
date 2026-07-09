@@ -11,6 +11,7 @@ import {
 } from "../services/auth";
 import { CURRENT_LEGAL_VERSION } from "../config/legal";
 import hub from "../config/hub";
+import WaitlistForm from "./WaitlistForm";
 
 /**
  * Slice 13.10: deferred login() until the residency + legal gate
@@ -60,6 +61,10 @@ export default function AuthModal({ onComplete, onDismiss }: Props) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  // Set when the backend rejects the email because the hub is in private
+  // beta and the address isn't on the allow-list. Instead of a dead-end
+  // error we swap the email form for a waitlist capture.
+  const [betaBlocked, setBetaBlocked] = useState(false);
   const closeRef = useRef<HTMLButtonElement>(null);
 
   // If user is already fully authenticated + resident + named, just complete
@@ -97,7 +102,16 @@ export default function AuthModal({ onComplete, onDismiss }: Props) {
       await requestCode(email.trim());
       setStep("code");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to send code");
+      const message =
+        err instanceof Error ? err.message : "Failed to send code";
+      // The beta allow-list gate rejects unknown emails at the request-code
+      // step (civic.auth requestVerification). Turn that into a waitlist
+      // invitation rather than a red error the visitor can't act on.
+      if (/private beta/i.test(message)) {
+        setBetaBlocked(true);
+      } else {
+        setError(message);
+      }
     } finally {
       setLoading(false);
     }
@@ -273,8 +287,21 @@ export default function AuthModal({ onComplete, onDismiss }: Props) {
           &times;
         </button>
 
+        {/* Private-beta fallback: the entered email isn't on the allow-list.
+            Offer the waitlist instead of a dead-end error. */}
+        {step === "email" && betaBlocked && (
+          <div className="auth-beta-blocked">
+            <h2 className="auth-title">We're in private beta</h2>
+            <p className="auth-description">
+              {hub.name} isn't open for general sign-ups yet. Join the waitlist
+              and we'll email you the moment access opens up.
+            </p>
+            <WaitlistForm initialEmail={email} />
+          </div>
+        )}
+
         {/* Step 1: Email */}
-        {step === "email" && (
+        {step === "email" && !betaBlocked && (
           <form onSubmit={handleRequestCode}>
             <h2 className="auth-title">Create an account to participate</h2>
             <p className="auth-description">

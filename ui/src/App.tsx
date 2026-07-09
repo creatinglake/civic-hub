@@ -44,6 +44,8 @@ import WordCloud from "./pages/WordCloud";
 import CreateWordCloud from "./pages/CreateWordCloud";
 import IntroPopup, { hasSeenIntro } from "./components/IntroPopup";
 import ReAcceptModal from "./components/ReAcceptModal";
+import PreviewBanner from "./components/PreviewBanner";
+import { usePreviewMode } from "./hooks/usePreviewMode";
 import "./App.css";
 
 // Routes that show the hub banner above the nav. Detail/action pages
@@ -68,8 +70,14 @@ function BannerSlot() {
 function AppContent() {
   const [showIntro, setShowIntro] = useState(() => !hasSeenIntro());
   const { user, loading } = useAuth();
+  const preview = usePreviewMode();
 
-  if (hub.beta_mode && !user && !loading) {
+  // Private-beta splash. A logged-out visitor sees BetaLanding until they opt
+  // into read-only preview ("Browse the site"). The backend allow-list is the
+  // real account gate; `preview` only relaxes this front-end wall so people
+  // can look around. Once in preview we fall through to the full app below,
+  // where PreviewBanner keeps the beta state visible.
+  if (hub.beta_mode && !user && !loading && !preview) {
     return (
       <div className="app">
         <Nav />
@@ -90,9 +98,18 @@ function AppContent() {
     );
   }
 
+  // While a logged-out visitor browses in beta preview, the persistent banner
+  // is enough of an onboarding cue — suppress the intro popup so we don't stack
+  // two overlays on top of the read-only experience.
+  const inBetaPreview = hub.beta_mode && !user;
+
   return (
     <div className="app">
-      {showIntro && <IntroPopup onDismiss={() => setShowIntro(false)} />}
+      {showIntro && !inBetaPreview && (
+        <IntroPopup onDismiss={() => setShowIntro(false)} />
+      )}
+
+      {inBetaPreview && <PreviewBanner />}
 
       <Nav />
       <WordcloudTeaser />

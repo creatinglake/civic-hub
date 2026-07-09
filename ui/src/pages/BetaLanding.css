@@ -44,6 +44,12 @@
   color: var(--color-text-muted);
 }
 
+.beta-landing-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+}
+
 .beta-landing-signin {
   display: inline-flex;
   align-items: center;
@@ -62,6 +68,28 @@
 
 .beta-landing-signin:hover {
   background: #14304f;
+}
+
+/* Secondary CTA — drops the visitor into read-only preview. Outlined so it
+   reads as the lower-emphasis option next to the solid "Sign in" button. */
+.beta-landing-browse {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: var(--space-sm) var(--space-lg);
+  background: transparent;
+  color: var(--pill-vote-fg, #1e3a5f);
+  border: 1px solid var(--pill-vote-fg, #1e3a5f);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-body);
+  font-size: var(--font-size-base);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.beta-landing-browse:hover {
+  background: var(--pill-vote-bg, #e7eef7);
 }
 
 /* --- Waitlist form --- */
