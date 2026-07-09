@@ -94,8 +94,14 @@ export async function submitFeedback(
   }
   const submission = rowToSubmission(data);
 
-  // Best-effort operator notification. Never blocks success.
-  void notifyOperator(submission).catch((err) => {
+  // Operator notification. This MUST be awaited: on serverless (Vercel)
+  // the function is frozen the moment the HTTP response is flushed, so a
+  // fire-and-forget send is killed mid-request and the email silently
+  // never goes out (submission still persists — which is exactly the
+  // "saved but no email" symptom this fixes). Still best-effort: a send
+  // failure is caught and logged, never thrown, so the already-persisted
+  // submission is reported as success.
+  await notifyOperator(submission).catch((err) => {
     console.warn(
       `[feedback] Operator notification failed for ${submission.id}: ${
         err instanceof Error ? err.message : String(err)
